@@ -1,6 +1,8 @@
 # TracePilot AI
 
-An evidence-driven software reliability and security investigation agent, built for the Meta Global AI Developer Hackathon (Indie Developer track).
+An evidence-driven software reliability and security investigation agent, built for the Meta Global AI Developer Hackathon (Indie Developer track, problem statement: Push the Frontier).
+
+> Status: project started during the hackathon building period (Oct 27 to Nov 4, 2026). See `BUILD_LOG.md` for what was built and when.
 
 ## The problem
 
@@ -8,19 +10,23 @@ Developers spend hours investigating failures: reading logs, replaying API calls
 
 ## What TracePilot does
 
-1. **Ingest evidence**: application logs, API responses, error traces, and relevant source files.
-2. **Correlate**: links log lines, failing requests, and code paths.
-3. **Hypothesize**: produces ranked, testable root-cause hypotheses with the evidence behind each.
-4. **Check**: proposes diagnostic steps and runs only authorized, read-only checks in a sandbox.
-5. **Verify**: applies a proposed fix in the sandbox and confirms the failure is gone.
-6. **Report**: outputs a clear investigation report with evidence, root cause, fix, and verification result.
+1. **Ingest evidence:** application logs, API responses, error traces, and relevant source files.
+2. **Correlate:** links log lines, failing requests, and code paths.
+3. **Hypothesize:** produces ranked, testable root-cause hypotheses with the evidence behind each.
+4. **Check:** proposes diagnostic steps and runs only authorized, read-only checks in a sandbox.
+5. **Verify:** applies a proposed fix in the sandbox and confirms the failure is gone.
+6. **Report:** outputs a clear investigation report with evidence, root cause, fix, and verification result.
+
+## Meta tooling
+
+TracePilot's agent loop runs on Meta's models through the Meta Model API: multi-step reasoning, tool calling, and structured output. The exact models used will be listed here once chosen.
 
 ## Tech stack
 
 - Backend: Python, FastAPI
 - Frontend: Next.js
-- Models: Meta Model API (model choice to be confirmed from the docs)
-- Sandbox: containerized, no access to real production systems
+- Models: Meta Model API
+- Sandbox: containerized, with no access to real production systems
 
 ## Safety principles
 
@@ -29,7 +35,7 @@ Developers spend hours investigating failures: reading logs, replaying API calls
 - Fixes are verified before being suggested as final.
 - API keys are read from environment variables and never committed.
 
-## Setup (to be completed)
+## Setup (to be completed during the build)
 
 ```bash
 # Backend
@@ -44,31 +50,28 @@ npm install
 npm run dev
 ```
 
-## 10-day build plan
+## Build plan
 
 | Day | Goal |
 |---|---|
-| 1 | Test the API with one call. Pick the models. Create repo structure. Define the sample "broken app" for the demo. |
-| 2 | Build the evidence ingestion (logs, traces, source files). |
-| 3 | Build the hypothesis generator with a structured output schema. |
-| 4 | Build the sandbox check runner (read-only, logged). |
-| 5 | Connect the loop: hypothesis, check, update confidence. |
-| 6 | Build the fix and verify step with automated tests. |
-| 7 | Build the Next.js UI: evidence view, hypotheses, report. |
-| 8 | Polish the demo scenario. Add error handling and tests. |
-| 9 | Record the demo video. Write the submission text. |
-| 10 | Final checks, upload to the submission portal, submit early. |
+| Oct 27 | Foundation: first Meta API call, repo structure, sandbox, sample app |
+| Oct 28 | Evidence ingestion and tools |
+| Oct 29 | Hypothesis generation with structured output |
+| Oct 30 | Sandbox check runner with tool calling |
+| Oct 31 | Agent loop: hypothesis, check, update, next step |
+| Nov 1 | Fix and verify step; security scenario |
+| Nov 2 | Next.js UI: live view and report |
+| Nov 3 | Hardening, tests, feature freeze, backup demo |
+| Nov 4 | Final demo recording and submission |
 
-## Demo scenario (MVP)
+## Demo scenarios
 
-A small sample API with a seeded bug (for example, an authorization check that returns 500 on one route). TracePilot reads the logs and trace, forms hypotheses, runs a check, applies a fix, and shows the verified result.
+- A sample API with a seeded reliability bug (500 error from a bad null check).
+- A sample API with a seeded security bug (missing authorization check).
 
-## Judging criteria alignment
+## What was built during the hackathon
 
-- **Impact (30%)**: saves developer time on real failures and security issues.
-- **Use of Meta AI tooling (25%)**: tool calling, structured output, and multi-step reasoning, not a basic chat wrapper.
-- **Technical depth (20%)**: evidence correlation, sandboxed execution, verification loop.
-- **Demo (25%)**: one tight, reliable end-to-end flow.
+Everything in this repository was built during the hackathon building period. Third-party libraries are listed in the dependency files and credited in the submission.
 
 ## License
 
