@@ -19,7 +19,7 @@ Developers spend hours investigating failures: reading logs, replaying API calls
 
 ## Meta tooling
 
-TracePilot's agent loop runs on Meta's models through the Meta Model API: multi-step reasoning, tool calling, and structured output. The exact models used will be listed here once chosen.
+TracePilot's agent loop runs on Meta's models through the Meta Model API: multi-step reasoning, tool calling, and structured output. It currently uses `muse-spark-1.3` through the Responses API.
 
 ## Tech stack
 
@@ -39,10 +39,11 @@ TracePilot's agent loop runs on Meta's models through the Meta Model API: multi-
 
 ```bash
 # Backend
-cd backend
-pip install -r requirements.txt
-export META_API_KEY="<your key>"   # never commit this
-uvicorn app.main:app --reload
+python -m venv .venv
+.venv/Scripts/python -m pip install -r backend/requirements.txt   # .venv/bin/python on macOS/Linux
+cp .env.example .env          # then set MODEL_API_KEY in .env (never commit it)
+.venv/Scripts/python backend/scripts/smoke_test.py   # checks the Meta Model API
+cd backend && ../.venv/Scripts/uvicorn app.main:app --reload
 
 # Frontend
 cd frontend
