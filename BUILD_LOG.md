@@ -17,3 +17,15 @@ Everything below was built during the hackathon building period (Oct 27 – Nov 
 - Smoke test passed against the Meta Model API: basic call, tool calling (`read_log`), and structured output.
   Notable: from logs alone, the model's first hypothesis blamed a missing order. The real cause is a missing coupon.
   That's exactly why TracePilot must check hypotheses against code and tests before trusting them.
+
+**Evidence tools** (`backend/app/tools.py`), all scoped to the target workspace:
+
+- `read_log`: filtered JSON log entries (by level, path, request id).
+- `read_file`: source with line numbers, or a directory listing.
+- `send_request`: in-process HTTP requests to the target app, so nothing leaves the machine.
+- `run_tests`: runs pytest for the whole suite or one test.
+
+Guardrails: no reads outside the workspace or of `.env` files, no external URLs, test selectors validated against shell injection, and local absolute paths scrubbed from all output before it reaches the model. There are 21 unit tests (`backend/tests/test_tools.py`), including escape attempts.
+
+First model-driven run (`backend/scripts/try_tools.py`): in 4 steps the model found both planted bugs.
+For each one it gave the root cause with evidence (log entries, code line numbers, a reproduced request, the failing test) and proposed a fix, without modifying code.
