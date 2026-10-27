@@ -14,3 +14,6 @@ Everything below was built during the hackathon building period (Oct 27 – Nov 
   - reliability: `compute_total` crashes with a 500 on orders without a coupon
 - `sample_app/tests/`: 5 tests, 2 failing on purpose (one per bug). TracePilot will prove its fixes by turning them green.
 - `sample_app/simulate_traffic.py`: generates realistic JSON-line logs, including the 500s and the cross-user reads.
+- Smoke test passed against the Meta Model API: basic call, tool calling (`read_log`), and structured output.
+  Notable: from logs alone, the model's first hypothesis blamed a missing order. The real cause is a missing coupon.
+  That's exactly why TracePilot must check hypotheses against code and tests before trusting them.
