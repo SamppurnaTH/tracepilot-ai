@@ -140,6 +140,17 @@ class Workspace:
         )
         return {"exit_code": result.exit_code, "summary": summary, "output": _truncate(output[-MAX_OUTPUT_CHARS:])}
 
+    def test_outcomes(self) -> dict[str, str]:
+        """Per-test outcomes ({node_id: "passed" | "failed" | "error"}), for harness-side verification."""
+        args = ["-m", "pytest", "-q", "-rA", "--tb=no", "-p", "no:cacheprovider"]
+        result = self.sandbox.python(args, timeout=180)
+        outcomes = {}
+        for line in (result.stdout + result.stderr).splitlines():
+            match = re.match(r"^(PASSED|FAILED|ERROR) (\S+)", line)
+            if match:
+                outcomes[match.group(2)] = match.group(1).lower()
+        return outcomes
+
     # --- fix tools ----------------------------------------------------------
 
     def edit_file(self, path: str, old: str, new: str) -> dict:

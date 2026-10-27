@@ -47,7 +47,7 @@ cp .env.example .env          # then set MODEL_API_KEY in .env (never commit it)
 .venv/Scripts/python backend/scripts/smoke_test.py   # checks the Meta Model API
 docker build -t tracepilot-sandbox:1 sandbox          # optional; built automatically on first use
 .venv/Scripts/python demo/simulate_traffic.py        # generate synthetic logs for the demo app
-.venv/Scripts/python backend/scripts/try_tools.py    # let the agent investigate the demo app
+.venv/Scripts/python backend/scripts/investigate.py  # full run: investigate -> fix -> verify -> report
 cd backend && ../.venv/Scripts/python -m pytest && cd ..   # backend tests
 cd backend && ../.venv/Scripts/uvicorn app.main:app --reload
 

@@ -41,3 +41,19 @@ For each one it gave the root cause with evidence (log entries, code line number
 
 **Demo integrity fix:** in a Docker run, the agent read `sample_app/README.md`, which described the planted bugs: an answer key.
 The answer key and traffic generator moved to `demo/`, outside the sandbox. App docstrings are now neutral, and a regression test fails if hint words appear anywhere in the sandbox copy.
+
+**Agent loop** (`backend/app/agent.py`): investigate → fix → verify → report.
+
+- **Hypotheses are first-class.** The model must register each guess with `propose_hypothesis` and settle it with `resolve_hypothesis` (confirmed or rejected). The harness refuses a confirmation that cites no evidence.
+- **Phase-gated tools.** Investigation can read, request and test, but not edit. The fix phase can edit the sandbox copy only. Edits under `tests/` are blocked, because tests are the ground truth.
+- **The harness decides verification, not the model.** It compares per-test outcomes before and after. A fix is verified only if every failing test now passes, nothing that passed now fails, and no test disappeared. On failure, the model gets the failing tests and one more attempt.
+- **Robustness:** step budgets per phase (the model is then forced to summarize), a nudge on repeated identical calls, and token and call accounting.
+- **Final report** via structured output (issues with category, severity, root cause, evidence, fix and linked hypotheses), merged with harness facts: hypotheses, diff and verification.
+- **Every step is emitted as an event** (`hypothesis`, `tool_call`, `patch`, `verification`, …) for the live UI and for replay. `backend/scripts/investigate.py` streams them and saves the full run to `runs/`.
+- Tests: 9 agent tests with a scripted fake model (no API calls), covering a full verified run, blocked test edits followed by a retry, skipping the fix with no confirmed cause, refusing an evidence-free confirmation, the repeat nudge and the step budget. 48 backend tests in total.
+
+**First real end-to-end run** (`muse-spark-1.3`, Docker sandbox, about 4 minutes):
+the agent proposed H1 (coupon) and H2 (missing ownership check). It read logs and code, reproduced both bugs (including a control request to the correctly protected `/total` endpoint), and confirmed both with evidence.
+It patched `compute_total` and `read_order`, and the harness verified the fix: **3 passed / 2 failed → 5 passed, 0 regressions**. It used 14 model calls, 16 tool calls and about 127K tokens.
+
+**Muse Spark Open via Baseten:** provider support and `backend/scripts/smoke_test_baseten.py` are in place. A live test is pending a reissued key; the first key returned 403.

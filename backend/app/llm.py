@@ -1,13 +1,13 @@
-"""Model client. All model calls go through here so the provider can be swapped later."""
+"""Model client. All model calls go through here so the provider can be swapped."""
 
 from openai import OpenAI
 
 from .config import Settings, get_settings
 
 
-def get_client(settings: Settings | None = None) -> tuple[OpenAI, str]:
-    """Return an OpenAI-compatible client for the Meta Model API and the model id to use."""
-    settings = settings or get_settings()
+def get_client(provider: str = "meta", settings: Settings | None = None) -> tuple[OpenAI, str]:
+    """Return an OpenAI-compatible client and the model id for a provider ("meta" or "baseten")."""
+    settings = settings or get_settings(provider)
     # Retries cover transient 429/5xx errors; the timeout stops a stuck call from hanging an investigation.
-    client = OpenAI(base_url=settings.meta_base_url, api_key=settings.model_api_key, max_retries=3, timeout=180)
-    return client, settings.meta_model
+    client = OpenAI(base_url=settings.base_url, api_key=settings.api_key, max_retries=3, timeout=180)
+    return client, settings.model
