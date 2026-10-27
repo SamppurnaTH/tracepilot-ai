@@ -12,7 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import REPO_ROOT  # noqa: E402
 from app.llm import get_client  # noqa: E402
-from app.tools import TOOL_SPECS, Workspace, execute_tool  # noqa: E402
+from app.sandbox import Sandbox  # noqa: E402
+from app.tools import INVESTIGATION_TOOLS, Workspace, execute_tool  # noqa: E402
 
 MAX_STEPS = 12
 
@@ -27,24 +28,26 @@ Do not modify any code. Finish with a short report: for each issue, the root cau
 
 def main() -> None:
     client, model = get_client()
-    workspace = Workspace(REPO_ROOT / "sample_app")
+    with Sandbox(REPO_ROOT / "sample_app") as sandbox:
+        print(f"Sandbox isolation: {sandbox.isolation}\n")
+        workspace = Workspace(sandbox)
 
-    response = client.responses.create(model=model, input=TASK, tools=TOOL_SPECS)
-    for step in range(1, MAX_STEPS + 1):
-        calls = [item for item in response.output if item.type == "function_call"]
-        if not calls:
-            break
-        outputs = []
-        for call in calls:
-            result = execute_tool(workspace, call.name, call.arguments)
-            preview = result if len(result) < 160 else result[:160] + "..."
-            print(f"[step {step}] {call.name}({call.arguments})\n         -> {preview}")
-            outputs.append({"type": "function_call_output", "call_id": call.call_id, "output": result})
-        response = client.responses.create(
-            model=model, input=outputs, previous_response_id=response.id, tools=TOOL_SPECS
-        )
-    else:
-        print(f"\nStopped after {MAX_STEPS} steps.")
+        response = client.responses.create(model=model, input=TASK, tools=INVESTIGATION_TOOLS)
+        for step in range(1, MAX_STEPS + 1):
+            calls = [item for item in response.output if item.type == "function_call"]
+            if not calls:
+                break
+            outputs = []
+            for call in calls:
+                result = execute_tool(workspace, call.name, call.arguments)
+                preview = result if len(result) < 160 else result[:160] + "..."
+                print(f"[step {step}] {call.name}({call.arguments})\n         -> {preview}")
+                outputs.append({"type": "function_call_output", "call_id": call.call_id, "output": result})
+            response = client.responses.create(
+                model=model, input=outputs, previous_response_id=response.id, tools=INVESTIGATION_TOOLS
+            )
+        else:
+            print(f"\nStopped after {MAX_STEPS} steps.")
 
     print("\n=== Report ===\n")
     print(response.output_text)

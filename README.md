@@ -26,12 +26,14 @@ TracePilot's agent loop runs on Meta's models through the Meta Model API: multi-
 - Backend: Python, FastAPI
 - Frontend: Next.js
 - Models: Meta Model API
-- Sandbox: containerized, with no access to real production systems
+- Sandbox: Docker container per investigation, running a disposable copy of the target app, with a process fallback when Docker isn't available
 
 ## Safety principles
 
 - Only investigates systems the user owns or is authorized to test.
-- All checks run in a controlled sandbox and are logged.
+- All checks run in a sandbox: a disposable copy of the app in a Docker container with no network, a read-only root filesystem, no capabilities, a non-root user, and CPU, memory, PID and time limits. The original code is never modified.
+- Tools are phase-gated: the investigation phase can read and test, but only the fix phase can edit, and only the sandbox copy.
+- Secrets are stripped from the sandbox environment, and local paths are scrubbed from everything sent to the model.
 - Fixes are verified before being suggested as final.
 - API keys are read from environment variables and never committed.
 
@@ -43,6 +45,10 @@ python -m venv .venv
 .venv/Scripts/python -m pip install -r backend/requirements.txt   # .venv/bin/python on macOS/Linux
 cp .env.example .env          # then set MODEL_API_KEY in .env (never commit it)
 .venv/Scripts/python backend/scripts/smoke_test.py   # checks the Meta Model API
+docker build -t tracepilot-sandbox:1 sandbox          # optional; built automatically on first use
+.venv/Scripts/python demo/simulate_traffic.py        # generate synthetic logs for the demo app
+.venv/Scripts/python backend/scripts/try_tools.py    # let the agent investigate the demo app
+cd backend && ../.venv/Scripts/python -m pytest && cd ..   # backend tests
 cd backend && ../.venv/Scripts/uvicorn app.main:app --reload
 
 # Frontend
@@ -69,6 +75,8 @@ npm run dev
 
 - A sample API with a seeded reliability bug (500 error from a bad null check).
 - A sample API with a seeded security bug (missing authorization check).
+
+The target app is `sample_app/`. The answer key and the traffic generator live in `demo/`, outside the sandbox, so the agent investigates without hints.
 
 ## What was built during the hackathon
 

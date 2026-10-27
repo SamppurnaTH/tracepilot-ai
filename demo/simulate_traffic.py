@@ -1,12 +1,19 @@
 """Generate synthetic traffic against the Orders API so it writes realistic logs.
 
-Run from sample_app/:  ../.venv/Scripts/python simulate_traffic.py
+Run from the repo root:  .venv/Scripts/python demo/simulate_traffic.py
 Output: sample_app/logs/orders_api.log (JSON lines)
+
+Kept outside sample_app/ so the agent never sees these comments while investigating.
 """
 
-from fastapi.testclient import TestClient
+import sys
+from pathlib import Path
 
-from orders_api.app import LOG_FILE, app
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "sample_app"))
+
+from fastapi.testclient import TestClient  # noqa: E402
+
+from orders_api.app import LOG_FILE, app  # noqa: E402
 
 ALICE = {"Authorization": "Bearer token-alice"}
 BOB = {"Authorization": "Bearer token-bob"}

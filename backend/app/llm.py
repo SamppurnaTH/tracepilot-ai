@@ -8,5 +8,6 @@ from .config import Settings, get_settings
 def get_client(settings: Settings | None = None) -> tuple[OpenAI, str]:
     """Return an OpenAI-compatible client for the Meta Model API and the model id to use."""
     settings = settings or get_settings()
-    client = OpenAI(base_url=settings.meta_base_url, api_key=settings.model_api_key)
+    # Retries cover transient 429/5xx errors; the timeout stops a stuck call from hanging an investigation.
+    client = OpenAI(base_url=settings.meta_base_url, api_key=settings.model_api_key, max_retries=3, timeout=180)
     return client, settings.meta_model

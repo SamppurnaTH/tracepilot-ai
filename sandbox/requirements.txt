@@ -1,0 +1,4 @@
+# Dependencies of the application under investigation (sample_app).
+fastapi==0.115.12
+httpx==0.28.1
+pytest==8.3.5

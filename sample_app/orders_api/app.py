@@ -1,8 +1,4 @@
-"""Orders API: the demo target that TracePilot investigates.
-
-This service contains two deliberately planted bugs (see sample_app/README.md).
-All data is synthetic.
-"""
+"""Orders API: read orders and their totals. All data is synthetic."""
 
 import json
 import logging

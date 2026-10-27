@@ -29,3 +29,15 @@ Guardrails: no reads outside the workspace or of `.env` files, no external URLs,
 
 First model-driven run (`backend/scripts/try_tools.py`): in 4 steps the model found both planted bugs.
 For each one it gave the root cause with evidence (log entries, code line numbers, a reproduced request, the failing test) and proposed a fix, without modifying code.
+
+**Sandbox** (`backend/app/sandbox.py`, `sandbox/Dockerfile`):
+
+- Each investigation gets a disposable copy of the target app, deleted afterwards; the original is never modified.
+- Docker isolation: one container per sandbox with `--network none`, a read-only root filesystem, `--cap-drop ALL`, `no-new-privileges`, a non-root user, and limits of 512 MB memory, 1 CPU and 128 PIDs. A timed-out command gets a fresh container.
+- Falls back to process isolation when Docker isn't available. Secrets are stripped from the sandbox environment in both modes.
+- All tools now run against the sandbox. New fix-phase tools: `edit_file` (exact, unique-match replacement in the copy only) and `show_diff`. They're phase-gated, so the investigation phase can't edit.
+- The model client now retries transient errors and has a request timeout.
+- Tests: 39 passing. They cover a fix verified end to end (both fixes applied, then 5/5 sample tests pass with the original untouched), patched code visible to requests, edit guards, secret isolation, timeouts, and Docker checks (no network, read-only root filesystem, non-root user).
+
+**Demo integrity fix:** in a Docker run, the agent read `sample_app/README.md`, which described the planted bugs: an answer key.
+The answer key and traffic generator moved to `demo/`, outside the sandbox. App docstrings are now neutral, and a regression test fails if hint words appear anywhere in the sandbox copy.

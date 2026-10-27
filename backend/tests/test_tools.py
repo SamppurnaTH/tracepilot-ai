@@ -1,24 +1,14 @@
 import json
-import subprocess
-import sys
+from pathlib import Path
 
 import pytest
 
 from app.config import REPO_ROOT
-from app.tools import Workspace, execute_tool
-
-SAMPLE_APP = REPO_ROOT / "sample_app"
+from app.tools import FIX_TOOLS, INVESTIGATION_TOOLS, Workspace, execute_tool
 
 
-@pytest.fixture(scope="module")
-def ws() -> Workspace:
-    # Fresh synthetic logs so read_log has known content.
-    subprocess.run([sys.executable, "simulate_traffic.py"], cwd=SAMPLE_APP, check=True, capture_output=True)
-    return Workspace(SAMPLE_APP)
-
-
-def call(ws: Workspace, name: str, **args) -> dict:
-    return json.loads(execute_tool(ws, name, json.dumps(args)))
+def call(ws: Workspace, name: str, allowed=INVESTIGATION_TOOLS, **args) -> dict:
+    return json.loads(execute_tool(ws, name, json.dumps(args), allowed=allowed))
 
 
 # --- read_log -------------------------------------------------------------
@@ -33,8 +23,9 @@ def test_read_log_filters_errors(ws):
 
 def test_read_log_scrubs_local_paths(ws):
     text = json.dumps(call(ws, "read_log", level="ERROR"))
-    assert str(REPO_ROOT) not in text
-    assert str(REPO_ROOT).replace("\\", "\\\\") not in text
+    for base in (str(REPO_ROOT), str(Path.home()), str(ws.root)):
+        assert base not in text
+        assert base.replace("\\", "\\\\") not in text
 
 
 def test_read_log_rejects_bad_service_name(ws):
@@ -56,14 +47,14 @@ def test_read_file_lists_directory(ws):
     assert "tests/test_orders.py" in files
 
 
-@pytest.mark.parametrize("path", ["../.env", "../backend/app/config.py", "..", "C:/Windows/win.ini"])
+@pytest.mark.parametrize("path", ["../.env", "../../backend/app/config.py", "..", "C:/Windows/win.ini"])
 def test_read_file_blocks_escape(ws, path):
     assert "error" in call(ws, "read_file", path=path)
 
 
-def test_read_file_blocks_env_inside_workspace(ws, tmp_path):
-    (tmp_path / ".env").write_text("MODEL_API_KEY=secret")
-    assert "error" in call(Workspace(tmp_path), "read_file", path=".env")
+def test_read_file_blocks_env_inside_workspace(ws):
+    (ws.root / ".env").write_text("MODEL_API_KEY=secret")
+    assert "error" in call(ws, "read_file", path=".env")
 
 
 # --- send_request ---------------------------------------------------------
@@ -104,7 +95,19 @@ def test_run_tests_rejects_unsafe_selector(ws, selector):
     assert "error" in call(ws, "run_tests", selector=selector)
 
 
-# --- dispatcher -----------------------------------------------------------
+# --- phases and dispatcher -----------------------------------------------
+
+
+def test_investigation_phase_cannot_edit(ws):
+    result = call(ws, "edit_file", path="orders_api/app.py", old="a", new="b")
+    assert result == {"error": "tool not available: edit_file"}
+
+
+def test_fix_phase_can_edit_and_diff(ws):
+    allowed = INVESTIGATION_TOOLS + FIX_TOOLS
+    old, new = 'title="Orders API (sample)"', 'title="Orders API (patched)"'
+    assert "edited" in call(ws, "edit_file", allowed, path="orders_api/app.py", old=old, new=new)
+    assert f"+app = FastAPI({new})" in call(ws, "show_diff", allowed)["diff"]
 
 
 def test_unknown_tool(ws):
@@ -112,4 +115,4 @@ def test_unknown_tool(ws):
 
 
 def test_private_methods_are_not_tools(ws):
-    assert "error" in call(ws, "_resolve", rel_path="..")
+    assert "error" in call(ws, "_scrub_bases")

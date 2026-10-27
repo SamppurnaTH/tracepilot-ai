@@ -1,8 +1,4 @@
-"""Tests for the sample Orders API.
-
-Two of these fail on purpose until the planted bugs are fixed;
-TracePilot uses them to verify its fixes.
-"""
+"""Tests for the Orders API."""
 
 from fastapi.testclient import TestClient
 
