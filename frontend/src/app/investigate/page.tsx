@@ -130,16 +130,6 @@ export default function Investigate() {
         </div>
       </div>
 
-      {live === false && (
-        <div className={cx(s.notice, s.noticeWarn)}>
-          <Icon name="bulb" size={18} />
-          <span>
-            This hosted demo has no backend, so it can&apos;t run new investigations. Run TracePilot locally (<Link href="/docs#getting-started">getting started</Link>
-            ) or use the CLI on your project. You can still pick an example below to watch its recorded run.
-          </span>
-        </div>
-      )}
-
       <section className={s.panel} aria-label="New investigation">
         <div className={s.tabs} role="tablist" aria-label="Project source">
           {(
