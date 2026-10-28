@@ -37,12 +37,12 @@ export default function Landing() {
               </span>
             </Link>
             <div className={s.links}>
-              <Link href="/product">Product</Link>
-              <Link href="/product#how">How it works</Link>
-              <Link href="/examples">Examples</Link>
-              <Link href="/results">Results</Link>
+              <Link href="/app/product">Product</Link>
+              <Link href="/app/product#how">How it works</Link>
+              <Link href="/app/examples">Examples</Link>
+              <Link href="/app/results">Results</Link>
               <Link href="/docs">Docs</Link>
-              <Link href="/examples" className={s.cta}>
+              <Link href="/app/examples" className={s.cta}>
                 Run live demo
               </Link>
             </div>
@@ -56,10 +56,10 @@ export default function Landing() {
                 TracePilot AI automatically investigates application issues, finds the root cause, generates a fix, verifies it with tests, and tells you exactly what to do.
               </p>
               <div className={s.heroActions}>
-                <Link href="/run?id=checkout&replay=1" className={s.cta}>
+                <Link href="/app/run?id=checkout&replay=1" className={s.cta}>
                   Watch demo <Icon name="arrowRight" size={16} />
                 </Link>
-                <Link href="/examples" className={s.ghost}>
+                <Link href="/app/examples" className={s.ghost}>
                   View example scenarios
                 </Link>
               </div>
@@ -114,10 +114,10 @@ export default function Landing() {
             <p className={s.bandText}>Watch each step, or compare TracePilot with a plain agent on the same model.</p>
           </div>
           <div className={a.actions}>
-            <Link href="/examples" className={s.cta}>
+            <Link href="/app/examples" className={s.cta}>
               Explore scenarios <Icon name="arrowRight" size={16} />
             </Link>
-            <Link href="/results" className={s.ghost}>
+            <Link href="/app/results" className={s.ghost}>
               See the comparison
             </Link>
           </div>

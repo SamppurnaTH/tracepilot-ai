@@ -22,7 +22,7 @@ echo "==> Service user and code in $APP"
 id tracepilot >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin tracepilot
 usermod -aG docker tracepilot
 mkdir -p "$APP"
-rsync -a --delete --exclude .git --exclude .env --exclude .venv --exclude runs --exclude frontend --exclude node_modules "$SRC/" "$APP/"
+rsync -a --delete --exclude .git --exclude .env --exclude .venv --exclude runs --exclude frontend --exclude node_modules --exclude releases --exclude current --exclude deploy-backups "$SRC/" "$APP/"
 python3 -m venv "$APP/.venv"
 "$APP/.venv/bin/pip" install -q --upgrade pip
 "$APP/.venv/bin/pip" install -q -r "$APP/backend/requirements.txt"

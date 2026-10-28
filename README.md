@@ -268,3 +268,30 @@ Everything in this repository was built during the hackathon building period. Th
 ## License
 
 [MIT](LICENSE)
+
+
+### Admin Console and user workspace
+
+`/admin` is the administration portal. `/app` is the authenticated investigation workspace.
+Administrators manage accounts, workspace identity, permissions and audit logs. Operators have
+operational access; viewers can read investigations and reports but cannot start or stop runs.
+User workspace access is a separate per-account grant. Existing administrators default to no
+workspace access; grant it under **Roles & permissions** when needed.
+
+All investigation, event-stream and saved-run APIs now require `Authorization: Bearer <token>`.
+Obtain a token from `POST /api/admin/login` using an account configured by the administrator.
+Public `/health`, scenario descriptions and bundled benchmark recordings remain readable.
+Tokens are kept in browser memory, shared across portal navigation, and cleared on reload or
+sign-out. Settings and the latest 200 audit events are available in the console; account changes
+revoke the affected account's sessions. Audit storage persists with the account database.
+
+The first administrator is bootstrapped from `TRACEPILOT_ADMIN_EMAIL` and
+`TRACEPILOT_ADMIN_PASSWORD` (at least 12 characters) only when the account database is empty.
+Back up the database configured by `TRACEPILOT_ADMIN_DB`; it includes accounts, settings and audit history.
+
+### Continuous delivery
+
+Pull requests and pushes to `main` run backend tests and frontend production checks in GitHub Actions.
+After the one-time EC2 bootstrap, passing pushes automatically deploy the tested backend revision,
+preserve server configuration and data, and verify `/health` before declaring success.
+See [deployment setup and recovery](deploy/README.md). Frontend delivery remains with Vercel's Git integration.

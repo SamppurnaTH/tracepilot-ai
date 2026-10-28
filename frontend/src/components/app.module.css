@@ -1303,3 +1303,6 @@
 .dropCompact { justify-items: start; }
 .dropCompact .btn { justify-self: end; }
 @media(max-width:1100px) { .dropCompact .btn { justify-self: start; } }
+.workspaceIdentity { display:flex; justify-content:flex-end; gap:20px; flex-wrap:wrap; padding:12px 36px 0; font-size:11px; color:#7a87a1; }
+.workspaceIdentity a { display:inline-flex; align-items:center; gap:7px; text-decoration:none; color:#7059cb; }
+@media(max-width:640px) { .workspaceIdentity { padding-inline:16px; justify-content:space-between; gap:10px; } }

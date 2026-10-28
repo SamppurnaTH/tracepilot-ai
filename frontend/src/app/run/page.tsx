@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -17,6 +18,7 @@ import { useData } from "@/lib/useData";
 
 function RunPage() {
   const params = useSearchParams();
+  const { user } = useAuth();
   const id = params.get("id");
   const liveId = params.get("live");
   const saved = params.get("saved");
@@ -99,7 +101,7 @@ function RunPage() {
           )}
         </>
       )}
-      {running && (
+      {running && user?.role !== "viewer" && (
         <button type="button" className={cx(s.btn, s.btnSm, s.btnDanger)} onClick={stop} disabled={stopping}>
           {stopping ? "Stopping…" : "Stop"}
         </button>
@@ -111,7 +113,7 @@ function RunPage() {
     <AppShell live={live}>
       <div className={s.runHead}>
         <div>
-          <Link href={liveId || saved ? "/runs" : "/examples"} className={s.muted}>
+          <Link href={liveId || saved ? "/app/runs" : "/app/examples"} className={s.muted}>
             ← {liveId || saved ? "My runs" : "Example scenarios"}
           </Link>
           <h1 className={s.pageTitle}>{view?.title ?? "Investigation"}</h1>
@@ -126,10 +128,10 @@ function RunPage() {
           <CopyButton text={typeof window === "undefined" ? "" : window.location.href} label="Share" className={s.btn} />
         </div>
       </div>
-      {error && <EmptyState icon="minusCircle" title="Investigation unavailable" text={error} href="/examples" action="Browse scenarios" />}
+      {error && <EmptyState icon="minusCircle" title="Investigation unavailable" text={error} href="/app/examples" action="Browse scenarios" />}
       {!view && !error && (id || liveId || saved) && <SkeletonCards count={2} />}
       {view && (done && state.report ? <RunResult scenario={view} state={state} startedAt={run.startedAt} /> : <Console scenario={view} state={state} startedAt={run.startedAt} controls={controls} recorded={run.mode === "replay"} />)}
-      {!id && !liveId && !saved && <EmptyState icon="search" title="Every fix starts with an investigation" text="Choose an example to explore the workflow, or connect your own project." href="/examples" action="Explore scenarios" />}
+      {!id && !liveId && !saved && <EmptyState icon="search" title="Every fix starts with an investigation" text="Choose an example to explore the workflow, or connect your own project." href="/app/examples" action="Explore scenarios" />}
     </AppShell>
   );
 }

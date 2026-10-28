@@ -67,3 +67,70 @@ def test_expired_session_and_cors(client):
     assert client.get("/api/admin/overview", headers=headers).status_code == 401
     response = client.options("/api/admin/users/test", headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "PATCH", "Access-Control-Request-Headers": "authorization,content-type"})
     assert response.status_code == 200
+
+def test_portal_permissions_and_audit(client, monkeypatch):
+    from app import main
+    monkeypatch.setattr(main, "docker_available", lambda: False)
+    admin = sign_in(client)
+    assert client.get("/api/admin/roles", headers=admin).status_code == 200
+    assert client.get("/api/workspace/me", headers=admin).status_code == 403
+    assert client.get("/api/investigations", headers=admin).status_code == 403
+    assert client.get("/api/runs").status_code == 401
+    assert client.post("/api/investigations", json={"scenario": "orders"}).status_code == 401
+    for role in ("operator", "viewer"):
+        email = f"{role}@example.com"
+        created = client.post("/api/admin/users", headers=admin, json={"name": role, "email": email, "password": "secure-password-123", "role": role})
+        assert created.status_code == 201
+        headers = sign_in(client, email, "secure-password-123")
+        assert client.get("/api/workspace/me", headers=headers).status_code == 200
+        assert client.get("/api/investigations", headers=headers).status_code == 200
+        assert client.get("/api/admin/health", headers=headers).status_code == 200
+        for path in ("/api/admin/audit", "/api/admin/roles", "/api/admin/settings", "/api/admin/users"):
+            assert client.get(path, headers=headers).status_code == 403
+        assert client.patch("/api/admin/settings", headers=headers, json={"name":"blocked","description":""}).status_code == 403
+        if role == "viewer":
+            assert client.post("/api/investigations", headers=headers, json={"scenario":"orders"}).status_code == 403
+            assert client.post("/api/investigations/missing/cancel", headers=headers).status_code == 403
+            assert client.post("/api/investigations/custom", headers=headers, data={"incident":"This is a test incident"}).status_code == 403
+        else:
+            assert client.post("/api/investigations/missing/cancel", headers=headers).status_code == 404
+    saved = client.patch("/api/admin/settings", headers=admin, json={"name":"Engineering","description":"Runtime debugging"})
+    assert saved.status_code == 200
+    assert client.get("/api/admin/settings", headers=admin).json()["name"] == "Engineering"
+    events = client.get("/api/admin/audit", headers=admin).json()
+    assert any(event["event"] == "workspace.settings_updated" for event in events)
+    assert any(event["event"] == "user.created" for event in events)
+    assert "secure-password" not in str(events)
+
+
+def test_workspace_grant_and_revocation(client):
+    admin = sign_in(client)
+    user = client.get("/api/admin/users", headers=admin).json()[0]
+    assert not user["workspace_access"]
+    response = client.patch(f"/api/admin/users/{user['id']}", headers=admin, json={"role":"admin","active":True,"workspace_access":True})
+    assert response.status_code == 200
+    assert client.get("/api/workspace/me", headers=admin).status_code == 401
+    admin = sign_in(client)
+    assert client.get("/api/workspace/me", headers=admin).status_code == 200
+    client.patch(f"/api/admin/users/{user['id']}", headers=admin, json={"role":"admin","active":True,"workspace_access":False})
+    admin = sign_in(client)
+    assert client.get("/api/workspace/me", headers=admin).status_code == 403
+    assert client.get("/api/investigations", headers=admin).status_code == 403
+
+def test_existing_account_database_migration(client, monkeypatch, tmp_path):
+    import sqlite3
+    from app.admin import password_hash, database
+    legacy = tmp_path / "legacy.sqlite3"
+    with sqlite3.connect(legacy) as db:
+        db.execute("CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL, role TEXT NOT NULL, active INTEGER NOT NULL DEFAULT 1, password TEXT NOT NULL)")
+        db.execute("INSERT INTO users VALUES ('legacy','legacy@example.com','Existing Admin','admin',1,?)", (password_hash("existing-secret-12345"),))
+        db.commit()
+    monkeypatch.setenv("TRACEPILOT_ADMIN_DB", str(legacy))
+    with database() as db:
+        account = db.execute("SELECT * FROM users WHERE id='legacy'").fetchone()
+        assert account["name"] == "Existing Admin"
+        assert account["workspace_access"] == 0
+        assert db.execute("SELECT COUNT(*) FROM users").fetchone()[0] == 1
+    headers = sign_in(client, "legacy@example.com", "existing-secret-12345")
+    assert client.get("/api/admin/overview", headers=headers).status_code == 200
+    assert client.get("/api/workspace/me", headers=headers).status_code == 403

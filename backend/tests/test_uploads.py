@@ -50,7 +50,14 @@ def client(monkeypatch, tmp_path):
     FakeCustom.built = []
     manager = main.RunManager(custom_factory=FakeCustom)
     monkeypatch.setattr(main, "manager", manager)
-    return TestClient(main.app)
+    # These tests isolate investigation behavior; authorization is covered in test_admin.py.
+    main.app.dependency_overrides[main.workspace_user] = lambda: {"role": "operator", "workspace_access": True}
+    main.app.dependency_overrides[main.workspace_writer] = lambda: {"role": "operator", "workspace_access": True}
+    try:
+        yield TestClient(main.app)
+    finally:
+        main.app.dependency_overrides.pop(main.workspace_user, None)
+        main.app.dependency_overrides.pop(main.workspace_writer, None)
 
 
 def wait(client, run_id, until=("completed", "failed", "cancelled")) -> dict:

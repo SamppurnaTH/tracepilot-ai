@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/components/AuthProvider";
 
 // Brand typography: Inter for UI text and headings, JetBrains Mono for code and terminals.
 const sans = Inter({ variable: "--font-inter", subsets: ["latin"] });
@@ -21,7 +22,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     // Font variables sit on <html> so the :root design tokens in globals.css can reference them.
     <html lang="en" data-theme="light" className={`${sans.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body><AuthProvider>{children}</AuthProvider></body>
     </html>
   );
 }

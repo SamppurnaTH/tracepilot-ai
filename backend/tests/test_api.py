@@ -28,7 +28,14 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setenv("MODEL_API_KEY", "test-key")
     manager = main.RunManager(factory=lambda s, provider, on_event: FakeInvestigation(s, provider, on_event))
     monkeypatch.setattr(main, "manager", manager)
-    return TestClient(main.app)
+    # These tests isolate investigation behavior; authorization is covered in test_admin.py.
+    main.app.dependency_overrides[main.workspace_user] = lambda: {"role": "operator", "workspace_access": True}
+    main.app.dependency_overrides[main.workspace_writer] = lambda: {"role": "operator", "workspace_access": True}
+    try:
+        yield TestClient(main.app)
+    finally:
+        main.app.dependency_overrides.pop(main.workspace_user, None)
+        main.app.dependency_overrides.pop(main.workspace_writer, None)
 
 
 def wait_done(client, run_id: str) -> dict:
@@ -131,3 +138,9 @@ def test_daily_limit(client, monkeypatch):
     second = client.post("/api/investigations", json={"scenario": "orders"})
     assert second.status_code == 429 and "used up" in second.json()["detail"]
     assert client.get("/health").json()["uploads_need_key"] is False
+
+def test_deployment_draining_rejects_new_investigations(client, tmp_path):
+    (tmp_path / ".deployment-draining").touch()
+    response = client.post("/api/investigations", json={"scenario": "orders"})
+    assert response.status_code == 503
+    assert "draining" in response.json()["detail"]

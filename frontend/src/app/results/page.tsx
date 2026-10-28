@@ -115,7 +115,7 @@ export default function Results() {
                         : ["—", "—", "—"];
                     return (
                       <tr key={id}>
-                        <th scope="row"><Link className={s.tableLink} href={`/run?id=${id}`}>{label}</Link></th>
+                        <th scope="row"><Link className={s.tableLink} href={`/app/run?id=${id}`}>{label}</Link></th>
                         <td>{lang}</td>
                         {cell(c.tracepilot).map((v, i) => (
                           <td key={`t${i}`}>{v}</td>

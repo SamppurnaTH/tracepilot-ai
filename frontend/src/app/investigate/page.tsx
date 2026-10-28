@@ -103,13 +103,13 @@ export default function Investigate() {
   const start = async () => {
     setError(null);
     if (source === "example" && !live) {
-      router.push(`/run?id=${example}&replay=1`);
+      router.push(`/app/run?id=${example}&replay=1`);
       return;
     }
     setBusy(true);
     try {
       if (source === "example") {
-        router.push(`/run?live=${await startLiveRun(example)}`);
+        router.push(`/app/run?live=${await startLiveRun(example)}`);
         return;
       }
       const form = new FormData();
@@ -124,7 +124,7 @@ export default function Investigate() {
         sessionStorage.setItem(KEY_STORE, accessKey.trim());
       } catch {}
       const run = await startCustomRun(form, accessKey.trim() || undefined);
-      router.push(`/run?live=${run.id}`);
+      router.push(`/app/run?live=${run.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);

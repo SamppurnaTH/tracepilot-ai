@@ -168,7 +168,7 @@ export default function Docs() {
           <section id="evaluation" className={cx(s.panel, s.docSection)}>
             <h2>Evaluation results</h2>
             <p>
-              Same model, with and without TracePilot, judged by hidden tests: see <Link href="/results">comparison results</Link>. Raw data and scripts:{" "}
+              Same model, with and without TracePilot, judged by hidden tests: see <Link href="/app/results">comparison results</Link>. Raw data and scripts:{" "}
               <code className={s.inlineCode}>eval/</code>, <code className={s.inlineCode}>backend/scripts/compare.py</code> and{" "}
               <code className={s.inlineCode}>backend/scripts/eval.py</code>.
             </p>
@@ -177,9 +177,9 @@ export default function Docs() {
           <section id="administration" className={cx(s.panel, s.docSection)}>
             <h2>Administration</h2>
             <p>Set TRACEPILOT_ADMIN_EMAIL and TRACEPILOT_ADMIN_PASSWORD (at least 12 characters) in the backend environment before first sign-in. The first account is bootstrapped only when the account database is empty. There is no default password.</p>
-            <p>Set NEXT_PUBLIC_API_URL to your backend URL before building the frontend. For local use: http://127.0.0.1:8000. Restart the backend and rebuild the frontend after configuring them, then open the <Link href="/admin">admin plane</Link>.</p>
+            <p>Set NEXT_PUBLIC_API_URL to your backend URL before building the frontend. For local use: http://127.0.0.1:8000. Restart the backend and rebuild the frontend after configuring them, then open the <Link href="/admin">Admin Console</Link>.</p>
             <p>Administrators create accounts and assign roles. Operators monitor and stop investigations. Viewers have read-only access. Suspending an account or changing its role revokes its sessions. Sessions expire after eight hours; reloading the page requires sign-in again.</p>
-            <p>Accounts are stored in runs/admin.sqlite3; set TRACEPILOT_ADMIN_DB to use a persistent volume. Passwords use salted PBKDF2 hashing. Keep the database private and use HTTPS when deployed. These roles protect /api/admin endpoints; the public demo APIs retain their existing access policy. Password recovery and email invitations are not included.</p>
+            <p>Accounts are stored in runs/admin.sqlite3; set TRACEPILOT_ADMIN_DB to use a persistent volume. Passwords use salted PBKDF2 hashing. Keep the database private and use HTTPS when deployed. Both admin and investigation APIs require a signed-in account. Administrators have full console access; user workspace access is granted separately. Operators can start and stop investigations in /app, and viewers are read-only. The published sample recordings remain public reference data. Password recovery and email invitations are not included.</p>
           </section>
 
           <section id="faq" className={cx(s.panel, s.docSection)}>

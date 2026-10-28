@@ -1,6 +1,19 @@
 // Line icons in a 24px grid, drawn with the current text color. Shapes follow the Lucide set (ISC licence).
 
 const PATHS: Record<string, React.ReactNode> = {
+  users: <><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8" /><circle cx="9" cy="7" r="4" /></>,
+  settings: <><path d="m9 3-.8 2-2.2.5-1.8 3.1 1.2 1.8v3.2L4.2 15.4 6 18.5l2.2.5.8 2h6l.8-2 2.2-.5 1.8-3.1-1.2-1.8v-3.2l1.2-1.8L18 5.5 15.8 5 15 3z" /><circle cx="12" cy="12" r="3" /></>,
+  activity: <path d="M2 12h4l3-8 5 16 3-8h5" />,
+  crown: <path d="m3 6 4 4 5-7 5 7 4-4-2 13H5zM6 22h12" />,
+  bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></>,
+  logout: <path d="M9 4H4v16h5M14 8l4 4-4 4M8 12h13" />,
+  refresh: <path d="M20 7a9 9 0 1 0 1 8M20 2v6h-6" />,
+  chevronDown: <path d="m6 9 6 6 6-6" />,
+  more: <><circle cx="12" cy="5" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="12" cy="19" r="1" /></>,
+  plus: <path d="M12 5v14M5 12h14" />,
+  lock: <><rect x="4" y="10" width="16" height="12" rx="2" /><path d="M8 10V6a4 4 0 0 1 8 0v4M12 15v3" /></>,
+  external: <path d="M14 3h7v7M21 3 10 14M10 3H3v18h18v-7" />,
+
   home: <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />,
   play: <path d="m7 4 13 8-13 8z" />,
   list: (

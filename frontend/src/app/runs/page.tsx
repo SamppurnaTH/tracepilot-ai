@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import s from "@/components/app.module.css";
@@ -31,6 +32,7 @@ function status(verified?: boolean | null, outcome?: string | null, raw?: string
 }
 
 export default function Runs() {
+  const { user } = useAuth();
   const { index, live } = useData();
   const [saved, setSaved] = useState<SavedRun[]>([]);
   const [query, setQuery] = useState("");
@@ -45,11 +47,11 @@ export default function Runs() {
     ...saved.map((r) => {
       const [label, tone] = status(r.verified, r.outcome, r.status);
       const known = (index ?? []).find((e) => e.scenario.id === r.scenario)?.scenario.title;
-      return { key: r.name, title: r.title || known || r.scenario, status: label, tone, duration: r.duration_s, tokens: r.tokens, date: r.started_at, href: `/run?saved=${encodeURIComponent(r.name)}`, source: "This backend" };
+      return { key: r.name, title: r.title || known || r.scenario, status: label, tone, duration: r.duration_s, tokens: r.tokens, date: r.started_at, href: `/app/run?saved=${encodeURIComponent(r.name)}`, source: "This backend" };
     }),
     ...(index ?? []).map((e) => {
       const [label, tone] = status(e.verified, e.outcome);
-      return { key: e.scenario.id, title: e.scenario.title, status: label, tone, duration: e.duration_s, tokens: e.tokens, date: e.started_at, href: `/run?id=${e.scenario.id}`, source: "Recorded" };
+      return { key: e.scenario.id, title: e.scenario.title, status: label, tone, duration: e.duration_s, tokens: e.tokens, date: e.started_at, href: `/app/run?id=${e.scenario.id}`, source: "Recorded" };
     }),
   ];
   const shown = rows.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()) && (filter === "All" || r.status === filter || r.source === filter));
@@ -66,13 +68,13 @@ export default function Runs() {
             {live ? "Runs saved by the connected backend, plus the published recordings." : "The published recordings. With a backend connected, your own runs appear here too."}
           </p>
         </div>
-        <Link href="/investigate" className={cx(s.btn, s.btnPrimary)}><Icon name="sparkle" size={16} /> New investigation</Link>
+        {user?.role !== "viewer" && <Link href="/app/investigate" className={cx(s.btn, s.btnPrimary)}><Icon name="sparkle" size={16} /> New investigation</Link>}
       </div>
       <div className={s.statRow}>{[["Total investigations", rows.length], ["Verified fixes", rows.filter((r) => r.status === "Verified").length], ["No code change", rows.filter((r) => r.status === "No code change").length], ["Saved on backend", saved.length]].map(([label, value]) => <div key={label} className={s.stat}><span className={s.statLabel}>{label}</span><span className={s.statValue}>{index === null ? "—" : value}</span></div>)}</div>
       <div className={s.collectionToolbar}><div className={s.filters} role="group" aria-label="Filter investigations">{["All", "Verified", "No code change", "Recorded", "This backend"].map((value) => <button key={value} className={cx(s.filter, filter === value && s.filterOn)} aria-pressed={filter === value} onClick={() => { setFilter(value); setPage(1); }}>{value === "This backend" ? "My saved runs" : value}</button>)}</div><input className={s.search} type="search" placeholder="Search investigations…" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} aria-label="Search runs" /></div>
       {savedError && <p className={s.errorText} role="alert">Saved backend runs could not be loaded. Recorded runs are still available.</p>}
       {index === null && <SkeletonCards count={2} />}
-      {index !== null && shown.length === 0 && <EmptyState icon="clock" title="No investigations found" text="Try a different search or filter, or start a new investigation." href="/examples" action="Explore scenarios" />}
+      {index !== null && shown.length === 0 && <EmptyState icon="clock" title="No investigations found" text="Try a different search or filter, or start a new investigation." href="/app/examples" action="Explore scenarios" />}
       {shown.length > 0 && <div className={s.tableWrap}>
         <table className={s.table}>
           <thead>

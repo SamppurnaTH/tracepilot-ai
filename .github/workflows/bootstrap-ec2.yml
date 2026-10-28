@@ -1,0 +1,48 @@
+name: Bootstrap EC2 deployment access
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bootstrap:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: ec2-production
+    concurrency:
+      group: tracepilot-ec2-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install restricted deployment receiver
+        env:
+          EC2_HOST: ${{ vars.EC2_HOST }}
+          EC2_USER: ${{ vars.EC2_USER }}
+          EC2_PORT: ${{ vars.EC2_PORT || '22' }}
+          BOOTSTRAP_KEY: ${{ secrets.EC2_BOOTSTRAP_KEY }}
+          DEPLOY_PUBLIC_KEY: ${{ vars.EC2_DEPLOY_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          : "${EC2_HOST:?Set EC2_HOST}"
+          : "${EC2_USER:?Set EC2_USER}"
+          : "${BOOTSTRAP_KEY:?Add the existing instance key as EC2_BOOTSTRAP_KEY temporarily}"
+          : "${DEPLOY_PUBLIC_KEY:?Set EC2_DEPLOY_PUBLIC_KEY}"
+          [[ "$EC2_PORT" =~ ^[0-9]+$ ]]
+          umask 077
+          key="$RUNNER_TEMP/bootstrap-key"
+          known="$RUNNER_TEMP/bootstrap-known-hosts"
+          trap 'rm -f "$key"' EXIT
+          printf '%s\n' "$BOOTSTRAP_KEY" > "$key"
+          ssh -i "$key" -p "$EC2_PORT" -o BatchMode=yes -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=accept-new -o HashKnownHosts=no -o UserKnownHostsFile="$known" \
+            -o ConnectTimeout=20 "$EC2_USER@$EC2_HOST" \
+            "sudo -n bash -s -- '$GITHUB_SHA' '$EC2_USER' '$DEPLOY_PUBLIC_KEY'" < deploy/bootstrap-ci.sh
+          echo 'EC2_HOST_KEY_BEGIN'
+          cat "$known"
+          echo 'EC2_HOST_KEY_END'
+          echo 'Bootstrap complete. Pin the displayed host key as EC2_KNOWN_HOSTS, remove EC2_BOOTSTRAP_KEY, and set EC2_DEPLOY_ENABLED=true.' >> "$GITHUB_STEP_SUMMARY"

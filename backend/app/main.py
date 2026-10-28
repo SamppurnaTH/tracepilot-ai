@@ -13,12 +13,12 @@ from dataclasses import dataclass, field
 import shutil
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from .admin import router as admin_router
+from .admin import router as admin_router, workspace_router, workspace_user, workspace_writer
 from .agent import Cancelled, Investigation
 from .cli import detect_app
 from .reviewer import Reviewer
@@ -80,6 +80,8 @@ class RunManager:
 
     def _reserve(self, scenario: str, provider: str, title: str) -> Run:
         with self.lock:
+            if (RUNS_DIR / ".deployment-draining").exists():
+                raise HTTPException(503, "a deployment is draining investigations; try again shortly")
             if self.active() >= MAX_CONCURRENT:
                 raise HTTPException(429, f"{MAX_CONCURRENT} investigations already running; try again shortly")
             today = time.strftime("%Y-%m-%d", time.gmtime())
@@ -150,6 +152,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TracePilot AI", lifespan=lifespan)
 app.include_router(admin_router)
+app.include_router(workspace_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("TRACEPILOT_CORS_ORIGINS", "*").split(",")],
@@ -175,7 +178,7 @@ def _require_docker() -> None:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "active_investigations": manager.active(), "uploads_need_key": bool(_upload_key())}
+    return {"status": "ok", "active_investigations": manager.active(), "uploads_need_key": bool(_upload_key()), "release": os.environ.get("TRACEPILOT_RELEASE")}
 
 
 @app.get("/api/scenarios")
@@ -183,7 +186,7 @@ def list_scenarios() -> list[dict]:
     return [s.summary() for s in SCENARIOS.values()]
 
 
-@app.post("/api/investigations", status_code=202)
+@app.post("/api/investigations", dependencies=[Depends(workspace_writer)], status_code=202)
 def start_investigation(body: StartRequest) -> dict:
     if body.scenario not in SCENARIOS:
         raise HTTPException(404, f"unknown scenario '{body.scenario}'")
@@ -204,7 +207,7 @@ def _check_key() -> None:
         raise HTTPException(503, str(exc)) from exc
 
 
-@app.post("/api/investigations/custom", status_code=202)
+@app.post("/api/investigations/custom", dependencies=[Depends(workspace_writer)], status_code=202)
 async def start_custom_investigation(
     incident: str = Form(..., min_length=10, max_length=4000),
     project: UploadFile | None = File(None),
@@ -252,7 +255,7 @@ async def start_custom_investigation(
     return manager.start_custom(title, build, cleanup=lambda: shutil.rmtree(base, ignore_errors=True)).summary()
 
 
-@app.post("/api/investigations/{run_id}/cancel")
+@app.post("/api/investigations/{run_id}/cancel", dependencies=[Depends(workspace_writer)])
 def cancel_investigation(run_id: str) -> dict:
     """Ask a running investigation to stop; it ends before its next model call."""
     run = _get_run(run_id)
@@ -261,7 +264,7 @@ def cancel_investigation(run_id: str) -> dict:
     return run.summary()
 
 
-@app.get("/api/investigations")
+@app.get("/api/investigations", dependencies=[Depends(workspace_user)])
 def list_investigations() -> list[dict]:
     return [r.summary() for r in sorted(manager.runs.values(), key=lambda r: r.started_at, reverse=True)]
 
@@ -273,13 +276,13 @@ def _get_run(run_id: str) -> Run:
     return run
 
 
-@app.get("/api/investigations/{run_id}")
+@app.get("/api/investigations/{run_id}", dependencies=[Depends(workspace_user)])
 def get_investigation(run_id: str) -> dict:
     run = _get_run(run_id)
     return {**run.summary(), "report": run.report}
 
 
-@app.get("/api/investigations/{run_id}/events")
+@app.get("/api/investigations/{run_id}/events", dependencies=[Depends(workspace_user)])
 async def stream_events(run_id: str) -> StreamingResponse:
     """Server-sent events: replays everything so far, then streams new events until the run ends."""
     run = _get_run(run_id)
@@ -298,7 +301,7 @@ async def stream_events(run_id: str) -> StreamingResponse:
     return StreamingResponse(generate(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
-@app.get("/api/runs")
+@app.get("/api/runs", dependencies=[Depends(workspace_user)])
 def list_saved_runs() -> list[dict]:
     """Saved runs on disk, newest first, for replay."""
     if not RUNS_DIR.exists():
@@ -321,7 +324,7 @@ def list_saved_runs() -> list[dict]:
     return runs
 
 
-@app.get("/api/runs/{name}")
+@app.get("/api/runs/{name}", dependencies=[Depends(workspace_user)])
 def get_saved_run(name: str) -> dict:
     path = (RUNS_DIR / f"{name}.json").resolve()
     if not path.is_relative_to(RUNS_DIR.resolve()) or not path.exists():

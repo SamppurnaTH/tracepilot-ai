@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -35,6 +36,7 @@ const FILTERS: [string, (e: RecordingIndexEntry) => boolean][] = [
 ];
 
 export default function Examples() {
+  const { user } = useAuth();
   const { index, live, indexError } = useData();
   const [query, setQuery] = useState("");
   const [starting, setStarting] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export default function Examples() {
     setStarting(id);
     try {
       const runId = await startLiveRun(id);
-      router.push(`/run?live=${runId}`);
+      router.push(`/app/run?live=${runId}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStarting(null);
@@ -66,9 +68,9 @@ export default function Examples() {
             Every card is a real, unedited investigation. View it step by step, or{live ? " run it live on the connected backend." : " run it live once a backend is connected."}
           </p>
         </div>
-        <Link href="/investigate" className={cx(s.btn, s.btnPrimary)}>
+        {user?.role !== "viewer" && <Link href="/app/investigate" className={cx(s.btn, s.btnPrimary)}>
           <Icon name="sparkle" size={16} /> New investigation
-        </Link>
+        </Link>}
       </div>
       <div className={s.collectionToolbar}><div className={s.filters} role="group" aria-label="Filter scenarios">
         {FILTERS.map(([name]) => (
@@ -109,16 +111,16 @@ export default function Examples() {
                   <button
                     type="button"
                     className={cx(s.btn, s.btnSm, s.btnPrimary)}
-                    disabled={!live || !e.scenario.live || starting !== null}
-                    title={!e.scenario.live ? "A benchmark run on an external project: replay only" : live ? undefined : "Needs a TracePilot backend"}
+                    disabled={user?.role === "viewer" || !live || !e.scenario.live || starting !== null}
+                    title={user?.role === "viewer" ? "Your workspace access is read-only" : !e.scenario.live ? "A benchmark run on an external project: replay only" : live ? undefined : "Needs a TracePilot backend"}
                     onClick={() => runLive(e.scenario.id)}
                   >
                     <Icon name="bolt" size={13} /> {starting === e.scenario.id ? "Starting…" : "Run live"}
                   </button>
-                  <Link href={`/run?id=${e.scenario.id}&replay=1`} className={cx(s.btn, s.btnSm, !live && s.btnPrimary)}>
+                  <Link href={`/app/run?id=${e.scenario.id}&replay=1`} className={cx(s.btn, s.btnSm, !live && s.btnPrimary)}>
                     <Icon name="play" size={13} /> Watch run
                   </Link>
-                  <Link href={`/run?id=${e.scenario.id}`} className={cx(s.btn, s.btnSm)}>
+                  <Link href={`/app/run?id=${e.scenario.id}`} className={cx(s.btn, s.btnSm)}>
                     View details
                   </Link>
                 </div>

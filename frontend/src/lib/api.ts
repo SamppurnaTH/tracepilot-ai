@@ -5,6 +5,15 @@ import type { Recording, RunEvent, ScenarioSummary } from "./run";
 const DEFAULT_API = process.env.NODE_ENV === "development" ? "http://localhost:8000" : "";
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_API).replace(/\/$/, "");
 
+let bearerToken = "";
+export function setApiToken(token: string) { bearerToken = token; }
+export async function apiFetch(url: string, options: RequestInit = {}) {
+  const headers = new Headers(options.headers);
+  if (bearerToken) headers.set("Authorization", `Bearer ${bearerToken}`);
+  const response = await fetch(url, { ...options, headers });
+  return response;
+}
+
 export interface RecordingIndexEntry {
   scenario: ScenarioSummary;
   file: string;
@@ -52,7 +61,7 @@ export async function loadRecording(file: string): Promise<Recording> {
 }
 
 export async function startLiveRun(scenario: string): Promise<string> {
-  const resp = await fetch(`${API_URL}/api/investigations`, {
+  const resp = await apiFetch(`${API_URL}/api/investigations`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ scenario }),
@@ -64,17 +73,32 @@ export async function startLiveRun(scenario: string): Promise<string> {
 
 /** Subscribe to a live run's events. Returns a function that closes the stream. */
 export function streamRun(runId: string, onEvent: (e: RunEvent) => void, onEnd: () => void): () => void {
-  const source = new EventSource(`${API_URL}/api/investigations/${runId}/events`);
-  source.onmessage = (msg) => onEvent(JSON.parse(msg.data));
-  source.addEventListener("end", () => {
-    source.close();
+  const controller = new AbortController();
+  (async () => {
+    try {
+      const response = await apiFetch(`${API_URL}/api/investigations/${encodeURIComponent(runId)}/events`, { signal: controller.signal });
+      if (!response.ok || !response.body) throw new Error("Investigation stream unavailable");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let pending = "";
+      while (!controller.signal.aborted) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        pending += decoder.decode(value, { stream: true }).replaceAll("\r\n", "\n");
+        let boundary: number;
+        while ((boundary = pending.indexOf("\n\n")) !== -1) {
+          const frame = pending.slice(0, boundary);
+          pending = pending.slice(boundary + 2);
+          const lines = frame.split("\n");
+          if (lines.some((line) => line === "event: end")) { await reader.cancel(); onEnd(); return; }
+          const data = lines.filter((line) => line.startsWith("data: ")).map((line) => line.slice(6)).join("\n");
+          if (data) onEvent(JSON.parse(data));
+        }
+      }
+    } catch (error) { if (controller.signal.aborted) return; console.error("Investigation stream ended", error); }
     onEnd();
-  });
-  source.onerror = () => {
-    source.close();
-    onEnd();
-  };
-  return () => source.close();
+  })();
+  return () => controller.abort();
 }
 
 export interface EvalSummary {
@@ -147,21 +171,21 @@ async function json<T>(resp: Response): Promise<T> {
 /** Start an investigation of your own project: a ZIP upload or a public repository URL, with optional attachments. */
 export async function startCustomRun(form: FormData, accessKey?: string): Promise<RunSummary> {
   const headers: Record<string, string> = accessKey ? { "X-TracePilot-Key": accessKey } : {};
-  return json(await fetch(`${API_URL}/api/investigations/custom`, { method: "POST", body: form, headers }));
+  return json(await apiFetch(`${API_URL}/api/investigations/custom`, { method: "POST", body: form, headers }));
 }
 
 export async function cancelRun(id: string): Promise<RunSummary> {
-  return json(await fetch(`${API_URL}/api/investigations/${id}/cancel`, { method: "POST" }));
+  return json(await apiFetch(`${API_URL}/api/investigations/${id}/cancel`, { method: "POST" }));
 }
 
 export async function getRun(id: string): Promise<RunSummary> {
-  return json(await fetch(`${API_URL}/api/investigations/${id}`));
+  return json(await apiFetch(`${API_URL}/api/investigations/${id}`));
 }
 
 export async function listSavedRuns(): Promise<SavedRun[]> {
-  return json(await fetch(`${API_URL}/api/runs`));
+  return json(await apiFetch(`${API_URL}/api/runs`));
 }
 
 export async function loadSavedRun(name: string): Promise<Recording> {
-  return json(await fetch(`${API_URL}/api/runs/${encodeURIComponent(name)}`));
+  return json(await apiFetch(`${API_URL}/api/runs/${encodeURIComponent(name)}`));
 }
