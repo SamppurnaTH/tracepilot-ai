@@ -1,0 +1,125 @@
+/* Layout concept: a flight recorder for software incidents. The investigation log runs down the
+   left like a cockpit voice recorder; the right side is the instrument panel (hypotheses,
+   verification gauge, patch, findings). Amber is the single signal color; green/red are state only. */
+:root {
+  --bg: #eef1f5;
+  --panel: #ffffff;
+  --panel-2: #f6f8fb;
+  --line: #d5dce6;
+  --ink: #132033;
+  --muted: #5a6a80;
+  --signal: #a95a06;
+  --signal-wash: #fbefdf;
+  --good: #16744b;
+  --good-wash: #e3f4ec;
+  --bad: #bb2537;
+  --bad-wash: #fbe7ea;
+  --code-bg: #f3f5f9;
+
+  --font-display: var(--font-chakra), "Segoe UI", system-ui, sans-serif;
+  --font-body: var(--font-plex), "Segoe UI", system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --step--1: 0.8125rem;
+  --step-0: 0.9375rem;
+  --step-1: 1.125rem;
+  --step-2: 1.5rem;
+  --step-3: clamp(1.75rem, 1.2rem + 2.2vw, 2.6rem);
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0d1420;
+    --panel: #142030;
+    --panel-2: #182638;
+    --line: #26354c;
+    --ink: #e2e8f1;
+    --muted: #8d9cb3;
+    --signal: #f0a03c;
+    --signal-wash: #2e2414;
+    --good: #43d692;
+    --good-wash: #13291f;
+    --bad: #ff7083;
+    --bad-wash: #321820;
+    --code-bg: #0f1926;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d1420;
+  --panel: #142030;
+  --panel-2: #182638;
+  --line: #26354c;
+  --ink: #e2e8f1;
+  --muted: #8d9cb3;
+  --signal: #f0a03c;
+  --signal-wash: #2e2414;
+  --good: #43d692;
+  --good-wash: #13291f;
+  --bad: #ff7083;
+  --bad-wash: #321820;
+  --code-bg: #0f1926;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--step-0);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.15;
+  margin: 0;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+}
+
+code,
+pre,
+.mono {
+  font-family: var(--font-mono);
+}
+
+a {
+  color: var(--signal);
+}
+
+button {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--signal);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

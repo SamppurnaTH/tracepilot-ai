@@ -70,11 +70,16 @@ docker build -t tracepilot-sandbox:1 sandbox          # optional; built automati
 cd backend && ../.venv/Scripts/python -m pytest && cd ..   # backend tests
 cd backend && ../.venv/Scripts/uvicorn app.main:app --reload   # API on http://localhost:8000
 
-# Frontend
+# Frontend (replays recorded runs; runs live when the API is up)
 cd frontend
 npm install
-npm run dev
+npm run dev                   # http://localhost:3000
 ```
+
+## The interface
+
+The frontend (`frontend/`) shows each investigation as a flight log: every check the agent runs, hypotheses moving from open to confirmed or rejected, a before/after test gauge, the patch, and the findings.
+It replays real recorded runs (`frontend/public/recordings/`), so the hosted demo works without a backend. With the API running, it can start live investigations and stream them.
 
 ## Build plan
 

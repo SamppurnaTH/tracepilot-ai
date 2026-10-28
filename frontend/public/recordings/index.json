@@ -1,0 +1,35 @@
+[
+  {
+    "scenario": {
+      "id": "orders",
+      "title": "Orders API: intermittent 500s and a data-exposure report",
+      "service": "orders_api",
+      "incident": "Two reports came in for the orders_api service:\n1. Users say GET /orders/9/total sometimes returns 500.\n2. A security reviewer suspects users can see other users' orders.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'."
+    },
+    "file": "orders.json",
+    "verified": true,
+    "duration_s": 215.9
+  },
+  {
+    "scenario": {
+      "id": "notes",
+      "title": "Notes API: search errors and noisy warnings",
+      "service": "notes_api",
+      "incident": "Support tickets for the notes_api service:\n1. Searching for a note whose title contains an apostrophe (for example \"Bob's\") fails with a server error.\n2. On-call noticed WARNING entries in the logs this morning and wants to know whether they are related.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'."
+    },
+    "file": "notes.json",
+    "verified": true,
+    "duration_s": 221.7
+  },
+  {
+    "scenario": {
+      "id": "billing",
+      "title": "Billing API: a disputed invoice and missing invoices",
+      "service": "billing_api",
+      "incident": "Two tickets came in for the billing_api service:\n1. Customer initech disputes invoice 1003: by their own calculation the total should be 54.13, but the invoice shows 54.12.\n2. A customer says the first page of their invoice list never shows their earliest invoices."
+    },
+    "file": "billing.json",
+    "verified": true,
+    "duration_s": 176.2
+  }
+]

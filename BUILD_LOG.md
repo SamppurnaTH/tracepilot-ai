@@ -89,3 +89,15 @@ The agent now keeps its own transcript. If the chain is lost, it replays the ful
 
 **Real run through the API: billing scenario** (about 3 minutes, 15 model calls, 18 tool calls): the agent confirmed both root causes, switched to `Decimal` with half-up tax rounding, and fixed the page offset. Verified **2/5 → 5/5, no regressions**.
 **All three scenarios have now been solved end to end by `muse-spark-1.3`.**
+
+**Frontend** (`frontend/`, Next.js 15, React 19):
+
+- A flight-recorder view of an investigation:
+  - a flight log of every check, grouped by phase
+  - hypothesis cards that move from open to confirmed or rejected, with their evidence
+  - a verification gauge (per-test cells before and after, plus fixed, broke and still-failing lists)
+  - the patch as a colored diff
+  - findings with severity and category
+- **Replay mode** plays real recorded runs at 4×, 10× or 25×, with "skip to result". **Live mode** starts a run on the API and streams events over SSE. Both feed the same reducer.
+- `backend/scripts/export_recordings.py` exports the latest verified run per scenario, without raw tool output. All three scenarios are recorded from real runs. A fresh orders run verified 3/5 → 5/5 in 3.6 minutes (13 model calls).
+- Checked in the browser at desktop and phone widths, in dark and light themes, with no horizontal overflow. The production build prerenders as a static page, so it can be hosted without a backend.
