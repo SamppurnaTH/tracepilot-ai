@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import s from "@/components/app.module.css";
+import { EmptyState, SkeletonCards } from "@/components/ScreenState";
+import { Icon } from "@/components/icons";
 import { AppShell } from "@/components/AppShell";
 import { cx } from "@/components/bits";
 import { listSavedRuns, type SavedRun } from "@/lib/api";
@@ -32,8 +34,11 @@ export default function Runs() {
   const { index, live } = useData();
   const [saved, setSaved] = useState<SavedRun[]>([]);
   const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("All");
+  const [page, setPage] = useState(1);
+  const [savedError, setSavedError] = useState(false);
   useEffect(() => {
-    if (live) listSavedRuns().then(setSaved).catch(() => setSaved([]));
+    if (live) listSavedRuns().then(setSaved).catch(() => setSavedError(true));
   }, [live]);
 
   const rows: Row[] = [
@@ -47,7 +52,10 @@ export default function Runs() {
       return { key: e.scenario.id, title: e.scenario.title, status: label, tone, duration: e.duration_s, tokens: e.tokens, date: e.started_at, href: `/run?id=${e.scenario.id}`, source: "Recorded" };
     }),
   ];
-  const shown = rows.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()));
+  const shown = rows.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()) && (filter === "All" || r.status === filter || r.source === filter));
+  const totalPages = Math.max(1, Math.ceil(shown.length / 6));
+  const currentPage = Math.min(page, totalPages);
+  const paged = shown.slice((currentPage - 1) * 6, currentPage * 6);
 
   return (
     <AppShell live={live}>
@@ -58,9 +66,14 @@ export default function Runs() {
             {live ? "Runs saved by the connected backend, plus the published recordings." : "The published recordings. With a backend connected, your own runs appear here too."}
           </p>
         </div>
-        <input className={s.search} type="search" placeholder="Search runs…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search runs" />
+        <Link href="/investigate" className={cx(s.btn, s.btnPrimary)}><Icon name="sparkle" size={16} /> New investigation</Link>
       </div>
-      <div className={s.tableWrap}>
+      <div className={s.statRow}>{[["Total investigations", rows.length], ["Verified fixes", rows.filter((r) => r.status === "Verified").length], ["No code change", rows.filter((r) => r.status === "No code change").length], ["Saved on backend", saved.length]].map(([label, value]) => <div key={label} className={s.stat}><span className={s.statLabel}>{label}</span><span className={s.statValue}>{index === null ? "—" : value}</span></div>)}</div>
+      <div className={s.collectionToolbar}><div className={s.filters} role="group" aria-label="Filter investigations">{["All", "Verified", "No code change", "Recorded", "This backend"].map((value) => <button key={value} className={cx(s.filter, filter === value && s.filterOn)} aria-pressed={filter === value} onClick={() => { setFilter(value); setPage(1); }}>{value === "This backend" ? "My saved runs" : value}</button>)}</div><input className={s.search} type="search" placeholder="Search investigations…" value={query} onChange={(e) => { setQuery(e.target.value); setPage(1); }} aria-label="Search runs" /></div>
+      {savedError && <p className={s.errorText} role="alert">Saved backend runs could not be loaded. Recorded runs are still available.</p>}
+      {index === null && <SkeletonCards count={2} />}
+      {index !== null && shown.length === 0 && <EmptyState icon="clock" title="No investigations found" text="Try a different search or filter, or start a new investigation." href="/examples" action="Explore scenarios" />}
+      {shown.length > 0 && <div className={s.tableWrap}>
         <table className={s.table}>
           <thead>
             <tr>
@@ -83,9 +96,9 @@ export default function Runs() {
                 </td>
               </tr>
             )}
-            {shown.map((r) => (
+            {paged.map((r) => (
               <tr key={`${r.source}-${r.key}`}>
-                <th scope="row">{r.title}</th>
+                <th scope="row" className={s.runName}>{r.title}</th>
                 <td>
                   <span className={cx(s.tag, r.tone)}>{r.status}</span>
                 </td>
@@ -102,7 +115,8 @@ export default function Runs() {
             ))}
           </tbody>
         </table>
-      </div>
+      </div>}
+      {shown.length > 0 && <div className={s.pagination}><span>Showing {(currentPage - 1) * 6 + 1}–{Math.min(currentPage * 6, shown.length)} of {shown.length} investigations</span><div className={s.actions}><button className={cx(s.btn,s.btnSm)} disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>Previous</button><span>Page {currentPage} of {totalPages}</span><button className={cx(s.btn,s.btnSm)} disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>Next</button></div></div>}
     </AppShell>
   );
 }

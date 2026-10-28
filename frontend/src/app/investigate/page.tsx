@@ -25,15 +25,23 @@ const readKey = () => {
 function FilePick({ label, hint, accept, multiple, files, onChange }: { label: string; hint: string; accept: string; multiple?: boolean; files: File[]; onChange: (f: File[]) => void }) {
   const ref = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
+  const [fileError, setFileError] = useState("");
+  const selectFiles = (selected: File[]) => {
+    const limit = multiple ? 5_000_000 : 50_000_000;
+    const valid = selected.every((file) => accept.split(",").some((type) => type.startsWith(".") ? file.name.toLowerCase().endsWith(type) : file.type === type) && file.size <= limit);
+    if (!valid) { setFileError(`Choose a supported file type, up to ${multiple ? 5 : 50} MB per file.`); return; }
+    setFileError(""); onChange(selected.slice(0, multiple ? 10 : 1));
+  };
   return (
     <div className={s.field}>
       <span className={s.label}>{label}</span>
       <div
-        className={cx(s.drop, over && s.dropOn)}
+        className={cx(s.drop, multiple && s.dropCompact, over && s.dropOn, files.length > 0 && s.dropSelected)}
         role="button"
+        aria-label={`Choose ${label.toLowerCase()}`}
         tabIndex={0}
         onClick={() => ref.current?.click()}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && ref.current?.click()}
+        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ref.current?.click(); } }}
         onDragOver={(e) => {
           e.preventDefault();
           setOver(true);
@@ -42,19 +50,21 @@ function FilePick({ label, hint, accept, multiple, files, onChange }: { label: s
         onDrop={(e) => {
           e.preventDefault();
           setOver(false);
-          onChange(Array.from(e.dataTransfer.files).slice(0, multiple ? 10 : 1));
+          selectFiles(Array.from(e.dataTransfer.files));
         }}
       >
-        <Icon name="download" size={22} />
-        <span className={s.hint}>{hint}</span>
+        <Icon name={files.length ? "checkCircle" : "file"} size={22} />
+        {!multiple && <strong className={s.dropTitle}>Upload your project</strong>}
+        <span className={s.hint}>{files.length ? `${files.length} file${files.length > 1 ? "s" : ""} selected` : hint}</span>
         <span className={cx(s.btn, s.btnSm)}>Choose {multiple ? "files" : "a file"}</span>
-        <input ref={ref} type="file" accept={accept} multiple={multiple} hidden onChange={(e) => onChange(Array.from(e.target.files ?? []))} />
+        <input ref={ref} type="file" accept={accept} multiple={multiple} hidden onChange={(e) => { selectFiles(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
       </div>
+      {fileError && <p className={s.errorText} role="alert">{fileError}</p>}
       {files.length > 0 && (
         <ul className={s.files}>
           {files.map((f) => (
             <li key={f.name}>
-              {f.name} · {(f.size / 1024).toFixed(0)} KB
+              <span>{f.name} · {(f.size / 1024).toFixed(0)} KB</span><button type="button" aria-label={`Remove ${f.name}`} onClick={() => onChange(files.filter((file) => file !== f))}>Remove</button>
             </li>
           ))}
         </ul>
@@ -93,7 +103,7 @@ export default function Investigate() {
   const start = async () => {
     setError(null);
     if (source === "example" && !live) {
-      router.push(`/run?id=${example}`);
+      router.push(`/run?id=${example}&replay=1`);
       return;
     }
     setBusy(true);
@@ -130,6 +140,7 @@ export default function Investigate() {
         </div>
       </div>
 
+      <div className={s.setupSteps} aria-label="Investigation setup"><span><b>1</b> Connect your code</span><span><b>2</b> Describe the incident</span><span><b>3</b> Investigate & verify</span></div>
       <section className={s.panel} aria-label="New investigation">
         <div className={s.tabs} role="tablist" aria-label="Project source">
           {(
@@ -139,13 +150,13 @@ export default function Investigate() {
               ["example", "Use example"],
             ] as [Source, string][]
           ).map(([id, label]) => (
-            <button key={id} type="button" role="tab" aria-selected={source === id} className={cx(s.tab, source === id && s.tabOn)} onClick={() => setSource(id)}>
+            <button key={id} type="button" role="tab" id={`source-tab-${id}`} aria-controls="source-panel" aria-selected={source === id} className={cx(s.tab, source === id && s.tabOn)} onClick={() => setSource(id)}>
               {label}
             </button>
           ))}
         </div>
 
-        <div className={s.formGrid}>
+        <div className={s.formGrid} role="tabpanel" id="source-panel" aria-labelledby={`source-tab-${source}`}>
           <div className={s.field}>
             {source === "upload" && (
               <FilePick
@@ -176,6 +187,8 @@ export default function Investigate() {
                 <span className={s.hint}>{live ? "Runs live on the connected backend." : "Opens the recorded run."}</span>
               </label>
             )}
+            {source !== "example" && <div className={s.setupNote}><Icon name="shieldCheck" size={18} /><div><strong>Your project stays yours.</strong><p>Investigations work on a sandboxed copy. Review the evidence and patch before applying a change.</p><Link href="/docs#projects">Supported projects →</Link></div></div>}
+            {source === "example" && <div className={s.setupNote}><Icon name="play" size={20} /><div><strong>No setup required</strong><p>Select a real incident to follow the complete debugging workflow.</p></div></div>}
           </div>
 
           {source !== "example" && (
@@ -189,6 +202,7 @@ export default function Investigate() {
                   onChange={(e) => setIncident(e.target.value)}
                   maxLength={4000}
                 />
+                <span className={s.hint}>{incident.length}/4,000 characters · At least 10 characters</span>
               </label>
               <FilePick label="Logs (optional)" hint="JSON lines or plain text: .log, .txt, .json" accept=".log,.txt,.json,.jsonl" multiple files={logs} onChange={setLogs} />
               <FilePick label="Screenshots (optional)" hint="PNG, JPEG, WebP or GIF; the model reads them as evidence" accept="image/png,image/jpeg,image/webp,image/gif" multiple files={shots} onChange={setShots} />
@@ -219,13 +233,13 @@ export default function Investigate() {
           )}
         </div>
 
-        {error && <p className={s.errorText}>{error}</p>}
-        <div className={s.actions}>
+        {error && <p className={s.errorText} role="alert">{error}</p>}
+        <div className={s.formActions}><p className={s.hint}>{source === "example" ? "Real incidents. Reproducing tests. Verifiable outcomes." : ready ? "Ready to investigate. Your original files stay unchanged." : "Connect a project and describe the incident to continue."}</p><div className={s.actions}>
           <button type="button" className={cx(s.btn, s.btnPrimary, s.btnLg)} onClick={start} disabled={busy || !ready || (source !== "example" && !live)}>
             {busy ? "Starting…" : source === "example" && !live ? "Watch the recorded run" : "Start investigation"} <Icon name="arrowRight" size={16} />
           </button>
           {source !== "example" && !live && <span className={s.hint}>Needs a TracePilot backend.</span>}
-        </div>
+        </div></div>
       </section>
     </AppShell>
   );

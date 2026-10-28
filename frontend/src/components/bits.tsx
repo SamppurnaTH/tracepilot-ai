@@ -3,7 +3,8 @@
 import { useId, useState } from "react";
 import s from "./app.module.css";
 
-export const cx = (...names: (string | false | undefined | null)[]) => names.filter(Boolean).join(" ");
+import { cx } from "@/lib/styles";
+export { cx };
 
 /**
  * The TracePilot AI mark (also public/brand/mark.svg): the letter A for AI, a flight path from error

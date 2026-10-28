@@ -26,3 +26,6 @@ Thumbs.db
 
 # TracePilot hand-off output
 tracepilot-out/
+
+# Local preview logs
+frontend/preview.*.log

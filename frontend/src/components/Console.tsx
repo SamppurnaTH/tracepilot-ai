@@ -464,11 +464,13 @@ export function Console({
   state,
   startedAt,
   controls,
+  recorded = false,
 }: {
   scenario: ScenarioSummary;
   state: RunState;
   startedAt?: number;
   controls?: React.ReactNode;
+  recorded?: boolean;
 }) {
   const [tab, setTab] = useState("progress");
   const files = splitDiff(state.diff || "");
@@ -485,7 +487,7 @@ export function Console({
       <span className={cx(s.pill, state.error === "Stopped by the user" ? s.pillAccent : s.pillBad)}>{state.error === "Stopped by the user" ? "Stopped" : "Failed"}</span>
     ) : (
       <span className={cx(s.pill, s.pillAccent)}>
-        <span className={s.pulse} /> Running
+        <span className={s.pulse} /> {recorded ? "Replaying" : "Running"}
       </span>
     );
   const patchFiles = files.filter((f) => !isTestPath(f.path));
@@ -499,7 +501,7 @@ export function Console({
           <h2 id="console-title" className={s.headTitle}>
             Investigation: {rest.length ? `${service.replace(/ API$/, "")} · ${rest.join(":").trim()}` : scenario.title}
           </h2>
-          <span className={s.lang}>Python</span>
+          <span className={s.lang}>{scenario.language === "java" ? "Java" : "Python"}</span>
           {statusPill}
         </div>
         <div className={s.headMeta}>
@@ -513,7 +515,7 @@ export function Console({
           )}
           {date && <span className={s.hideNarrow}>{date} UTC</span>}
           <CopyButton
-            text={typeof window === "undefined" ? "" : `${window.location.origin}${window.location.pathname}#${scenario.id}`}
+            text={typeof window === "undefined" ? "" : window.location.href}
             label="Share"
             className={s.ghostBtn}
           />
@@ -525,12 +527,12 @@ export function Console({
         <div className={s.main}>
           <div className={s.tabs} role="tablist" aria-label="Investigation views">
             {TABS.map(([id, label, icon]) => (
-              <button key={id} type="button" role="tab" aria-selected={tab === id} className={cx(s.tab, tab === id && s.tabOn)} onClick={() => setTab(id)}>
+              <button key={id} type="button" role="tab" id={`console-tab-${id}`} aria-controls="console-panel" aria-selected={tab === id} className={cx(s.tab, tab === id && s.tabOn)} onClick={() => setTab(id)}>
                 <Icon name={icon} size={15} /> {label}
               </button>
             ))}
           </div>
-          <div className={s.tabBody} role="tabpanel">
+          <div className={s.tabBody} role="tabpanel" id="console-panel" aria-labelledby={`console-tab-${tab}`}>
             {tab === "progress" && (
               <div className={s.progress}>
                 <Terminal items={state.timeline} startedAt={startedAt} />

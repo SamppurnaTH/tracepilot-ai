@@ -1,0 +1,11 @@
+.footer { width:100%; margin-top:32px; border-top:1px solid #dfe6f2; color:#5b6982; font-size:12px; padding:28px 0 8px; }
+.top { display:grid; grid-template-columns:2fr 1fr 1fr; gap:32px; padding-bottom:28px; }
+.brand { display:flex; align-items:center; gap:9px; color:#14203b; text-decoration:none; font-size:16px; }
+.identity p { margin-top:12px; line-height:1.8; }
+.top nav { display:grid; gap:9px; align-content:start; }
+.top nav span { color:#19233a; font-weight:700; margin-bottom:4px; }
+.top nav a { text-decoration:none; }
+.top nav a:hover { color:#493dff; }
+.bottom { display:flex; flex-wrap:wrap; gap:10px 24px; justify-content:space-between; padding-top:18px; border-top:1px solid #e5eaf3; font-size:11px; }
+.note { color:#77839b; }
+@media(max-width:640px) { .top { grid-template-columns:1fr 1fr; gap:24px; } .identity { grid-column:1/-1; } }

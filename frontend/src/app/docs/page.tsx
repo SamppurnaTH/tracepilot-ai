@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import s from "@/components/app.module.css";
 import { AppShell, REPO_URL } from "@/components/AppShell";
 import { CopyButton, cx } from "@/components/bits";
@@ -14,6 +14,7 @@ const SECTIONS: [string, string, IconName][] = [
   ["projects", "Supported projects", "code"],
   ["architecture", "Architecture", "layers"],
   ["evaluation", "Evaluation results", "chart"],
+  ["administration", "Administration", "shieldCheck"],
   ["faq", "FAQ", "bulb"],
 ];
 
@@ -55,6 +56,12 @@ const OPTIONS: [string, string][] = [
 export default function Docs() {
   const { live } = useData();
   const [tab, setTab] = useState("Python project");
+  const [active, setActive] = useState("getting-started");
+  useEffect(() => {
+    const observer = new IntersectionObserver((entries) => { for (const entry of entries) { if (entry.isIntersecting) setActive(entry.target.id); } }, { rootMargin: "-10% 0px -65% 0px" });
+    document.querySelectorAll("section[id]").forEach((section) => observer.observe(section));
+    return () => observer.disconnect();
+  }, []);
   const code = QUICKSTART[tab].join("\n");
   return (
     <AppShell live={live}>
@@ -69,7 +76,7 @@ export default function Docs() {
       <div className={s.docs}>
         <nav className={s.docNav} aria-label="Documentation sections">
           {SECTIONS.map(([id, label, icon]) => (
-            <a key={id} href={`#${id}`} className={s.docLink}>
+            <a key={id} href={`#${id}`} className={cx(s.docLink, active === id && s.docLinkOn)} aria-current={active === id ? "location" : undefined} onClick={() => setActive(id)}>
               <Icon name={icon} size={16} /> {label}
             </a>
           ))}
@@ -165,6 +172,14 @@ export default function Docs() {
               <code className={s.inlineCode}>eval/</code>, <code className={s.inlineCode}>backend/scripts/compare.py</code> and{" "}
               <code className={s.inlineCode}>backend/scripts/eval.py</code>.
             </p>
+          </section>
+
+          <section id="administration" className={cx(s.panel, s.docSection)}>
+            <h2>Administration</h2>
+            <p>Set TRACEPILOT_ADMIN_EMAIL and TRACEPILOT_ADMIN_PASSWORD (at least 12 characters) in the backend environment before first sign-in. The first account is bootstrapped only when the account database is empty. There is no default password.</p>
+            <p>Set NEXT_PUBLIC_API_URL to your backend URL before building the frontend. For local use: http://127.0.0.1:8000. Restart the backend and rebuild the frontend after configuring them, then open the <Link href="/admin">admin plane</Link>.</p>
+            <p>Administrators create accounts and assign roles. Operators monitor and stop investigations. Viewers have read-only access. Suspending an account or changing its role revokes its sessions. Sessions expire after eight hours; reloading the page requires sign-in again.</p>
+            <p>Accounts are stored in runs/admin.sqlite3; set TRACEPILOT_ADMIN_DB to use a persistent volume. Passwords use salted PBKDF2 hashing. Keep the database private and use HTTPS when deployed. These roles protect /api/admin endpoints; the public demo APIs retain their existing access policy. Password recovery and email invitations are not included.</p>
           </section>
 
           <section id="faq" className={cx(s.panel, s.docSection)}>

@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from .admin import router as admin_router
 from .agent import Cancelled, Investigation
 from .cli import detect_app
 from .reviewer import Reviewer
@@ -148,10 +149,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="TracePilot AI", lifespan=lifespan)
+app.include_router(admin_router)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("TRACEPILOT_CORS_ORIGINS", "*").split(",")],
-    allow_methods=["GET", "POST"],  # uploads are multipart POSTs
+    allow_methods=["GET", "POST", "PATCH"],  # uploads are multipart POSTs
     allow_headers=["*"],
 )
 manager = RunManager()

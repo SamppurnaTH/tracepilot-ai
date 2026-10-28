@@ -809,3 +809,26 @@
   color: var(--console-muted);
   font-family: var(--font-mono);
 }
+
+/* Light investigation chrome frames the dark execution workspace. */
+.console { border-color: #dfe6f2; background: #fff; box-shadow: 0 5px 25px #19366308; }
+.head,.stepper,.controls,.tabs { --console-border: #e5eaf4; --console-text: #132038; --console-muted: #687893; --console-raised: #f4f6fc; --console-accent: #4b3dff; --console-accent-wash: #eeedff; --console-good: #00af7a; --console-good-wash: #ddfaee; background: #fcfdff; color: #132038; border-color: #e5eaf4; color-scheme: light; }
+.head { background: linear-gradient(100deg,#fff,#f8faff); }
+.headIcon { color: #f39512; background: #fff5e2; border-radius: 50%; }
+.lang { color: #2866e9; background: #e8efff; border: 0; }
+.pillAccent { color: #008e63; background: #dcfaee; }
+.stepNum { width: 26px; height: 26px; }
+.step_done .stepNum { color: #fff; }
+.step_current .stepNum { color: #fff; background: #00af7a; border-color: #00af7a; box-shadow: 0 0 0 4px #00af7a15; }
+.main { border-color: #e5eaf4; }
+.tabs { padding-top: 10px; }
+.tab { border: 1px solid #e5eaf4; border-radius: 6px 6px 0 0; padding: 9px; font-size: 12px; }
+.tabOn { background: #f3f3ff; color: #493dff; border-bottom: 2px solid #493dff; }
+.tabBody { background: #070e17; }
+/* Execution progress remains readable at every workspace width. */
+.progress { grid-template-columns: minmax(0,1fr); }
+.terminal { background: #070e17; }
+.terminalHead { background: #0d1828; }
+@media(min-width:1400px) { .body { grid-template-columns: minmax(0,1fr) 280px; } }
+@media print { .diffFile,.diff { overflow: visible; } .diffLine { white-space: pre-wrap; overflow-wrap: anywhere; min-width: 0; } }
+.summary { --console-text: #1e2b43; --console-muted: #71809a; --console-border: #e5eaf4; --console-accent: #5944f6; --console-good: #009c6e; --console-bad: #d14456; --console-surface: #f5f7fc; --console-raised: #eef1f8; --console-soft: #4b5972; color: #1e2b43; background: #fff; }

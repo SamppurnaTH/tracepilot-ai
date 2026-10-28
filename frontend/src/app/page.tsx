@@ -3,26 +3,12 @@
 import Link from "next/link";
 import s from "./landing.module.css";
 import a from "@/components/app.module.css";
-import { REPO_URL } from "@/components/AppShell";
-import { Logo, Wordmark, cx } from "@/components/bits";
+import { Footer } from "@/components/Footer";
+import { Logo, Wordmark } from "@/components/bits";
 import { Icon, type IconName } from "@/components/icons";
+import { WorkflowOverview } from "@/components/WorkflowOverview";
 import { estimateCost } from "@/lib/run";
 import { kTokens, minutes, useData } from "@/lib/useData";
-
-const FLOW: [string, string, IconName, string][] = [
-  ["1. Investigate", "Reads logs, code and screenshots; tests hypotheses with real requests", "search", a.iconViolet],
-  ["2. Reproduce", "Writes a test that fails on the current code, or uses one that already does", "flask", a.iconBlue],
-  ["3. Fix", "Patches a sandboxed copy; existing tests stay read-only", "code", a.iconGreen],
-  ["4. Verify", "Your test suite decides, then an independent model reviews the patch", "shieldCheck", a.iconAmber],
-  ["5. Hand-off", "Patch, PR description and a full report, ready to review", "file", a.iconPink],
-];
-
-const FEATURES: [string, string, IconName, string][] = [
-  ["Works on your code", "Python with pytest and Java with Maven. Upload a project, point at a repo, or use the CLI.", "code", a.iconViolet],
-  ["Knows when to stop", "When the cause is outside the code, like an expired API key, it says so instead of patching.", "minusCircle", a.iconAmber],
-  ["Independent review", "Muse Spark Open, an open-weight Meta model, rejects patches that only game the tests.", "eye", a.iconGreen],
-  ["Secure sandbox", "Docker with no network, a read-only root and a non-root user. Your files are never touched.", "shieldCheck", a.iconBlue],
-];
 
 export default function Landing() {
   const { comparison, index } = useData();
@@ -51,8 +37,8 @@ export default function Landing() {
               </span>
             </Link>
             <div className={s.links}>
-              <a href="#product">Product</a>
-              <a href="#how">How it works</a>
+              <Link href="/product">Product</Link>
+              <Link href="/product#how">How it works</Link>
               <Link href="/examples">Examples</Link>
               <Link href="/results">Results</Link>
               <Link href="/docs">Docs</Link>
@@ -64,15 +50,14 @@ export default function Landing() {
           <div className={s.heroGrid}>
             <div>
               <h1 className={s.title}>
-                From errors to <span className={s.gradient}>verified fixes</span>
+                From Errors to <span className={s.gradient}>Verified Fixes</span>
               </h1>
               <p className={s.lede}>
-                TracePilot AI investigates a failing service, writes a test that reproduces the bug, fixes it, proves the fix with your tests and an independent model,
-                and tells you exactly what to do. When the cause isn&apos;t in the code, it says so instead of patching.
+                TracePilot AI automatically investigates application issues, finds the root cause, generates a fix, verifies it with tests, and tells you exactly what to do.
               </p>
               <div className={s.heroActions}>
-                <Link href="/examples" className={s.cta}>
-                  Run live demo <Icon name="arrowRight" size={16} />
+                <Link href="/run?id=checkout&replay=1" className={s.cta}>
+                  Watch demo <Icon name="arrowRight" size={16} />
                 </Link>
                 <Link href="/examples" className={s.ghost}>
                   View example scenarios
@@ -80,6 +65,12 @@ export default function Landing() {
               </div>
             </div>
             <div className={s.stage} aria-hidden="true">
+              <div className={s.orbit} />
+              <div className={s.codeWindow}>
+                <div className={s.windowDots}><i /><i /><i /><span>checkout / validator.py</span></div>
+                <pre><span>def</span> validate_checkout(cart):{"\n"}  coupon = cart.get(<b>&quot;coupon&quot;</b>){"\n"}  <span>if</span> coupon is not None:{"\n"}    apply_coupon(coupon){"\n\n"}  <span>return</span> checkout(cart)</pre>
+                <div className={s.codeStatus}>● Reproducing test generated</div>
+              </div>
               <div className={s.stack}>
                 {(["Investigate", "Reproduce", "Fix", "Verify", "Hand-off"] as const).map((label, i) => (
                   <div key={label} className={s.layer}>
@@ -90,6 +81,7 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
+              <div className={s.testWindow}><span>VERIFICATION</span><code>✓ Reproduction test</code><code>✓ Regression suite</code><code>✓ Independent AI review</code><strong>All checks passed <Icon name="checkCircle" size={15} /></strong></div>
               <span className={s.check}>
                 <Icon name="check" size={30} />
               </span>
@@ -114,42 +106,7 @@ export default function Landing() {
       </header>
 
       <div className={s.inner}>
-        <section className={s.section} id="how" aria-labelledby="how-title">
-          <div className={s.center}>
-            <h2 id="how-title" className={s.h2}>
-              How TracePilot AI works
-            </h2>
-            <p className={s.sub}>A verification-first AI agent for real-world debugging, built on Meta Muse Spark.</p>
-          </div>
-          <ol className={s.flow}>
-            {FLOW.map(([title, text, icon, tone]) => (
-              <li key={title} className={s.flowStep}>
-                <span className={cx(s.flowIcon, tone)}>
-                  <Icon name={icon} size={22} />
-                </span>
-                <span className={s.flowTitle}>{title}</span>
-                <span className={s.flowText}>{text}</span>
-              </li>
-            ))}
-          </ol>
-        </section>
-
-        <section className={s.section} id="product" aria-labelledby="product-title">
-          <h2 id="product-title" className={s.h2}>
-            Built for real engineering work
-          </h2>
-          <div className={s.features}>
-            {FEATURES.map(([title, text, icon, tone]) => (
-              <article key={title} className={s.feature}>
-                <span className={cx(s.featureIcon, tone)}>
-                  <Icon name={icon} size={20} />
-                </span>
-                <h3 className={s.featureTitle}>{title}</h3>
-                <p className={s.featureText}>{text}</p>
-              </article>
-            ))}
-          </div>
-        </section>
+        <WorkflowOverview />
 
         <div className={s.band}>
           <div>
@@ -166,15 +123,7 @@ export default function Landing() {
           </div>
         </div>
 
-        <footer className={s.footer}>
-          <span>TracePilot AI · Meta Global AI Developer Hackathon · MIT licensed</span>
-          <span>
-            Investigator: muse-spark-1.3 · Reviewer: Muse Spark Open ·{" "}
-            <a href={REPO_URL} target="_blank" rel="noreferrer">
-              GitHub
-            </a>
-          </span>
-        </footer>
+        <Footer />
       </div>
     </div>
   );

@@ -41,7 +41,8 @@ export async function uploadsNeedKey(): Promise<boolean> {
 
 export async function loadRecordingIndex(): Promise<RecordingIndexEntry[]> {
   const resp = await fetch("/recordings/index.json");
-  return resp.ok ? resp.json() : [];
+  if (!resp.ok) throw new Error("The scenario library could not be loaded");
+  return resp.json();
 }
 
 export async function loadRecording(file: string): Promise<Recording> {

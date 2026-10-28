@@ -1,5 +1,9 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
+import { EmptyState, SkeletonCards } from "@/components/ScreenState";
+import { downloadText } from "@/lib/report";
 import s from "@/components/app.module.css";
 import { AppShell } from "@/components/AppShell";
 import { cx } from "@/components/bits";
@@ -33,7 +37,7 @@ function Bars({ title, sub, a, b, fmt }: { title: string; sub: string; a: number
           <div key={label} className={s.barCol}>
             <span className={s.barValue}>{fmt(v)}</span>
             <span className={s.barTrack}>
-              <span className={cx(s.bar, cls)} style={{ height: `${Math.max(6, (v / max) * 100)}%` }} />
+              <span className={cx(s.bar, cls)} style={{ height: `${(v / max) * 100}%` }} />
             </span>
             <span className={s.barLabel}>{label}</span>
           </div>
@@ -44,7 +48,8 @@ function Bars({ title, sub, a, b, fmt }: { title: string; sub: string; a: number
 }
 
 export default function Results() {
-  const { comparison, evaluation, live } = useData();
+  const { comparison, evaluation, live, comparisonLoading } = useData();
+  const [language, setLanguage] = useState("All");
   const tp = comparison?.systems.tracepilot;
   const plain = comparison?.systems.plain;
   const gamed = evaluation?.reviewer.gamed;
@@ -58,9 +63,10 @@ export default function Results() {
             Same model (muse-spark-1.3) · same sandbox, logs and tools · real incidents · judged by hidden acceptance tests that neither system sees.
           </p>
         </div>
+        <button className={s.btn} disabled={!comparison} onClick={() => downloadText("tracepilot-benchmark.json", JSON.stringify(comparison, null, 2))}><Icon name="download" size={15} /> Export benchmark</button>
       </div>
       {!tp || !plain ? (
-        <p className={s.muted}>Loading results…</p>
+        comparisonLoading ? <SkeletonCards /> : <EmptyState icon="chart" title="Benchmark unavailable" text="Benchmark data could not be loaded. Refresh the page to try again." />
       ) : (
         <>
           <section className={s.panel} aria-labelledby="bench-title">
@@ -79,6 +85,7 @@ export default function Results() {
             <h2 id="detail-title" className={s.panelTitle}>
               Detailed results
             </h2>
+            <div className={s.filters} role="group" aria-label="Benchmark language">{["All", "Python", "Java"].map((value) => <button key={value} className={cx(s.filter, language === value && s.filterOn)} aria-pressed={language === value} onClick={() => setLanguage(value)}>{value}</button>)}</div>
             <div className={s.tableWrap}>
               <table className={s.table}>
                 <thead>
@@ -94,7 +101,7 @@ export default function Results() {
                   </tr>
                 </thead>
                 <tbody>
-                  {Object.entries(comparison!.cases).map(([id, c]) => {
+                  {Object.entries(comparison!.cases).filter(([id]) => language === "All" || (CASE_LABEL[id]?.[1] ?? "Python") === language).map(([id, c]) => {
                     const [label, lang] = CASE_LABEL[id] ?? [id, "Python"];
                     const cell = (x?: { runs: number; correct: number; avg_tokens: number; avg_duration_s: number }) =>
                       x
@@ -108,7 +115,7 @@ export default function Results() {
                         : ["—", "—", "—"];
                     return (
                       <tr key={id}>
-                        <th scope="row">{label}</th>
+                        <th scope="row"><Link className={s.tableLink} href={`/run?id=${id}`}>{label}</Link></th>
                         <td>{lang}</td>
                         {cell(c.tracepilot).map((v, i) => (
                           <td key={`t${i}`}>{v}</td>

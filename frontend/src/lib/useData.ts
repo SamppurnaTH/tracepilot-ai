@@ -8,16 +8,18 @@ export function useData() {
   const [index, setIndex] = useState<RecordingIndexEntry[] | null>(null);
   const [comparison, setComparison] = useState<ComparisonSummary | null>(null);
   const [evaluation, setEvaluation] = useState<EvalSummary | null>(null);
+  const [indexError, setIndexError] = useState(false);
+  const [comparisonLoading, setComparisonLoading] = useState(true);
   const [live, setLive] = useState<boolean | null>(null);
   useEffect(() => {
     loadRecordingIndex()
       .then(setIndex)
-      .catch(() => setIndex([]));
-    loadComparison().then(setComparison);
-    loadEval().then(setEvaluation);
+      .catch(() => { setIndex([]); setIndexError(true); });
+    loadComparison().then(setComparison).catch(() => setComparison(null)).finally(() => setComparisonLoading(false));
+    loadEval().then(setEvaluation).catch(() => setEvaluation(null));
     backendAvailable().then(setLive);
   }, []);
-  return { index, comparison, evaluation, live };
+  return { index, comparison, evaluation, live, indexError, comparisonLoading };
 }
 
 export const kTokens = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}K` : String(n));

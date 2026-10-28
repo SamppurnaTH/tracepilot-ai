@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import s from "@/components/app.module.css";
+import { EmptyState, SkeletonCards } from "@/components/ScreenState";
 import { AppShell } from "@/components/AppShell";
 import { CopyButton, cx } from "@/components/bits";
 import { Console } from "@/components/Console";
@@ -19,6 +20,7 @@ function RunPage() {
   const id = params.get("id");
   const liveId = params.get("live");
   const saved = params.get("saved");
+  const replay = params.get("replay") === "1";
   const { index, live } = useData();
   const run = useRun();
   const [scenario, setScenario] = useState<ScenarioSummary | null>(null);
@@ -34,7 +36,7 @@ function RunPage() {
       if (!entry) return setError(`No recorded run called "${id}".`);
       setScenario(entry.scenario);
       loadRecording(entry.file)
-        .then((rec) => show(rec, false))
+        .then((rec) => show(rec, replay))
         .catch((err) => setError(String(err)));
     } else if (liveId) {
       getRun(liveId)
@@ -51,7 +53,7 @@ function RunPage() {
         })
         .catch((err) => setError(err instanceof Error ? err.message : String(err)));
     }
-  }, [id, liveId, saved, index, show, follow]);
+  }, [id, liveId, saved, index, show, follow, replay]);
 
   const state = run.state;
   const view = scenario ? { ...scenario, incident: scenario.incident || state.incident || "" } : null;
@@ -71,8 +73,11 @@ function RunPage() {
   const replayFromStart = async () => {
     const entry = index?.find((e) => e.scenario.id === id);
     if (!entry) return;
-    setWatching(true);
-    show(await loadRecording(entry.file), true);
+    try {
+      setError(null);
+      show(await loadRecording(entry.file), true);
+      setWatching(true);
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
   };
 
   const controls = (
@@ -121,13 +126,10 @@ function RunPage() {
           <CopyButton text={typeof window === "undefined" ? "" : window.location.href} label="Share" className={s.btn} />
         </div>
       </div>
-      {error && <p className={s.errorText}>{error}</p>}
-      {view && (done && state.report ? <RunResult scenario={view} state={state} startedAt={run.startedAt} /> : <Console scenario={view} state={state} startedAt={run.startedAt} controls={controls} />)}
-      {!id && !liveId && !saved && (
-        <p className={s.muted}>
-          Pick a run from <Link href="/examples">example scenarios</Link> or <Link href="/runs">my runs</Link>.
-        </p>
-      )}
+      {error && <EmptyState icon="minusCircle" title="Investigation unavailable" text={error} href="/examples" action="Browse scenarios" />}
+      {!view && !error && (id || liveId || saved) && <SkeletonCards count={2} />}
+      {view && (done && state.report ? <RunResult scenario={view} state={state} startedAt={run.startedAt} /> : <Console scenario={view} state={state} startedAt={run.startedAt} controls={controls} recorded={run.mode === "replay"} />)}
+      {!id && !liveId && !saved && <EmptyState icon="search" title="Every fix starts with an investigation" text="Choose an example to explore the workflow, or connect your own project." href="/examples" action="Explore scenarios" />}
     </AppShell>
   );
 }

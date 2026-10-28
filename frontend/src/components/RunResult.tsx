@@ -26,6 +26,7 @@ export function RunResult({ scenario, state, startedAt }: { scenario: ScenarioSu
     ? ["Summary", "Root cause", "Evidence", "Recommendation", "Activity log"]
     : ["Summary", "Root cause", "Patch", "Tests", "AI review", "Evidence", "Activity log"];
   const [tab, setTab] = useState("Summary");
+  const [exporting, setExporting] = useState(false);
 
   const facts: [IconName, string, string, string][] = [
     ["search", "Root cause", issue?.root_cause ?? state.hypotheses.find((h) => h.status === "confirmed")?.claim ?? "—", s.iconViolet],
@@ -39,17 +40,20 @@ export function RunResult({ scenario, state, startedAt }: { scenario: ScenarioSu
   ];
 
   const handoff = (
-    <div className={s.actions}>
+    <div className={s.handoff}>
+      <p className={s.handoffLabel}>READY FOR HAND-OFF</p><div className={s.actions}>
       <button type="button" className={cx(s.btn, s.btnPrimary)} onClick={() => downloadText(`tracepilot-${scenario.id}-report.md`, markdownReport(scenario, state))}>
         <Icon name="download" size={16} /> Download report
       </button>
       {!noCode && <CopyButton text={prDescription(scenario, state)} label="Copy PR description" className={s.btn} />}
       {state.diff && <CopyButton text={state.diff} label="Copy patch" className={s.btn} />}
+      <button className={s.btn} disabled={exporting} onClick={() => { setExporting(true); window.print(); setExporting(false); }}><Icon name="file" size={14} /> Print / Save PDF</button>
+      </div><p className={s.hint}>Report exports as Markdown. Use the print dialog to save a PDF.</p>
     </div>
   );
 
   return (
-    <section className={s.panel} aria-labelledby="result-title">
+    <section className={cx(s.panel, s.resultPanel)} aria-labelledby="result-title">
       <div className={s.runHead}>
         <div className={s.runTitle}>
           <span className={cx(s.chip, ok ? s.iconGreen : s.iconMuted)}>
@@ -61,21 +65,22 @@ export function RunResult({ scenario, state, startedAt }: { scenario: ScenarioSu
           <span className={cx(s.tag, ok ? s.sevPass : s.sevCritical)}>{noCode ? "No code change needed" : ok ? "Verified fix" : "Not verified"}</span>
         </div>
       </div>
+      <div className={s.resultMetrics}><span><Icon name="clock" size={14} /> {minutes(r.duration_s)}</span><span><Icon name="layers" size={14} /> {tokens.toLocaleString()} tokens</span><span><Icon name="file" size={14} /> {code.length} code files changed</span><span><Icon name="shieldCheck" size={14} /> {noCode ? "External root cause" : state.secondOpinion ? VERDICT[state.secondOpinion.verdict] : "Review unavailable"}</span></div>
       <div className={s.tabs} role="tablist" aria-label="Result views">
         {tabs.map((t) => (
-          <button key={t} type="button" role="tab" aria-selected={tab === t} className={cx(s.tab, tab === t && s.tabOn)} onClick={() => setTab(t)}>
+          <button key={t} type="button" role="tab" id={`result-tab-${t.replaceAll(" ", "-")}`} aria-controls="result-panel" aria-selected={tab === t} className={cx(s.tab, tab === t && s.tabOn)} onClick={() => setTab(t)}>
             {t}
           </button>
         ))}
       </div>
 
-      <div role="tabpanel">
+      <div role="tabpanel" id="result-panel" aria-labelledby={`result-tab-${tab.replaceAll(" ", "-")}`}>
         {tab === "Summary" && (
           <div className={s.resultGrid}>
             <div className={s.field} style={{ gap: 12 }}>
-              <div className={cx(s.verdict, ok ? s.verdictGood : s.verdictBad)}>
-                <span className={s.verdictIcon} style={{ background: ok ? "var(--good)" : "var(--bad)" }}>
-                  <Icon name={ok ? "check" : "minusCircle"} size={22} />
+              <div className={cx(s.verdict, noCode ? s.verdictInfo : ok ? s.verdictGood : s.verdictBad)}>
+                <span className={s.verdictIcon} style={{ background: noCode ? "#2570ff" : ok ? "var(--good)" : "var(--bad)" }}>
+                  <Icon name={noCode ? "bulb" : ok ? "check" : "minusCircle"} size={22} />
                 </span>
                 <div>
                   <p className={s.verdictTitle}>{noCode ? "No code change needed" : ok ? "Fix verified" : "Not verified"}</p>
@@ -114,7 +119,7 @@ export function RunResult({ scenario, state, startedAt }: { scenario: ScenarioSu
                 </>
               ) : (
                 <>
-                  <span className={s.label}>Patch preview</span>
+                  <div className={s.pageHead}><span className={s.label}>Patch preview</span><button className={cx(s.btn,s.btnSm)} onClick={() => setTab("Patch")}>View full patch <Icon name="arrowRight" size={13} /></button></div>
                   {code.length ? (
                     <div className={s.light}>
                       <DiffBlock files={code.slice(0, 1)} />

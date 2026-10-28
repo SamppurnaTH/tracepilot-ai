@@ -1,0 +1,19 @@
+.eyebrow { color:#7264da; font-size:10px; font-weight:700; letter-spacing:.16em; margin-bottom:10px; }
+.loginGrid { display:grid; grid-template-columns:minmax(280px,1fr) minmax(280px,1fr); gap:24px; align-items:start; }
+.login { padding:32px; }
+.form { display:grid; gap:18px; margin-top:12px; }
+.access { padding:32px; background:linear-gradient(130deg,#fff,#f2f4ff); }
+.role { display:flex; gap:14px; padding:16px 0; border-bottom:1px solid #e2e7f3; }
+.role h3 { font-size:14px; margin-bottom:6px; }
+.role p { font-size:13px; color:#66718c; line-height:1.7; }
+.settings { margin:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 32px; }
+.settings div { padding:15px 0; border-bottom:1px solid #e9edf5; }
+.settings dt { font-size:12px; color:#68738c; }
+.settings dd { margin:6px 0 0; font-size:14px; font-weight:600; overflow-wrap:anywhere; }
+.create { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+.create button { justify-self:start; }
+@media(max-width:1000px) { .loginGrid { grid-template-columns:1fr; } }
+@media(max-width:640px) { .login,.access { padding:22px; } .settings,.create { grid-template-columns:1fr; } }
+.tabPanel { display: grid; gap: 24px; }
+.roleCards { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; }
+@media(max-width:800px) { .roleCards { grid-template-columns: 1fr; } }
