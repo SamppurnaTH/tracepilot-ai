@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from .admin import router as admin_router, workspace_router, workspace_user, workspace_writer
+from .admin import current_user, router as admin_router, workspace_router, workspace_user, workspace_writer
 from .agent import Cancelled, Investigation
 from .cli import detect_app
 from .reviewer import Reviewer
@@ -186,7 +186,23 @@ def list_scenarios() -> list[dict]:
     return [s.summary() for s in SCENARIOS.values()]
 
 
-@app.post("/api/investigations", dependencies=[Depends(workspace_writer)], status_code=202)
+# The built-in example scenarios are the public demo: anyone can run and watch them (within the
+# concurrency and daily limits). A signed-in caller is held to their workspace role. Investigations
+# of uploaded or cloned code need a workspace operator or the upload access key.
+def optional_user(authorization: str = Header("")) -> dict | None:
+    return workspace_user(current_user(authorization)) if authorization else None
+
+
+def optional_writer(authorization: str = Header("")) -> dict | None:
+    return workspace_writer(workspace_user(current_user(authorization))) if authorization else None
+
+
+def _require_user_for_custom(scenario: str, user: dict | None) -> None:
+    if scenario == "custom" and user is None:
+        raise HTTPException(401, "sign in to the workspace to see investigations of uploaded code")
+
+
+@app.post("/api/investigations", dependencies=[Depends(optional_writer)], status_code=202)
 def start_investigation(body: StartRequest) -> dict:
     if body.scenario not in SCENARIOS:
         raise HTTPException(404, f"unknown scenario '{body.scenario}'")
@@ -207,7 +223,7 @@ def _check_key() -> None:
         raise HTTPException(503, str(exc)) from exc
 
 
-@app.post("/api/investigations/custom", dependencies=[Depends(workspace_writer)], status_code=202)
+@app.post("/api/investigations/custom", status_code=202)
 async def start_custom_investigation(
     incident: str = Form(..., min_length=10, max_length=4000),
     project: UploadFile | None = File(None),
@@ -217,10 +233,11 @@ async def start_custom_investigation(
     tests: str | None = Form(None),
     test_args: str | None = Form(None),
     x_tracepilot_key: str = Header(""),
+    user: dict | None = Depends(optional_writer),
 ) -> dict:
     """Investigate your own project: upload a ZIP or give a public repository URL, plus optional logs and screenshots."""
     key = _upload_key()
-    if key and not hmac.compare_digest(x_tracepilot_key.encode(), key.encode()):
+    if user is None and key and not hmac.compare_digest(x_tracepilot_key.encode(), key.encode()):
         raise HTTPException(401, "investigating your own code needs an access key")
     _check_key()
     _require_docker()
@@ -255,10 +272,11 @@ async def start_custom_investigation(
     return manager.start_custom(title, build, cleanup=lambda: shutil.rmtree(base, ignore_errors=True)).summary()
 
 
-@app.post("/api/investigations/{run_id}/cancel", dependencies=[Depends(workspace_writer)])
-def cancel_investigation(run_id: str) -> dict:
+@app.post("/api/investigations/{run_id}/cancel")
+def cancel_investigation(run_id: str, user: dict | None = Depends(optional_writer)) -> dict:
     """Ask a running investigation to stop; it ends before its next model call."""
     run = _get_run(run_id)
+    _require_user_for_custom(run.scenario, user)
     if run.status == "running":
         run.stop.set()
     return run.summary()
@@ -276,16 +294,18 @@ def _get_run(run_id: str) -> Run:
     return run
 
 
-@app.get("/api/investigations/{run_id}", dependencies=[Depends(workspace_user)])
-def get_investigation(run_id: str) -> dict:
+@app.get("/api/investigations/{run_id}")
+def get_investigation(run_id: str, user: dict | None = Depends(optional_user)) -> dict:
     run = _get_run(run_id)
+    _require_user_for_custom(run.scenario, user)
     return {**run.summary(), "report": run.report}
 
 
-@app.get("/api/investigations/{run_id}/events", dependencies=[Depends(workspace_user)])
-async def stream_events(run_id: str) -> StreamingResponse:
+@app.get("/api/investigations/{run_id}/events")
+async def stream_events(run_id: str, user: dict | None = Depends(optional_user)) -> StreamingResponse:
     """Server-sent events: replays everything so far, then streams new events until the run ends."""
     run = _get_run(run_id)
+    _require_user_for_custom(run.scenario, user)
 
     async def generate():
         sent = 0
@@ -301,9 +321,9 @@ async def stream_events(run_id: str) -> StreamingResponse:
     return StreamingResponse(generate(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
-@app.get("/api/runs", dependencies=[Depends(workspace_user)])
-def list_saved_runs() -> list[dict]:
-    """Saved runs on disk, newest first, for replay."""
+@app.get("/api/runs")
+def list_saved_runs(user: dict | None = Depends(optional_user)) -> list[dict]:
+    """Saved runs on disk, newest first, for replay. Without sign-in, only example-scenario runs."""
     if not RUNS_DIR.exists():
         return []
     runs = []
@@ -311,6 +331,8 @@ def list_saved_runs() -> list[dict]:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
+            continue
+        if user is None and data.get("scenario") == "custom":
             continue
         report = data.get("report") or {}
         usage = report.get("usage") or {}
@@ -324,9 +346,11 @@ def list_saved_runs() -> list[dict]:
     return runs
 
 
-@app.get("/api/runs/{name}", dependencies=[Depends(workspace_user)])
-def get_saved_run(name: str) -> dict:
+@app.get("/api/runs/{name}")
+def get_saved_run(name: str, user: dict | None = Depends(optional_user)) -> dict:
     path = (RUNS_DIR / f"{name}.json").resolve()
     if not path.is_relative_to(RUNS_DIR.resolve()) or not path.exists():
         raise HTTPException(404, "run not found")
-    return json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8"))
+    _require_user_for_custom(data.get("scenario", ""), user)
+    return data

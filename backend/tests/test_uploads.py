@@ -53,11 +53,13 @@ def client(monkeypatch, tmp_path):
     # These tests isolate investigation behavior; authorization is covered in test_admin.py.
     main.app.dependency_overrides[main.workspace_user] = lambda: {"role": "operator", "workspace_access": True}
     main.app.dependency_overrides[main.workspace_writer] = lambda: {"role": "operator", "workspace_access": True}
+    main.app.dependency_overrides[main.optional_user] = lambda: {"role": "operator", "workspace_access": True}
+    main.app.dependency_overrides[main.optional_writer] = lambda: {"role": "operator", "workspace_access": True}
     try:
         yield TestClient(main.app)
     finally:
-        main.app.dependency_overrides.pop(main.workspace_user, None)
-        main.app.dependency_overrides.pop(main.workspace_writer, None)
+        for dependency in (main.workspace_user, main.workspace_writer, main.optional_user, main.optional_writer):
+            main.app.dependency_overrides.pop(dependency, None)
 
 
 def wait(client, run_id, until=("completed", "failed", "cancelled")) -> dict:
@@ -154,6 +156,9 @@ def test_real_target_zip_detects_python_and_app(client):
 
 
 def test_upload_key_is_required_when_configured(client, monkeypatch):
+    # Signed out: the upload key is the only way in, and the run stays private to the workspace.
+    main.app.dependency_overrides.pop(main.optional_writer)
+    main.app.dependency_overrides.pop(main.optional_user)
     monkeypatch.setenv("TRACEPILOT_UPLOAD_KEY", "judges-only")
     assert client.get("/health").json()["uploads_need_key"] is True
     form = {"data": {"incident": "Checkout returns 500 for empty carts"}, "files": [("project", ("svc.zip", project_zip({"svc/app.py": ""}), "application/zip"))]}
@@ -161,7 +166,12 @@ def test_upload_key_is_required_when_configured(client, monkeypatch):
     assert client.post("/api/investigations/custom", headers={"X-TracePilot-Key": "wrong"}, **form).status_code == 401
     resp = client.post("/api/investigations/custom", headers={"X-TracePilot-Key": "judges-only"}, **form)
     assert resp.status_code == 202, resp.text
-    wait(client, resp.json()["id"])
+    assert client.get(f"/api/investigations/{resp.json()['id']}").status_code == 401
+    for _ in range(100):
+        if main.manager.runs[resp.json()["id"]].status != "running":
+            break
+        time.sleep(0.05)
+    assert [r for r in client.get("/api/runs").json() if r["scenario"] == "custom"] == []
 
 
 def test_public_server_refuses_to_run_without_docker(client, monkeypatch):

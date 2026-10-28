@@ -75,8 +75,9 @@ def test_portal_permissions_and_audit(client, monkeypatch):
     assert client.get("/api/admin/roles", headers=admin).status_code == 200
     assert client.get("/api/workspace/me", headers=admin).status_code == 403
     assert client.get("/api/investigations", headers=admin).status_code == 403
-    assert client.get("/api/runs").status_code == 401
-    assert client.post("/api/investigations", json={"scenario": "orders"}).status_code == 401
+    # The example scenarios are the public demo: no sign-in needed to list saved runs or start one.
+    assert client.get("/api/runs").status_code == 200
+    assert client.post("/api/investigations", json={"scenario": "no-such-scenario"}).status_code == 404
     for role in ("operator", "viewer"):
         email = f"{role}@example.com"
         created = client.post("/api/admin/users", headers=admin, json={"name": role, "email": email, "password": "secure-password-123", "role": role})
