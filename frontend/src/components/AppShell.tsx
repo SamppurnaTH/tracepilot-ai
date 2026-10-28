@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/AreaLink";
 import { useAuth } from "./AuthProvider";
 import { Footer } from "./Footer";
 import { useState } from "react";
@@ -21,11 +21,13 @@ const LINKS: [string, string, IconName][] = [
 export const REPO_URL = "https://github.com/SamppurnaTH/tracepilot-ai";
 
 export function AppShell({ live, children }: { live?: boolean | null; children: React.ReactNode }) {
-  const path = usePathname();
+  // Public demo pages share this shell; compare them against the workspace routes the nav is written in.
+  const pathname = usePathname();
+  const path = pathname?.startsWith("/app") ? pathname : `/app${pathname ?? ""}`;
   const { user, workspace } = useAuth();
   const links = LINKS.filter(([, href]) => user?.role !== "viewer" || href !== "/app/investigate");
   const [menuOpen, setMenuOpen] = useState(false);
-  const currentPage = LINKS.find(([, href]) => path === href)?.[0] ?? (path === "/app/run" ? "Investigation" : path === "/admin" ? "Administration" : "Workspace");
+  const currentPage = LINKS.find(([, href]) => path === href)?.[0] ?? (path === "/app/run" ? "Investigation" : pathname === "/admin" ? "Administration" : "Workspace");
   return (
     <div className={s.shell}>
       <a href="#main-content" className={s.skipLink}>Skip to content</a>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "./AuthProvider";
-import Link from "next/link";
+import Link from "@/components/AreaLink";
 import { Logo, Wordmark } from "./bits";
 import s from "./footer.module.css";
 

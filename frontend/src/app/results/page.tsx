@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/AreaLink";
 import { EmptyState, SkeletonCards } from "@/components/ScreenState";
 import { downloadText } from "@/lib/report";
 import s from "@/components/app.module.css";

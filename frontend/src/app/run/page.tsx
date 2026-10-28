@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
-import Link from "next/link";
+import Link from "@/components/AreaLink";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import s from "@/components/app.module.css";

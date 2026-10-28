@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useAreaPath } from "@/components/AreaLink";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import s from "@/components/app.module.css";
@@ -76,6 +76,7 @@ function FilePick({ label, hint, accept, multiple, files, onChange }: { label: s
 export default function Investigate() {
   const { index, live } = useData();
   const router = useRouter();
+  const area = useAreaPath();
   const [source, setSource] = useState<Source>("upload");
   const [project, setProject] = useState<File[]>([]);
   const [repo, setRepo] = useState("");
@@ -103,13 +104,13 @@ export default function Investigate() {
   const start = async () => {
     setError(null);
     if (source === "example" && !live) {
-      router.push(`/app/run?id=${example}&replay=1`);
+      router.push(area(`/app/run?id=${example}&replay=1`));
       return;
     }
     setBusy(true);
     try {
       if (source === "example") {
-        router.push(`/app/run?live=${await startLiveRun(example)}`);
+        router.push(area(`/app/run?live=${await startLiveRun(example)}`));
         return;
       }
       const form = new FormData();
@@ -124,7 +125,7 @@ export default function Investigate() {
         sessionStorage.setItem(KEY_STORE, accessKey.trim());
       } catch {}
       const run = await startCustomRun(form, accessKey.trim() || undefined);
-      router.push(`/app/run?live=${run.id}`);
+      router.push(area(`/app/run?live=${run.id}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);

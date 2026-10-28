@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/AreaLink";
 import { Icon, type IconName } from "./icons";
 import { cx } from "@/lib/styles";
 import s from "@/app/landing.module.css";

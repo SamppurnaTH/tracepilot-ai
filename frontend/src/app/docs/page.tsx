@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/AreaLink";
 import { useEffect, useState } from "react";
 import s from "@/components/app.module.css";
 import { AppShell, REPO_URL } from "@/components/AppShell";

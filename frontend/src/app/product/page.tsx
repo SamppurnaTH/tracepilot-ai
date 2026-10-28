@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/AreaLink";
 import { AppShell } from "@/components/AppShell";
 import { WorkflowOverview } from "@/components/WorkflowOverview";
 import { Icon } from "@/components/icons";

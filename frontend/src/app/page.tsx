@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/AreaLink";
 import s from "./landing.module.css";
 import a from "@/components/app.module.css";
 import { Footer } from "@/components/Footer";

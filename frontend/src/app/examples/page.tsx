@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
-import Link from "next/link";
+import Link, { useAreaPath } from "@/components/AreaLink";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import s from "@/components/app.module.css";
@@ -43,6 +43,7 @@ export default function Examples() {
   const [filter, setFilter] = useState("All");
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const area = useAreaPath();
   const test = FILTERS.find(([name]) => name === filter)![1];
 
   const runLive = async (id: string) => {
@@ -50,7 +51,7 @@ export default function Examples() {
     setStarting(id);
     try {
       const runId = await startLiveRun(id);
-      router.push(`/app/run?live=${runId}`);
+      router.push(area(`/app/run?live=${runId}`));
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
       setStarting(null);
