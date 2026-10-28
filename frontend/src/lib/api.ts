@@ -1,7 +1,9 @@
 import type { Recording, RunEvent, ScenarioSummary } from "./run";
 
 // The live backend is optional: without it the page replays recorded runs.
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000").replace(/\/$/, "");
+// A deployed build only contacts a backend when NEXT_PUBLIC_API_URL is set; local dev defaults to localhost.
+const DEFAULT_API = process.env.NODE_ENV === "development" ? "http://localhost:8000" : "";
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? DEFAULT_API).replace(/\/$/, "");
 
 export interface RecordingIndexEntry {
   scenario: ScenarioSummary;
@@ -11,6 +13,7 @@ export interface RecordingIndexEntry {
 }
 
 export async function backendAvailable(): Promise<boolean> {
+  if (!API_URL) return false;
   try {
     const resp = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(2500) });
     return resp.ok;
