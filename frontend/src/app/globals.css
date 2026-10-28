@@ -1,29 +1,53 @@
-/* TracePilot design tokens. A quiet, neutral developer-tool palette with a single blue accent;
-   green, red and amber only ever mean state (verified, failing, needs attention). */
+/* TracePilot design tokens. A bright product surface with an indigo-to-violet accent; the sidebar and the
+   investigation console stay dark in both themes, like an IDE panel. Green, red and amber only mean state. */
 :root {
-  --bg: #f7f8fa;
+  --bg: #f5f6fb;
   --surface: #ffffff;
-  --surface-2: #f2f4f7;
-  --border: #e3e6eb;
-  --border-strong: #cdd3dc;
-  --text: #0f1419;
-  --text-2: #4f5968;
-  --text-3: #858e9c;
-  --accent: #2f5bea;
-  --accent-hover: #254ad0;
-  --accent-wash: #edf1fe;
+  --surface-2: #f2f3f9;
+  --border: #e5e7f0;
+  --border-strong: #d3d6e4;
+  --text: #0e1124;
+  --text-2: #4a5068;
+  --text-3: #8a8fa6;
+  --accent: #5a3ff2;
+  --accent-2: #8b5cf6;
+  --accent-hover: #4a30de;
+  --accent-wash: #efecff;
   --on-accent: #ffffff;
-  --good: #12805c;
-  --good-wash: #e6f4ee;
-  --bad: #c62f3c;
-  --bad-wash: #fcebed;
-  --warn: #a35c00;
-  --warn-wash: #fdf2e1;
-  --code-bg: #f6f7f9;
-  --shadow: 0 1px 2px rgb(15 20 25 / 0.04), 0 1px 1px rgb(15 20 25 / 0.03);
-  --shadow-lg: 0 12px 32px -12px rgb(15 20 25 / 0.14);
+  --good: #16a34a;
+  --good-wash: #e8f7ee;
+  --bad: #dc2626;
+  --bad-wash: #fdecec;
+  --warn: #c76a04;
+  --warn-wash: #fff4e0;
+  --blue: #2f6bf2;
+  --blue-wash: #e8f0ff;
+  --pink: #e0457b;
+  --pink-wash: #fdeaf1;
+  --code-bg: #f6f7fb;
+  --shadow: 0 1px 2px rgb(14 17 36 / 0.05), 0 1px 3px rgb(14 17 36 / 0.04);
+  --shadow-lg: 0 18px 40px -18px rgb(30 20 90 / 0.25);
 
-  --font-sans: var(--font-geist), "Segoe UI", system-ui, -apple-system, sans-serif;
+  /* Always-dark surfaces: the sidebar and the investigation console. */
+  --nav-bg: #11132a;
+  --nav-surface: #1a1d38;
+  --nav-text: #e7e8f5;
+  --nav-muted: #9a9dbc;
+  --console-bg: #0f1226;
+  --console-surface: #161a33;
+  --console-raised: #1c2140;
+  --console-border: #262b4c;
+  --console-text: #e6e8f4;
+  --console-muted: #9096b8;
+  --console-good: #4ade80;
+  --console-good-wash: rgb(74 222 128 / 0.12);
+  --console-bad: #f87171;
+  --console-bad-wash: rgb(248 113 113 / 0.12);
+  --console-accent: #a594ff;
+  --console-accent-wash: rgb(165 148 255 / 0.14);
+  --console-warn: #fbbf24;
+
+  --font-sans: var(--font-jakarta), "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "Cascadia Mono", Consolas, monospace;
 
   --text-xs: 0.75rem;
@@ -32,61 +56,75 @@
   --text-lg: 1.0625rem;
   --text-xl: 1.375rem;
   --text-2xl: clamp(1.5rem, 1.2rem + 1.2vw, 1.875rem);
-  --text-hero: clamp(2.1rem, 1.4rem + 3vw, 3.5rem);
-  --radius: 10px;
-  --radius-sm: 6px;
-  --max: 1200px;
+  --text-hero: clamp(2.2rem, 1.5rem + 3vw, 3.4rem);
+  --radius: 14px;
+  --radius-sm: 9px;
+  --sidebar: 236px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0b0d10;
-    --surface: #121519;
-    --surface-2: #181c21;
-    --border: #232830;
-    --border-strong: #313843;
-    --text: #e8eaed;
-    --text-2: #a4acb8;
-    --text-3: #6f7886;
-    --accent: #6f8cff;
-    --accent-hover: #8aa1ff;
-    --accent-wash: #19203d;
-    --on-accent: #0b0d10;
-    --good: #3ecf8e;
-    --good-wash: #0f261c;
-    --bad: #ff6b76;
-    --bad-wash: #2c1418;
-    --warn: #f0b04a;
-    --warn-wash: #2a2010;
-    --code-bg: #0e1013;
-    --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
-    --shadow-lg: 0 16px 40px -16px rgb(0 0 0 / 0.6);
+    --bg: #0b0d1a;
+    --surface: #13162b;
+    --surface-2: #1a1e38;
+    --border: #252a48;
+    --border-strong: #33395e;
+    --text: #eceef8;
+    --text-2: #a6abc8;
+    --text-3: #7378a0;
+    --accent: #8a76ff;
+    --accent-2: #b08cff;
+    --accent-hover: #9f8fff;
+    --accent-wash: #221d4a;
+    --on-accent: #0b0d1a;
+    --good: #4ade80;
+    --good-wash: #12291f;
+    --bad: #f87171;
+    --bad-wash: #2e1519;
+    --warn: #fbbf24;
+    --warn-wash: #2c2110;
+    --blue: #7aa2ff;
+    --blue-wash: #18213f;
+    --pink: #f47fa8;
+    --pink-wash: #2d1624;
+    --code-bg: #0f1226;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+    --shadow-lg: 0 18px 40px -18px rgb(0 0 0 / 0.7);
+    --nav-bg: #0e1024;
+    --nav-surface: #171a35;
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0b0d10;
-  --surface: #121519;
-  --surface-2: #181c21;
-  --border: #232830;
-  --border-strong: #313843;
-  --text: #e8eaed;
-  --text-2: #a4acb8;
-  --text-3: #6f7886;
-  --accent: #6f8cff;
-  --accent-hover: #8aa1ff;
-  --accent-wash: #19203d;
-  --on-accent: #0b0d10;
-  --good: #3ecf8e;
-  --good-wash: #0f261c;
-  --bad: #ff6b76;
-  --bad-wash: #2c1418;
-  --warn: #f0b04a;
-  --warn-wash: #2a2010;
-  --code-bg: #0e1013;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
-  --shadow-lg: 0 16px 40px -16px rgb(0 0 0 / 0.6);
+  --bg: #0b0d1a;
+  --surface: #13162b;
+  --surface-2: #1a1e38;
+  --border: #252a48;
+  --border-strong: #33395e;
+  --text: #eceef8;
+  --text-2: #a6abc8;
+  --text-3: #7378a0;
+  --accent: #8a76ff;
+  --accent-2: #b08cff;
+  --accent-hover: #9f8fff;
+  --accent-wash: #221d4a;
+  --on-accent: #0b0d1a;
+  --good: #4ade80;
+  --good-wash: #12291f;
+  --bad: #f87171;
+  --bad-wash: #2e1519;
+  --warn: #fbbf24;
+  --warn-wash: #2c2110;
+  --blue: #7aa2ff;
+  --blue-wash: #18213f;
+  --pink: #f47fa8;
+  --pink-wash: #2d1624;
+  --code-bg: #0f1226;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 18px 40px -18px rgb(0 0 0 / 0.7);
+  --nav-bg: #0e1024;
+  --nav-surface: #171a35;
   color-scheme: dark;
 }
 
@@ -97,6 +135,11 @@
 html,
 body {
   margin: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 16px;
 }
 
 body {
@@ -112,9 +155,9 @@ body {
 h1,
 h2,
 h3 {
-  font-weight: 600;
-  line-height: 1.2;
-  letter-spacing: -0.015em;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
   margin: 0;
   text-wrap: balance;
 }
@@ -144,6 +187,10 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   *::before,
   *::after {

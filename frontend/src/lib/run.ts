@@ -90,6 +90,7 @@ export interface ScenarioSummary {
 
 export interface Recording {
   id: string;
+  started_at?: number; // unix seconds
   scenario: string;
   status: string;
   verified: boolean | null;

@@ -214,3 +214,17 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
   - Two comparison processes appending to one results file would have overwritten each other. Fixed: the file is re-read before every append.
   - Older patches mark new files as `--- a/…` followed by `@@ -0,0`, so the test counter first reported TracePilot as editing tests, which it can't do. Fixed.
 - **Cost:** about 2.0M tokens, roughly $2.50. That's well above the $0.75 estimate, mostly the plain agent's own spend (505K tokens on ShipSpace alone).
+
+**UI redesign to a product dashboard** (from a reference mockup):
+
+- Dark navy sidebar and a bright main column, in Plus Jakarta Sans with an indigo-to-violet accent. The hero reads "From errors to verified fixes", with five colour-coded steps and a "Proven results" card. The card's numbers come from `comparison.json`.
+- Scenario cards open an inline investigation console that's always dark, like an IDE panel. It has:
+  - a six-step stepper (steps that weren't needed show as "Not needed")
+  - a terminal log with real timestamps from each recording
+  - an outcome card with the recommended action
+  - tabs for root causes, the evidence brief, reproducing tests, the patch, test results and the second opinion
+  - an investigation summary with report, PR-description and patch hand-off
+- The page opens on a finished run. Clicking a card replays it step by step, and `#scenario` links open a specific run.
+- Comparison bar charts with key takeaways; the reviewer benchmark; a "Run it on your own code" section.
+- The mockup's illustrative numbers were replaced with real data. For example, the refunds run wrote no test and analysed no "24 files", and ShipSpace's bug is the edit window, not delivery dates.
+- Checked at 1536 px and at 375 px (no overflow), and in light and dark themes.
