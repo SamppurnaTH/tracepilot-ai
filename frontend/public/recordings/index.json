@@ -8,6 +8,7 @@
     },
     "file": "orders.json",
     "verified": true,
+    "outcome": null,
     "duration_s": 143.7,
     "tests": {
       "before": {
@@ -43,6 +44,7 @@
     },
     "file": "notes.json",
     "verified": true,
+    "outcome": null,
     "duration_s": 157.8,
     "tests": {
       "before": {
@@ -73,6 +75,7 @@
     },
     "file": "billing.json",
     "verified": true,
+    "outcome": null,
     "duration_s": 205.9,
     "tests": {
       "before": {
@@ -108,6 +111,7 @@
     },
     "file": "inventory.json",
     "verified": true,
+    "outcome": null,
     "duration_s": 208.4,
     "tests": {
       "before": {
@@ -133,5 +137,35 @@
     "tokens": 123659,
     "model_calls": 16,
     "review": "approve"
+  },
+  {
+    "scenario": {
+      "id": "refunds",
+      "title": "Refunds API: refunds failing right after a deploy",
+      "service": "refunds_api",
+      "incident": "Refunds have been failing since this morning: customers get an error and support is escalating.\nIt started right after this morning's deploy of v2.14.0, so on-call suspects the release.\nFind what broke and fix it."
+    },
+    "file": "refunds.json",
+    "verified": false,
+    "outcome": "no_code_change",
+    "duration_s": 103.4,
+    "tests": {
+      "before": {
+        "passed": 6
+      },
+      "after": {
+        "passed": 6
+      }
+    },
+    "issues": [
+      {
+        "title": "Payment provider API key expiry causing refund 502s",
+        "severity": "critical",
+        "category": "reliability"
+      }
+    ],
+    "tokens": 42982,
+    "model_calls": 7,
+    "review": null
   }
 ]

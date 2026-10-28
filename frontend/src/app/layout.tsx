@@ -10,7 +10,7 @@ const description =
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://tracepilot-ai.vercel.app"),
-  title: "TracePilot AI: root cause, patch and proof for every incident",
+  title: "TracePilot AI: a verification-first debugging agent",
   description,
   openGraph: { title: "TracePilot AI: the AI debugger that proves its fix", description, url: "/", siteName: "TracePilot AI", type: "website" },
   twitter: { card: "summary_large_image", title: "TracePilot AI: the AI debugger that proves its fix", description },

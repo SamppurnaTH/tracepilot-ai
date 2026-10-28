@@ -136,7 +136,10 @@ def investigate(args: argparse.Namespace) -> int:
     v, u = report["verification"], report["usage"]
     review = (report.get("second_opinion") or {}).get("verdict", "skipped")
     print("\n" + "=" * 72)
-    print(f"{'FIX VERIFIED' if v['verified'] else 'NOT VERIFIED'}: tests {v['before']} -> {v['after']}, reviewer: {review}")
+    if report.get("outcome") == "no_code_change":
+        print("NO CODE CHANGE NEEDED: the root cause is outside the code (see report.md for what to change)")
+    else:
+        print(f"{'FIX VERIFIED' if v['verified'] else 'NOT VERIFIED'}: tests {v['before']} -> {v['after']}, reviewer: {review}")
     for issue in report["findings"].get("issues", []):
         print(f"  [{issue['severity']}/{issue['category']}] {issue['title']}")
     print(f"Cost: {u['model_calls']} model calls, {u['input_tokens'] + u['output_tokens']:,} tokens, {report['duration_s']} s")
@@ -155,7 +158,7 @@ def investigate(args: argparse.Namespace) -> int:
                 print("Applied fix.patch to your working tree. Review it with `git diff`.")
     elif report["diff"]:
         print(f"To apply:  cd \"{repo}\" && git apply \"{out / 'fix.patch'}\"")
-    return 0 if v["verified"] else 1
+    return 0 if v["verified"] or report.get("outcome") == "no_code_change" else 1
 
 
 def main(argv: list[str] | None = None) -> int:

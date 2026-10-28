@@ -22,6 +22,7 @@ class Scenario:
     app: str  # "module:attribute" of the ASGI app inside the target
     incident: str
     traffic: tuple  # (method, path, headers) or (method, path, headers, json_body) tuples, replayed in order
+    log_files: tuple = ()  # recorded production logs (paths relative to the repo root, outside the target)
 
     @property
     def target(self):
@@ -32,6 +33,9 @@ class Scenario:
             {"method": method, "path": path, "headers": {**headers, "x-request-id": f"r-{101 + i}"}, "body": body[0] if body else None}
             for i, (method, path, headers, *body) in enumerate(self.traffic)
         ]
+
+    def logs(self) -> list:
+        return [REPO_ROOT / p for p in self.log_files]
 
     def summary(self) -> dict:
         return {"id": self.id, "title": self.title, "service": self.service, "incident": self.incident}
@@ -123,6 +127,17 @@ Test credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2
                 ("GET", "/stock/C-300", ALICE),  # 5, only 3 exist
                 ("POST", "/reservations", ALICE, {"sku": "C-300", "qty": 5}),  # oversold
             ),
+        ),
+        Scenario(
+            id="refunds",
+            title="Refunds API: refunds failing right after a deploy",
+            service="refunds_api",
+            app="refunds_api.app:app",
+            incident="""Refunds have been failing since this morning: customers get an error and support is escalating.
+It started right after this morning's deploy of v2.14.0, so on-call suspects the release.
+Find what broke and fix it.""",
+            traffic=(),
+            log_files=("demo/logs/refunds_api.log",),  # recorded in production; the provider can't be reached from a sandbox
         ),
     ]
 }

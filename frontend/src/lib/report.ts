@@ -5,6 +5,7 @@ import { formatTally, shortTest, type RunState, type ScenarioSummary } from "./r
 const REVIEW_LABEL: Record<string, string> = { approve: "approved", concerns: "raised concerns", reject: "rejected the fix", unavailable: "unavailable" };
 
 function statusLine(state: RunState): string {
+  if (state.report?.outcome === "no_code_change") return "No code change needed: the root cause is outside the code";
   const v = state.verification;
   const tests = v ? `tests ${formatTally(v.before)} → ${formatTally(v.after)}, ${v.regressions.length} regressions` : "no test run";
   const review = state.secondOpinion ? `; independent review ${REVIEW_LABEL[state.secondOpinion.verdict] ?? state.secondOpinion.verdict}` : "";

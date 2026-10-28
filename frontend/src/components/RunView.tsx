@@ -48,6 +48,7 @@ const REVIEW: Record<SecondOpinion["verdict"], [string, string]> = {
 function StatusBadge({ state }: { state: RunState }) {
   if (state.phase === "failed") return <span className={cx(s.badge, s.badgeBad)}>Failed</span>;
   if (state.phase === "done") {
+    if (state.report?.outcome === "no_code_change") return <span className={cx(s.badge, s.badgeGood)}>No code change needed</span>;
     const ok = state.verification?.verified;
     return <span className={cx(s.badge, ok ? s.badgeGood : s.badgeBad)}>{ok ? "Fix verified" : "Not verified"}</span>;
   }
@@ -112,6 +113,34 @@ function Outcome({ scenario, state }: { scenario: ScenarioSummary; state: RunSta
 
   const ok = v?.verified;
   const slug = scenario.id;
+  if (r.outcome === "no_code_change") {
+    // Knowing when not to patch: the cause is real, but its fix belongs outside this repository.
+    return (
+      <section className={cx(s.card, s.outcome)}>
+        <div className={s.outcomeHead}>
+          <span className={cx(s.outcomeIcon, s.outcomeIconGood)} aria-hidden="true">
+            ✓
+          </span>
+          <div className={s.outcomeText}>
+            <h2 className={s.outcomeTitle}>Root cause found, and it isn&apos;t in the code</h2>
+            <p className={s.outcomeSummary}>{r.findings.summary}</p>
+          </div>
+        </div>
+        <dl className={s.kpis}>
+          <Kpi label="Code changes" value="None, on purpose" tone={s.goodText} />
+          <Kpi label="Root causes" value={`${confirmed} confirmed`} />
+          <Kpi label="Time" value={formatClock(r.duration_s)} />
+          <Kpi label="Tokens" value={tokens ? kTokens(tokens) : "—"} />
+          <Kpi label="Est. cost" value={tokens ? estimateCost(tokens) : "—"} />
+        </dl>
+        <div className={s.outcomeActions}>
+          <button type="button" className={cx(s.btn, s.btnPrimary)} onClick={() => downloadText(`tracepilot-${slug}-report.md`, markdownReport(scenario, state))}>
+            Download report
+          </button>
+        </div>
+      </section>
+    );
+  }
   return (
     <section className={cx(s.card, s.outcome)}>
       <div className={s.outcomeHead}>
@@ -234,6 +263,7 @@ function Hypotheses({ list }: { list: Hypothesis[] }) {
                 ) : (
                   h.reason && <p className={s.hypMeta}>{h.reason}</p>
                 )}
+                {h.status === "confirmed" && h.fix_in && h.fix_in !== "code" && <p className={s.hypMeta}>Fix belongs in: {h.fix_in}, not the code</p>}
               </div>
               <span className={cx(s.tag, status[h.status][0])}>{status[h.status][1]}</span>
             </li>

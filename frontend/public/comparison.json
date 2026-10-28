@@ -1,0 +1,110 @@
+{
+  "systems": {
+    "plain": {
+      "runs": 13,
+      "correct": 12,
+      "false_success": 0,
+      "honest_failure": 1,
+      "new_tests": 0,
+      "runs_editing_tests": 0,
+      "avg_tokens": 137596,
+      "avg_duration_s": 293.2
+    },
+    "tracepilot": {
+      "runs": 13,
+      "correct": 13,
+      "false_success": 0,
+      "honest_failure": 0,
+      "new_tests": 5,
+      "runs_editing_tests": 0,
+      "avg_tokens": 94346,
+      "avg_duration_s": 190.6
+    }
+  },
+  "cases": {
+    "refunds": {
+      "plain": {
+        "runs": 2,
+        "correct": 1,
+        "false_success": 0
+      },
+      "tracepilot": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      }
+    },
+    "orders": {
+      "plain": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      },
+      "tracepilot": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      }
+    },
+    "shipping": {
+      "plain": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      },
+      "tracepilot": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      }
+    },
+    "notes": {
+      "plain": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      },
+      "tracepilot": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      }
+    },
+    "billing": {
+      "plain": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      },
+      "tracepilot": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      }
+    },
+    "inventory": {
+      "plain": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      },
+      "tracepilot": {
+        "runs": 2,
+        "correct": 2,
+        "false_success": 0
+      }
+    },
+    "shipspace": {
+      "plain": {
+        "runs": 1,
+        "correct": 1,
+        "false_success": 0
+      },
+      "tracepilot": {
+        "runs": 1,
+        "correct": 1,
+        "false_success": 0
+      }
+    }
+  }
+}

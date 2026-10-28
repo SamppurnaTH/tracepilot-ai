@@ -11,6 +11,8 @@ def _tally(t: dict) -> str:
 
 
 def status_line(report: dict) -> str:
+    if report.get("outcome") == "no_code_change":
+        return "No code change needed: the root cause is outside the code"
     v = report["verification"]
     line = f"{'Fix verified' if v['verified'] else 'Not verified'} (tests {_tally(v['before'])} -> {_tally(v['after'])}, {len(v['regressions'])} regressions)"
     review = report.get("second_opinion")

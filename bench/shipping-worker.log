@@ -1,0 +1,20 @@
+2026-10-22 16:02:11,402 INFO shipping.worker: order 5498 standard placed 2026-10-22 promised 2026-10-27
+2026-10-23 09:14:02,118 INFO shipping.worker: order 5512 express placed 2026-10-23 promised 2026-10-24
+2026-10-23 09:14:02,131 INFO shipping.notify: scheduling courier for order 5512 on 2026-10-24
+2026-10-23 09:14:02,377 ERROR shipping.notify: failed to schedule courier for order 5512
+Traceback (most recent call last):
+  File "/srv/shipping/notify.py", line 41, in schedule
+    slot = carrier.book(promised)
+  File "/srv/venv/lib/python3.11/site-packages/carrierkit/client.py", line 88, in book
+    raise ValueError(f"no delivery slots on {day:%Y-%m-%d} ({day:%A})")
+ValueError: no delivery slots on 2026-10-24 (Saturday)
+2026-10-23 10:30:45,021 INFO shipping.worker: order 5517 standard placed 2026-10-23 promised 2026-10-27
+2026-10-23 11:40:50,880 INFO shipping.worker: order 5530 express placed 2026-10-23 promised 2026-10-24
+2026-10-23 11:40:51,004 ERROR shipping.notify: failed to schedule courier for order 5530
+Traceback (most recent call last):
+  File "/srv/shipping/notify.py", line 41, in schedule
+    slot = carrier.book(promised)
+  File "/srv/venv/lib/python3.11/site-packages/carrierkit/client.py", line 88, in book
+    raise ValueError(f"no delivery slots on {day:%Y-%m-%d} ({day:%A})")
+ValueError: no delivery slots on 2026-10-24 (Saturday)
+2026-10-26 08:01:13,550 INFO shipping.worker: order 5541 express placed 2026-10-26 promised 2026-10-27

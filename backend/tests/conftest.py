@@ -10,9 +10,10 @@ ORDERS_TARGET = ORDERS.target
 
 def open_seeded(scenario, isolation: str) -> Sandbox:
     """Open a sandbox for a scenario and replay its seed traffic, as an investigation does."""
-    sb = Sandbox(scenario.target, isolation=isolation, app=scenario.app).__enter__()
-    seeded = Workspace(sb).send_batch(scenario.seed_requests())
-    assert isinstance(seeded, list), seeded
+    sb = Sandbox(scenario.target, isolation=isolation, app=scenario.app, logs=scenario.logs()).__enter__()
+    if scenario.seed_requests():
+        seeded = Workspace(sb).send_batch(scenario.seed_requests())
+        assert isinstance(seeded, list), seeded
     return sb
 
 

@@ -9,6 +9,7 @@ export interface RecordingIndexEntry {
   scenario: ScenarioSummary;
   file: string;
   verified: boolean;
+  outcome?: string | null;
   duration_s: number;
   tests?: { before: Record<string, number>; after: Record<string, number> };
   issues?: { title: string; severity: "critical" | "high" | "medium" | "low"; category: string }[];
@@ -76,5 +77,26 @@ export interface EvalSummary {
 
 export async function loadEval(): Promise<EvalSummary | null> {
   const resp = await fetch("/eval.json").catch(() => null);
+  return resp?.ok ? resp.json() : null;
+}
+
+interface ComparisonSystem {
+  runs: number;
+  correct: number;
+  false_success: number;
+  honest_failure: number;
+  new_tests: number;
+  runs_editing_tests: number;
+  avg_tokens: number;
+  avg_duration_s: number;
+}
+
+export interface ComparisonSummary {
+  systems: Partial<Record<"plain" | "tracepilot", ComparisonSystem>>;
+  cases: Record<string, Partial<Record<"plain" | "tracepilot", { runs: number; correct: number; false_success: number }>>>;
+}
+
+export async function loadComparison(): Promise<ComparisonSummary | null> {
+  const resp = await fetch("/comparison.json").catch(() => null);
   return resp?.ok ? resp.json() : null;
 }

@@ -39,7 +39,10 @@ def main() -> None:
     for issue in report["findings"].get("issues", []):
         print(f"- [{issue['severity']}/{issue['category']}] {issue['title']}: {issue['root_cause']}")
     v = report["verification"]
-    print(f"\nVerified: {v['verified']}  fixed={len(v['fixed'])} still_failing={v['still_failing']} regressions={v['regressions']}")
+    if report.get("outcome") == "no_code_change":
+        print("\nNo code change needed: the root cause is outside the code.")
+    else:
+        print(f"\nVerified: {v['verified']}  fixed={len(v['fixed'])} still_failing={v['still_failing']} regressions={v['regressions']}")
     u = report["usage"]
     print(f"Usage: {u['model_calls']} model calls, {u['tool_calls']} tool calls, "
           f"{u['input_tokens'] + u['output_tokens']} tokens, {report['duration_s']}s")

@@ -44,6 +44,9 @@ Rules:
 - Never confirm a hypothesis from intuition alone. If evidence contradicts it, reject it and form a better one.
 - Look for the cause of every reported symptom, and note any closely related defect you discover.
 - Tests are the ground truth: never weaken or edit them.
+- Not every incident is a code bug. If the cause is configuration, data, or something outside the system (an expired
+  credential, a third-party outage), confirm it with fix_in set accordingly. No code change is then the right answer:
+  a patch that papers over an external failure is worse than none.
 - A fix is proven by a test that fails before it and passes after. An existing test you run that fails counts;
   if no failing test demonstrates a confirmed root cause, write one with write_regression_test before you
   finish investigating. It must fail on the current code.
@@ -78,6 +81,12 @@ HYPOTHESIS_TOOLS: list[dict] = [
                 "status": {"type": "string", "enum": ["confirmed", "rejected"]},
                 "evidence": {"type": "array", "items": {"type": "string"}},
                 "reason": {"type": "string"},
+                "fix_in": {
+                    "type": "string",
+                    "enum": ["code", "config", "data", "external"],
+                    "description": "For a confirmed cause, where the fix belongs: this repository's code, deployment "
+                    "configuration, stored data, or outside the system (a third party, credentials, infrastructure). Default code.",
+                },
             },
             "required": ["id", "status", "evidence", "reason"],
             "additionalProperties": False,
@@ -156,6 +165,7 @@ class Hypothesis:
     status: str = "open"
     evidence: list[str] = field(default_factory=list)
     reason: str = ""
+    fix_in: str = "code"  # where a confirmed cause's fix belongs: code, config, data or external
 
 
 def compare_outcomes(before: dict[str, str], after: dict[str, str]) -> dict:
@@ -226,6 +236,7 @@ class Investigation:
         self._regression_files: dict[str, list[str]] = {}  # file the agent wrote -> its test ids
         self.observed_failures: dict[str, str] = {}  # existing tests the agent saw fail during the investigation
         self.token_budget = TOKEN_BUDGET
+        self.protect_tests = True  # existing tests are ground truth (the plain baseline turns this off)
         self._attempts = 0
         self.events: list[dict] = []
         self.usage = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0, "model_calls": 0, "tool_calls": 0, "by_phase": {}}
@@ -239,6 +250,7 @@ class Investigation:
     def from_scenario(cls, scenario: Scenario, **kwargs) -> "Investigation":
         """A scenario run, with the Muse Spark Open reviewer whenever a Baseten key is configured."""
         kwargs.setdefault("reviewer", Reviewer.from_env())
+        kwargs.setdefault("logs", scenario.logs())
         return cls(scenario.incident, scenario.target, app=scenario.app, seed_requests=scenario.seed_requests(), **kwargs)
 
     # --- plumbing -----------------------------------------------------------
@@ -304,7 +316,7 @@ class Investigation:
             return json.dumps(self._resolve(args))
         if name == "write_regression_test" and name in _names(allowed):
             return json.dumps(self._regression_test(workspace, args))
-        if name == "edit_file" and str(args.get("path", "")).startswith(PROTECTED_PREFIXES):
+        if self.protect_tests and name == "edit_file" and str(args.get("path", "")).startswith(PROTECTED_PREFIXES):
             result = json.dumps({"error": "tests are the ground truth and cannot be modified; fix the application code"})
             self._emit("blocked", tool=name, args=args, reason="protected path")
             return result
@@ -353,7 +365,10 @@ class Investigation:
         evidence = [str(e) for e in args.get("evidence") or []]
         if status == "confirmed" and not evidence:
             return {"error": "a confirmed hypothesis needs at least one piece of evidence"}
-        hyp.status, hyp.evidence, hyp.reason = status, evidence, str(args.get("reason", ""))
+        fix_in = str(args.get("fix_in") or "code")
+        if fix_in not in ("code", "config", "data", "external"):
+            return {"error": "fix_in must be one of code, config, data, external"}
+        hyp.status, hyp.evidence, hyp.reason, hyp.fix_in = status, evidence, str(args.get("reason", "")), fix_in
         self._emit("hypothesis_update", **asdict(hyp))
         return {"id": hyp.id, "status": hyp.status}
 
@@ -491,8 +506,9 @@ class Investigation:
             )
 
             confirmed = [h for h in self.hypotheses.values() if h.status == "confirmed"]
+            code_causes = [h for h in confirmed if h.fix_in == "code"]
             reproduced = lambda: any(o != "passed" for o in {**baseline, **self.regression_tests, **self.observed_failures}.values())  # noqa: E731
-            if confirmed and not reproduced():
+            if code_causes and not reproduced():
                 # A fix that nothing failed before can't be verified: ask once for a reproducing test.
                 self._run_phase(
                     workspace,
@@ -508,7 +524,8 @@ class Investigation:
             baseline = {**baseline, **self.regression_tests, **self.observed_failures}
             verification = compare_outcomes(baseline, baseline)
             second_opinion = None
-            if confirmed:
+            outcome = "no_root_cause"
+            if code_causes:
                 verification = self._fix(
                     workspace,
                     baseline,
@@ -532,6 +549,12 @@ class Investigation:
                         1,
                     )
                     second_opinion = self._second_opinion(sandbox, verification)
+                outcome = "fixed" if verification["verified"] else "not_verified"
+            elif confirmed:
+                # Knowing when not to patch: the cause is real, but the fix doesn't belong in this code.
+                outcome = "no_code_change"
+                where = ", ".join(sorted({h.fix_in for h in confirmed}))
+                self._emit("skip_fix", reason=f"root cause is outside the code ({where}); no code change is the right fix")
             else:
                 self._emit("skip_fix", reason="no confirmed root cause")
 
@@ -545,6 +568,7 @@ class Investigation:
                 "findings": findings,
                 "diff": sandbox.diff(),
                 "verification": verification,
+                "outcome": outcome,
                 "second_opinion": second_opinion,
                 "usage": self.usage,
                 "duration_s": round(time.monotonic() - self._started, 1),
@@ -590,7 +614,8 @@ class Investigation:
                 {
                     "role": "user",
                     "content": "Write the final report of a software incident investigation. Base it only on these recorded facts; "
-                    "each issue's evidence must come from the hypotheses' evidence.\n"
+                    "each issue's evidence must come from the hypotheses' evidence. For a cause whose fix_in is not code, the fix field "
+                    "must say exactly what to change outside the code and who should do it.\n"
                     f"Recorded facts:\n{json.dumps(facts, indent=2)}",
                 }
             ],

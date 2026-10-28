@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import s from "@/components/ui.module.css";
 import { RunView } from "@/components/RunView";
 import { Logo, Severity } from "@/components/bits";
-import { API_URL, backendAvailable, loadEval, loadRecording, loadRecordingIndex, startLiveRun, streamRun, type EvalSummary, type RecordingIndexEntry } from "@/lib/api";
+import { API_URL, backendAvailable, loadComparison, loadEval, loadRecording, loadRecordingIndex, startLiveRun, streamRun, type ComparisonSummary, type EvalSummary, type RecordingIndexEntry } from "@/lib/api";
 import { publicTicket } from "@/lib/report";
 import { estimateCost, formatTally, initialState, reduce, type RunEvent, type RunState, type ScenarioSummary } from "@/lib/run";
 
@@ -38,6 +38,58 @@ const STEPS = [
 ];
 
 const kTokens = (n: number) => `${Math.round(n / 1000)}K`;
+function Comparison({ data }: { data: ComparisonSummary }) {
+  const plain = data.systems.plain;
+  const tp = data.systems.tracepilot;
+  if (!plain || !tp) return null;
+  const rows: [string, (x: NonNullable<typeof plain>) => string][] = [
+    ["Actually fixed (hidden tests)", (x) => `${x.correct}/${x.runs}`],
+    ["Claimed fixed but wasn't", (x) => String(x.false_success)],
+    ["Reproducing tests written", (x) => String(x.new_tests)],
+    ["Runs that edited existing tests", (x) => String(x.runs_editing_tests)],
+    ["Average tokens", (x) => kTokens(x.avg_tokens)],
+    ["Average time", (x) => minutes(x.avg_duration_s)],
+  ];
+  return (
+    <section className={s.section} id="compare" aria-labelledby="compare-title">
+      <div className={s.sectionHead}>
+        <h2 id="compare-title" className={s.sectionTitle}>
+          Same model, with and without TracePilot
+        </h2>
+        <p className={s.sectionText}>
+          Both use muse-spark-1.3 with the same sandbox, logs and tools. The plain agent is a typical coding agent that decides for itself when it&apos;s done. Every patch is judged
+          by hidden acceptance tests that neither system sees.
+        </p>
+      </div>
+      <div className={s.tableWrap}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th scope="col" />
+              <th scope="col">Plain agent</th>
+              <th scope="col">TracePilot</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(([label, value]) => (
+              <tr key={label}>
+                <th scope="row">{label}</th>
+                <td>{value(plain)}</td>
+                <td>{value(tp)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className={s.sectionText}>
+        Where it fits: general coding agents such as Cursor, GitHub Copilot, OpenHands and Devin can also read code, edit it and run tests. TracePilot is narrower on purpose: an
+        incident goes in, and what comes out is a reproducing test, a patch verified by your tests and reviewed by a second model, or a clear &quot;this isn&apos;t a code
+        problem&quot;.
+      </p>
+    </section>
+  );
+}
+
 const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");
 
 function Evaluation({ data }: { data: EvalSummary }) {
@@ -135,6 +187,7 @@ const minutes = (sec: number) => (sec < 60 ? `${Math.round(sec)} s` : `${(sec / 
 function Landing({
   index,
   evalData,
+  comparison,
   scenarios,
   live,
   startError,
@@ -143,6 +196,7 @@ function Landing({
 }: {
   index: RecordingIndexEntry[];
   evalData: EvalSummary | null;
+  comparison: ComparisonSummary | null;
   scenarios: ScenarioSummary[];
   live: boolean | null;
   startError: string | null;
@@ -170,12 +224,12 @@ function Landing({
       <section className={s.hero}>
         <p className={s.kicker}>
           <span className={s.kickerDot} aria-hidden="true" />
-          Built on Meta Muse Spark, with an open-weight reviewer
+          Verification-first debugging agent · built on Meta Muse Spark
         </p>
-        <h1 className={s.heroTitle}>Root cause, patch and proof for every incident.</h1>
+        <h1 className={s.heroTitle}>A fix you can verify, not just a fix.</h1>
         <p className={s.heroText}>
-          TracePilot investigates a failing service like a senior engineer: it tests hypotheses against logs, code and live requests in a sandbox, patches the code, and calls it fixed
-          only when your test suite and an independent model agree.
+          TracePilot turns an incident into a test that reproduces it, a patch your test suite confirms, and a second opinion from an independent open-weight model, with the
+          evidence to review before you merge. When the cause isn&apos;t in the code, it says so instead of patching.
         </p>
         <div className={s.heroActions}>
           {first && (
@@ -193,9 +247,9 @@ function Landing({
         <section className={s.metrics} aria-label="Results from recorded runs">
           <div className={s.metric}>
             <span className={s.metricValue}>
-              {index.filter((e) => e.verified).length}/{index.length}
+              {index.filter((e) => e.verified || e.outcome === "no_code_change").length}/{index.length}
             </span>
-            <span className={s.metricLabel}>incidents fixed and verified by tests</span>
+            <span className={s.metricLabel}>incidents resolved: fixed and verified by tests, or correctly left unpatched</span>
           </div>
           <div className={s.metric}>
             <span className={s.metricValue}>{issues.length}</span>
@@ -222,8 +276,8 @@ function Landing({
             Incidents
           </h2>
           <p className={s.sectionText}>
-            Synthetic services with planted defects, including one where CI is green and the agent must write the failing test itself. Each recording is a
-            real, unedited run: investigated by muse-spark-1.3, reviewed by Muse Spark Open.
+            Synthetic services with planted defects: one where CI is green and the agent must write the failing test itself, and one where the right answer is no
+            code change at all. Each recording is a real, unedited run: investigated by muse-spark-1.3, reviewed by Muse Spark Open.
           </p>
         </div>
         {startError && <p className={s.errorText}>{startError}</p>}
@@ -255,7 +309,9 @@ function Landing({
                     <dl className={s.facts}>
                       <div>
                         <dt>Result</dt>
-                        <dd className={rec.verified ? s.goodText : s.badText}>{rec.verified ? "Verified" : "Not verified"}</dd>
+                        <dd className={rec.verified || rec.outcome === "no_code_change" ? s.goodText : s.badText}>
+                          {rec.outcome === "no_code_change" ? "No code change" : rec.verified ? "Verified" : "Not verified"}
+                        </dd>
                       </div>
                       {rec.tests && (
                         <div>
@@ -293,6 +349,8 @@ function Landing({
           })}
         </div>
       </section>
+
+      {comparison && <Comparison data={comparison} />}
 
       {evalData && evalData.agent_total.runs > 0 && <Evaluation data={evalData} />}
 
@@ -347,6 +405,7 @@ function Landing({
 export default function Home() {
   const [index, setIndex] = useState<RecordingIndexEntry[]>([]);
   const [evalData, setEvalData] = useState<EvalSummary | null>(null);
+  const [comparison, setComparison] = useState<ComparisonSummary | null>(null);
   const [scenarios, setScenarios] = useState<ScenarioSummary[]>([]);
   const [live, setLive] = useState<boolean | null>(null);
   const [active, setActive] = useState<Active | null>(null);
@@ -367,6 +426,7 @@ export default function Home() {
       })
       .catch(() => setIndex([]));
     loadEval().then(setEvalData);
+    loadComparison().then(setComparison);
     backendAvailable().then(async (up) => {
       setLive(up);
       if (up) {
@@ -465,6 +525,7 @@ export default function Home() {
             <span>TracePilot</span>
           </button>
           <nav className={s.navLinks} aria-label="Primary">
+            {!active && <a href="#compare">Comparison</a>}
             {!active && <a href="#eval">Evaluation</a>}
             {!active && <a href="#how">How it works</a>}
             <a href={REPO_URL} target="_blank" rel="noreferrer">
@@ -482,7 +543,7 @@ export default function Home() {
         {active ? (
           <RunView scenario={active.scenario} state={state} mode={active.mode} onBack={back} controls={controls} />
         ) : (
-          <Landing index={index} evalData={evalData} scenarios={scenarios} live={live} startError={startError} onReplay={replay} onLive={runLive} />
+          <Landing index={index} evalData={evalData} comparison={comparison} scenarios={scenarios} live={live} startError={startError} onReplay={replay} onLive={runLive} />
         )}
       </main>
 

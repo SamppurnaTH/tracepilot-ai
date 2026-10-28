@@ -25,7 +25,9 @@ def main() -> None:
     latest: dict[str, tuple[Path, dict]] = {}
     for path in sorted(RUNS.glob("*.json")):  # names start with a timestamp, so later wins
         data = json.loads(path.read_text(encoding="utf-8"))
-        if data.get("status") == "completed" and data.get("verified") and data.get("scenario") in SCENARIOS:
+        # A run is worth showing when its fix was verified, or when it rightly concluded no code change was needed.
+        good = data.get("verified") or (data.get("report") or {}).get("outcome") == "no_code_change"
+        if data.get("status") == "completed" and good and data.get("scenario") in SCENARIOS:
             latest[data["scenario"]] = (path, data)
 
     index = []
@@ -40,7 +42,8 @@ def main() -> None:
             {
                 "scenario": SCENARIOS[scenario_id].summary(),
                 "file": name,
-                "verified": True,
+                "verified": bool(data.get("verified")),
+                "outcome": report.get("outcome"),
                 "duration_s": report["duration_s"],
                 # Headline facts, so the landing page can show results without loading every recording.
                 "tests": {"before": verification["before"], "after": verification["after"]},

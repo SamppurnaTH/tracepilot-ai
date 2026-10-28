@@ -1,8 +1,12 @@
 # TracePilot AI
 
-**The AI debugger that proves its fix.** TracePilot investigates a software incident in a sandbox, writes a test that reproduces the bug, patches the code, and calls it fixed only when the test suite and an independent open-weight model agree. Built for the Meta Global AI Developer Hackathon (Indie Developer track, problem statement: Push the Frontier).
+**A verification-first debugging agent.** TracePilot turns a software incident into a test that reproduces it, a patch your test suite confirms, and a second opinion from an independent open-weight model, with the evidence to review before you merge. When the cause isn't in the code, it says so instead of patching. Built for the Meta Global AI Developer Hackathon (Indie Developer track, problem statement: Push the Frontier).
 
-**Live demo: [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app)** replays real, unedited investigations of four incidents. **Results: [eval/RESULTS.md](eval/RESULTS.md)**: 8/8 runs verified, 8/8 test-gaming patches caught, about $0.10 per investigation.
+**Live demo: [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app)** replays real, unedited investigations of five incidents.
+
+**Results:**
+- **[Same model, with and without TracePilot](eval/COMPARISON.md):** 13/13 actually fixed vs 12/13, with 31% fewer tokens and 35% less time.
+- **[Evaluation](eval/RESULTS.md):** 8/8 runs verified and 8/8 test-gaming patches caught, at about $0.10 per investigation.
 
 ## Quickstart: run it on your own project
 
@@ -144,6 +148,27 @@ That's **about 34% fewer tokens** on the same incidents. Runs vary, and the sing
   - **7/8 correct patches approved.** One reference fix got "concerns" instead.
   - About 4K tokens per review.
 - **A real catch:** in one billing run, the patch passed all 5 tests, but Muse Spark Open flagged a latent crash: `sum()` over an invoice with no lines returns the integer `0`, which has no `.quantize()`. No test covered it.
+
+## How it compares
+
+General coding agents (Cursor, GitHub Copilot's coding agent, OpenHands, Devin) and AI features in monitoring tools (such as Sentry) can also read code, investigate failures, edit files and run tests. TracePilot doesn't claim to be the first to do any of that. It's narrower on purpose: an incident goes in, and what comes out is a reproducing test, a patch verified by your tests and reviewed by a second model, or a clear "this isn't a code problem".
+
+**Measured, same model.** [`backend/scripts/compare.py`](backend/scripts/compare.py) runs `muse-spark-1.3` two ways: as a plain coding agent (same sandbox, logs and tools, decides for itself when it's done), and inside TracePilot. Every patch is applied to a fresh copy and judged by hidden acceptance tests (`eval/hidden/`) that neither system sees. The cases are the five demo incidents, the shipping module and ShipSpace (13 runs per system).
+
+| Same model (`muse-spark-1.3`) | Plain agent | TracePilot |
+|---|---|---|
+| Actually fixed (hidden tests) | 12/13 | **13/13** |
+| Claimed fixed but wasn't | 0 | 0 |
+| Reproducing tests written | 0 | **5** |
+| Average tokens (TracePilot includes the reviewer) | 137,596 | **94,346** (31% fewer) |
+| Average time | 293 s | **191 s** (35% less) |
+
+What this shows, honestly:
+
+- **The model is strong on its own.** On these incidents the plain agent fixed almost everything, and it never claimed a fix that wasn't real.
+- **The measurable gains are cost and speed, plus proof that ships with the fix.** The largest gap was on ShipSpace: 505K tokens and 18 minutes for the plain agent, against 335K and 12 minutes for TracePilot, for the same one-line fix.
+- **The one miss** was the refunds incident, where the cause is an expired provider API key. One plain run diagnosed it correctly but also changed the service's logging code during the incident, spent 356K tokens, and said it hadn't fixed it. We score unrequested code changes on an external-cause incident as a failure; that's a judgment call, and the raw runs are in `eval/comparison.json`.
+- **Where verification matters most** is when a patch looks right but isn't. No such patch appeared in this comparison. The [reviewer benchmark](eval/RESULTS.md) measures that case directly: 8/8 patches that pass every test but game them were rejected.
 
 ## API
 

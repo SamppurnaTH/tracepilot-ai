@@ -99,6 +99,8 @@ EXPECTED = {
             ("billing_api/app.py", "    offset = page * size\n", "    offset = (page - 1) * size\n"),
         ],
     },
+    # The cause is outside the code (an expired provider API key): the right answer is no patch.
+    "refunds": {"seed_statuses": [201] * 5 + [502] * 4, "failing": set(), "no_code_fix": True, "fixes": []},
     # No existing test catches these bugs: a reproducing regression test must be written first.
     "inventory": {
         "seed_statuses": [200, 201, 201, 200, 201, 200, 200, 200, 201],
@@ -153,6 +155,8 @@ def test_exactly_the_expected_tests_fail(scenario_sandbox):
 
 def test_reference_fix_verifies(scenario_sandbox):
     scenario, sb = scenario_sandbox
+    if EXPECTED[scenario.id].get("no_code_fix"):
+        pytest.skip("the correct outcome for this scenario is no code change")
     ws = Workspace(sb)
     if "regression" in EXPECTED[scenario.id]:
         (sb.root / "tests" / "test_regression_ref.py").write_text(EXPECTED[scenario.id]["regression"], encoding="utf-8")

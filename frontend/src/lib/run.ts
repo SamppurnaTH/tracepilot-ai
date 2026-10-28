@@ -12,6 +12,7 @@ export interface Hypothesis {
   status: HypothesisStatus;
   evidence: string[];
   reason: string;
+  fix_in?: "code" | "config" | "data" | "external";
 }
 
 export interface Issue {
@@ -66,6 +67,8 @@ export interface Report {
   diff: string;
   verification: Verification;
   second_opinion?: SecondOpinion | null;
+  // "fixed" | "not_verified" | "no_code_change" (the cause is outside the code) | "no_root_cause"
+  outcome?: string;
   usage: Usage;
   duration_s: number;
 }

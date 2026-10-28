@@ -314,3 +314,18 @@ def test_regression_tool_is_not_available_while_fixing():
     )
     fix_request = next(r for r in client.requests if r.get("tools") and "edit_file" in {t["name"] for t in r["tools"]})
     assert "write_regression_test" not in {t["name"] for t in fix_request["tools"]}
+
+
+def test_cause_outside_the_code_means_no_patch():
+    report, client = run(
+        [
+            [call("propose_hypothesis", claim="provider key expired", symptom="refunds fail", next_check="read logs")],
+            [call("resolve_hypothesis", id="H1", status="confirmed", evidence=["401 api_key_expired"], reason="logs", fix_in="external")],
+            "The provider key expired.",
+            REPORT,
+        ]
+    )
+    assert report["outcome"] == "no_code_change" and report["diff"] == ""
+    assert "fix" not in [e["phase"] for e in report["events"] if e["type"] == "phase"]
+    assert "outside the code (external)" in next(e["reason"] for e in report["events"] if e["type"] == "skip_fix")
+    assert "fix_in is not code" in client.requests[-1]["input"][0]["content"]  # the report must say what to do instead

@@ -186,3 +186,31 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - **Second real run: verified.** The agent reproduced the bug with ShipSpace's own `ShipServiceTest`, fixed the line, and went 232 → 251 passing with no regressions. It also explained why CI stayed green (the covering test isn't in CI's list, and the in-CI controller test mocks the service). Muse Spark Open approved and flagged backfilling ships already stored with a 10-hour window. It cost **335K tokens (about $0.42) in 12 minutes**. The patch passes `git apply --check`.
 - **One imprecision:** the generated PR description lists "include ShipServiceTest in CI" under "What changed", but the patch only changes `ShipService.java`. It's a recommendation, not an applied change.
 - 8 new Java tests (`test_java.py`), plus 1 new and 1 rewritten agent test. 115 backend tests pass.
+
+**Knowing when not to patch:**
+
+- `resolve_hypothesis` now records where a confirmed cause's fix belongs: `fix_in` = code, config, data or external. If no confirmed cause is in the code, the harness skips the fix phase. The outcome is "no code change needed", and the report says what to change instead.
+- New `refunds` incident: refunds fail right after a deploy, and on-call suspects the release. The recorded production logs show the provider's API key expiring at 08:00, eight minutes after the deploy, with a successful refund in between.
+- In a real run, Muse Spark rejected the deploy hypothesis with that evidence, confirmed the expired key as an external cause, and made no patch. It cost 43K tokens. The landing page and run view show this outcome as "No code change needed".
+
+**Positioning and a fair comparison** (prompted by a competitor analysis: Cursor, Copilot, OpenHands, Devin and Sentry Seer all overlap with parts of TracePilot):
+
+- New tagline: "a verification-first debugging agent". The README gains a "How it compares" section that names those tools and what overlaps with them.
+- OpenHands was considered for a head-to-head. Meta's API does serve chat completions, but current OpenHands needs Python 3.12 and multi-gigabyte runtime images. It was dropped in favour of a cleaner experiment: the same model with and without TracePilot.
+- `backend/app/baseline.py` is a plain coding agent: same model, sandbox, logs, tools and total step budget, a standard prompt, test edits allowed, and it decides for itself whether it's done.
+- `backend/scripts/compare.py` applies every patch to a fresh copy and judges it with hidden acceptance tests (`eval/hidden/`) that neither system sees. They probe beyond the visible tests: other orders, invoices, SKUs, dates and injection payloads. The judge was validated before any model run: every reference fix passes, every unchanged copy fails, and every test-gaming fix fails.
+- **Results, 13 runs per system** (5 demo incidents, the shipping module, ShipSpace):
+
+  | | Plain agent | TracePilot |
+  |---|---|---|
+  | Actually fixed | 12/13 | 13/13 |
+  | False successes | 0 | 0 |
+  | Reproducing tests written | 0 | 5 |
+  | Average tokens | 138K | 94K (31% fewer) |
+  | Average time | 293 s | 191 s (35% less) |
+
+  The model is strong on its own. The plain agent's one miss was refunds, where it changed logging code during an external-cause incident (356K tokens).
+- **Bugs found while building this:**
+  - Two comparison processes appending to one results file would have overwritten each other. Fixed: the file is re-read before every append.
+  - Older patches mark new files as `--- a/…` followed by `@@ -0,0`, so the test counter first reported TracePilot as editing tests, which it can't do. Fixed.
+- **Cost:** about 2.0M tokens, roughly $2.50. That's well above the $0.75 estimate, mostly the plain agent's own spend (505K tokens on ShipSpace alone).

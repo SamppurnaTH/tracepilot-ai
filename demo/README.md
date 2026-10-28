@@ -12,8 +12,11 @@ TracePilot investigates the apps in `targets/`. Each one is a small synthetic Fa
 | `billing` | Pagination offset is `page * size` (off by one page) | Correctness | First page never shows the earliest invoices |
 | `inventory` | `POST /reservations` never checks `qty > 0`, so a negative quantity adds phantom stock | Correctness | A-100 shows more than the 100 units the warehouse counted |
 | `inventory` | Cancelling doesn't check the reservation is still active, so a double cancel returns stock twice | Correctness | C-300 was oversold: 5 reserved, 3 exist |
+| `refunds` | *No code bug:* the payment provider's API key expired at 08:00, eight minutes after a deploy | External | Refunds fail since this morning's deploy; on-call suspects the release |
 
 Note that the `notes` incident never mentions security. The agent has to discover that a quoting error is really an injection that leaks other users' notes. The test suite checks this, so escaping only the apostrophe isn't enough.
+
+In `refunds`, the right answer is **no code change**. The recorded production logs (`demo/logs/refunds_api.log`) show three key-expiry warnings before the deploy, a successful refund after it, then `401 api_key_expired` from 08:03. The fix is to issue a new key at the provider.
 
 In `inventory`, all 5 existing tests pass ("CI is green"). The agent has to write reproducing tests with `write_regression_test`, which the harness keeps only if they fail before the fix; they must then pass after it.
 
