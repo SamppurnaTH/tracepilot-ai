@@ -2,6 +2,8 @@
 
 An evidence-driven software reliability and security investigation agent, built for the Meta Global AI Developer Hackathon (Indie Developer track, problem statement: Push the Frontier).
 
+**Live demo: [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app)**, which replays real recorded investigations of all three scenarios.
+
 > Status: project started during the hackathon building period (Oct 27 to Nov 4, 2026). See `BUILD_LOG.md` for what was built and when.
 
 ## The problem

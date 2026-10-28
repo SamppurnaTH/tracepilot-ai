@@ -101,3 +101,13 @@ The agent now keeps its own transcript. If the chain is lost, it replays the ful
 - **Replay mode** plays real recorded runs at 4×, 10× or 25×, with "skip to result". **Live mode** starts a run on the API and streams events over SSE. Both feed the same reducer.
 - `backend/scripts/export_recordings.py` exports the latest verified run per scenario, without raw tool output. All three scenarios are recorded from real runs. A fresh orders run verified 3/5 → 5/5 in 3.6 minutes (13 model calls).
 - Checked in the browser at desktop and phone widths, in dark and light themes, with no horizontal overflow. The production build prerenders as a static page, so it can be hosted without a backend.
+
+**Full local check before deploying:**
+
+- 77/77 backend tests with Docker, and the Meta and Baseten smoke tests passed.
+- Frontend lint, type-check and build were clean, and all three replays completed.
+- A live run from the UI (orders) verified 3/5 → 5/5 in 2.5 minutes with 89K tokens, streamed over SSE.
+- Fixed one issue: deployed builds no longer probe `localhost:8000`, which caused a console error for every visitor.
+
+**Deployed:** [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app). It's the Vercel Hobby plan with root directory `frontend`, and it redeploys on every push to `main`.
+Verified as a visitor: replay mode works and the console is clean. Live runs need the backend, which requires Docker for the sandbox, so they run locally.
