@@ -1,7 +1,7 @@
 /* TracePilot design tokens. A bright product surface with an indigo-to-violet accent; the sidebar and the
    investigation console stay dark in both themes, like an IDE panel. Green, red and amber only mean state. */
 :root {
-  --bg: #f7f9fd;
+  --bg: #f5f6fb;
   --surface: #ffffff;
   --surface-2: #f2f3f9;
   --border: #e5e7f0;
@@ -9,12 +9,12 @@
   --text: #0e1124;
   --text-2: #4a5068;
   --text-3: #8a8fa6;
-  --accent: #493dff;
-  --accent-2: #753aff;
+  --accent: #6366F1;
+  --accent-2: #8B5CF6;
   --accent-hover: #4F46E5;
   --accent-wash: #eef0fe;
   --on-accent: #ffffff;
-  --good: #00ac78;
+  --good: #16a34a;
   --good-wash: #e8f7ee;
   --bad: #dc2626;
   --bad-wash: #fdecec;
@@ -33,7 +33,7 @@
   --nav-surface: #161C36;
   --nav-text: #e7e8f5;
   --nav-muted: #9a9dbc;
-  --console-bg: #070e17;
+  --console-bg: #0f1226;
   --console-surface: #161a33;
   --console-raised: #1c2140;
   --console-border: #262b4c;
@@ -60,9 +60,75 @@
   --text-xl: 1.375rem;
   --text-2xl: clamp(1.5rem, 1.2rem + 1.2vw, 1.875rem);
   --text-hero: clamp(2.2rem, 1.5rem + 3vw, 3.4rem);
-  --radius: 10px;
+  --radius: 14px;
   --radius-sm: 9px;
-  --sidebar: 224px;
+  --sidebar: 236px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b0d1a;
+    --surface: #13162b;
+    --surface-2: #1a1e38;
+    --border: #252a48;
+    --border-strong: #33395e;
+    --text: #eceef8;
+    --text-2: #a6abc8;
+    --text-3: #7378a0;
+    --accent: #818CF8;
+    --accent-2: #A78BFA;
+    --accent-hover: #A5B4FC;
+    --accent-wash: #221d4a;
+    --on-accent: #0b0d1a;
+    --good: #4ade80;
+    --good-wash: #12291f;
+    --bad: #f87171;
+    --bad-wash: #2e1519;
+    --warn: #fbbf24;
+    --warn-wash: #2c2110;
+    --blue: #38BDF8;
+    --blue-wash: #18213f;
+    --pink: #f47fa8;
+    --pink-wash: #2d1624;
+    --code-bg: #0f1226;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+    --shadow-lg: 0 18px 40px -18px rgb(0 0 0 / 0.7);
+    --nav-bg: #080C1A;
+    --nav-surface: #131A33;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0b0d1a;
+  --surface: #13162b;
+  --surface-2: #1a1e38;
+  --border: #252a48;
+  --border-strong: #33395e;
+  --text: #eceef8;
+  --text-2: #a6abc8;
+  --text-3: #7378a0;
+  --accent: #818CF8;
+  --accent-2: #A78BFA;
+  --accent-hover: #A5B4FC;
+  --accent-wash: #221d4a;
+  --on-accent: #0b0d1a;
+  --good: #4ade80;
+  --good-wash: #12291f;
+  --bad: #f87171;
+  --bad-wash: #2e1519;
+  --warn: #fbbf24;
+  --warn-wash: #2c2110;
+  --blue: #38BDF8;
+  --blue-wash: #18213f;
+  --pink: #f47fa8;
+  --pink-wash: #2d1624;
+  --code-bg: #0f1226;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 18px 40px -18px rgb(0 0 0 / 0.7);
+  --nav-bg: #080C1A;
+  --nav-surface: #131A33;
+  color-scheme: dark;
 }
 
 * {

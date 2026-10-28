@@ -64,10 +64,11 @@ export default function Landing() {
           <div className={s.heroGrid}>
             <div>
               <h1 className={s.title}>
-                From Errors to <span className={s.gradient}>Verified Fixes</span>
+                From errors to <span className={s.gradient}>verified fixes</span>
               </h1>
               <p className={s.lede}>
-                TracePilot AI automatically investigates application issues, finds the root cause, generates a fix, verifies it with tests, and tells you exactly what to do.
+                TracePilot AI investigates a failing service, writes a test that reproduces the bug, fixes it, proves the fix with your tests and an independent model,
+                and tells you exactly what to do. When the cause isn&apos;t in the code, it says so instead of patching.
               </p>
               <div className={s.heroActions}>
                 <Link href="/examples" className={s.cta}>
@@ -79,12 +80,6 @@ export default function Landing() {
               </div>
             </div>
             <div className={s.stage} aria-hidden="true">
-              <div className={s.orbit} />
-              <div className={s.codeWindow}>
-                <div className={s.windowDots}><i /><i /><i /><span>checkout / validator.py</span></div>
-                <pre><span>def</span> validate_checkout(cart):{"\n"}  coupon = cart.get(<b>&quot;coupon&quot;</b>){"\n"}  <span>if</span> coupon is not None:{"\n"}    apply_coupon(coupon){"\n\n"}  <span>return</span> checkout(cart)</pre>
-                <div className={s.codeStatus}>● Reproducing test generated</div>
-              </div>
               <div className={s.stack}>
                 {(["Investigate", "Reproduce", "Fix", "Verify", "Hand-off"] as const).map((label, i) => (
                   <div key={label} className={s.layer}>
@@ -95,7 +90,6 @@ export default function Landing() {
                   </div>
                 ))}
               </div>
-              <div className={s.testWindow}><span>VERIFICATION</span><code>✓ Reproduction test</code><code>✓ Regression suite</code><code>✓ Independent AI review</code><strong>All checks passed <Icon name="checkCircle" size={15} /></strong></div>
               <span className={s.check}>
                 <Icon name="check" size={30} />
               </span>
@@ -185,4 +179,3 @@ export default function Landing() {
     </div>
   );
 }
-

@@ -499,7 +499,7 @@ export function Console({
           <h2 id="console-title" className={s.headTitle}>
             Investigation: {rest.length ? `${service.replace(/ API$/, "")} · ${rest.join(":").trim()}` : scenario.title}
           </h2>
-          <span className={s.lang}>{scenario.language === "java" ? "Java" : "Python"}</span>
+          <span className={s.lang}>Python</span>
           {statusPill}
         </div>
         <div className={s.headMeta}>

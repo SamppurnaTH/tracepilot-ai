@@ -34,7 +34,7 @@ function RunPage() {
       if (!entry) return setError(`No recorded run called "${id}".`);
       setScenario(entry.scenario);
       loadRecording(entry.file)
-        .then((rec) => show(rec, params.get("replay") === "1"))
+        .then((rec) => show(rec, false))
         .catch((err) => setError(String(err)));
     } else if (liveId) {
       getRun(liveId)
@@ -51,7 +51,7 @@ function RunPage() {
         })
         .catch((err) => setError(err instanceof Error ? err.message : String(err)));
     }
-  }, [id, liveId, saved, index, show, follow, params]);
+  }, [id, liveId, saved, index, show, follow]);
 
   const state = run.state;
   const view = scenario ? { ...scenario, incident: scenario.incident || state.incident || "" } : null;
