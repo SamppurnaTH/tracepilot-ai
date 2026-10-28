@@ -46,6 +46,9 @@
   --console-accent: #a594ff;
   --console-accent-wash: rgb(165 148 255 / 0.14);
   --console-warn: #fbbf24;
+  --console-code-bg: #0a0c1c;
+  --console-soft: #c9cce4;
+  --console-time: #7d88d8;
 
   --font-sans: var(--font-jakarta), "Segoe UI", system-ui, -apple-system, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, "Cascadia Mono", Consolas, monospace;
@@ -179,6 +182,18 @@ a {
 button {
   font: inherit;
   color: inherit;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 :focus-visible {

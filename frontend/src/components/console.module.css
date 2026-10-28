@@ -286,7 +286,7 @@
 
 /* terminal */
 .terminal {
-  background: #0a0c1c;
+  background: var(--console-code-bg);
   border: 1px solid var(--console-border);
   border-radius: 10px;
   padding: 14px 16px;
@@ -305,7 +305,7 @@
 }
 
 .tTime {
-  color: #7d88d8;
+  color: var(--console-time);
 }
 
 .tText {
@@ -389,7 +389,7 @@
 
 .outcomeText {
   font-size: var(--text-sm);
-  color: #c9cce4;
+  color: var(--console-soft);
   overflow-wrap: anywhere;
 }
 
@@ -404,7 +404,7 @@
   display: grid;
   gap: 6px;
   font-size: var(--text-sm);
-  color: #c9cce4;
+  color: var(--console-soft);
   overflow-wrap: anywhere;
 }
 
@@ -506,7 +506,7 @@
 
 .cardText {
   font-size: var(--text-sm);
-  color: #c9cce4;
+  color: var(--console-soft);
   overflow-wrap: anywhere;
 }
 
@@ -574,7 +574,7 @@
   display: grid;
   gap: 4px;
   font-size: var(--text-sm);
-  color: #c9cce4;
+  color: var(--console-soft);
 }
 
 .bullets li {
@@ -605,14 +605,14 @@
 .pre {
   margin: 0;
   padding: 12px 14px;
-  background: #0a0c1c;
+  background: var(--console-code-bg);
   border: 1px solid var(--console-border);
   border-radius: 10px;
   font-size: 0.78rem;
   line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  color: #c9cce4;
+  color: var(--console-soft);
 }
 
 .testList {
@@ -666,7 +666,7 @@
 .diff {
   margin: 0;
   overflow-x: auto;
-  background: #0a0c1c;
+  background: var(--console-code-bg);
   font-size: 0.76rem;
   line-height: 1.65;
   padding: 8px 0;
@@ -793,7 +793,7 @@
   border: 1px solid var(--console-border);
   border-radius: 10px;
   overflow: hidden;
-  background: #0a0c1c;
+  background: var(--console-code-bg);
   max-width: 640px;
 }
 

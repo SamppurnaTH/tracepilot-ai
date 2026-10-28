@@ -20,13 +20,13 @@ function tallyOf(tests: Record<string, Outcome>): Record<string, number> {
 
 // --- diff helpers -------------------------------------------------------------------
 
-interface FileDiff {
+export interface FileDiff {
   path: string;
   isNew: boolean;
   lines: string[];
 }
 
-function splitDiff(diff: string): FileDiff[] {
+export function splitDiff(diff: string): FileDiff[] {
   const files: FileDiff[] = [];
   const lines = diff.replace(/\n$/, "").split("\n");
   for (let i = 0; i < lines.length; i++) {
@@ -41,9 +41,9 @@ function splitDiff(diff: string): FileDiff[] {
   return files;
 }
 
-const isTestPath = (p: string) => p.startsWith("tests/") || p.startsWith("src/test/") || /(^|\/)test_[^/]*$/.test(p);
+export const isTestPath = (p: string) => p.startsWith("tests/") || p.startsWith("src/test/") || /(^|\/)test_[^/]*$/.test(p);
 
-function DiffBlock({ files }: { files: FileDiff[] }) {
+export function DiffBlock({ files }: { files: FileDiff[] }) {
   return (
     <div className={s.diffFiles}>
       {files.map((f) => {
@@ -102,7 +102,7 @@ function stepStates(state: RunState): [string, string, StepState][] {
   });
 }
 
-function Stepper({ state }: { state: RunState }) {
+export function Stepper({ state }: { state: RunState }) {
   return (
     <ol className={s.stepper} aria-label="Progress">
       {stepStates(state).map(([title, sub, st], i) => (
@@ -122,7 +122,7 @@ function Stepper({ state }: { state: RunState }) {
 
 // --- live progress ------------------------------------------------------------------------
 
-function Terminal({ items, startedAt }: { items: TimelineItem[]; startedAt?: number }) {
+export function Terminal({ items, startedAt }: { items: TimelineItem[]; startedAt?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     // Follow the newest line inside the terminal only; never scroll the page.
@@ -157,8 +157,9 @@ function Terminal({ items, startedAt }: { items: TimelineItem[]; startedAt?: num
   );
 }
 
-function OutcomeCard({ state }: { state: RunState }) {
+export function OutcomeCard({ state }: { state: RunState }) {
   const r = state.report;
+  const stopped = state.error === "Stopped by the user";
   if (!r) {
     const last = [...state.timeline].reverse().find((i) => i.kind !== "phase");
     return (
@@ -168,7 +169,7 @@ function OutcomeCard({ state }: { state: RunState }) {
             <span className={s.pulse} />
           </span>
           <div>
-            <p className={s.outcomeTitle}>{state.phase === "failed" ? "Investigation failed" : "Investigating"}</p>
+            <p className={s.outcomeTitle}>{state.phase === "failed" ? (stopped ? "Investigation stopped" : "Investigation failed") : "Investigating"}</p>
             <p className={s.outcomeSub}>{state.error ?? last?.title ?? "Starting the sandbox"}</p>
           </div>
         </div>
@@ -209,7 +210,7 @@ function OutcomeCard({ state }: { state: RunState }) {
 
 // --- other tabs ---------------------------------------------------------------------------
 
-function RootCauses({ state }: { state: RunState }) {
+export function RootCauses({ state }: { state: RunState }) {
   const issues = state.report?.findings.issues ?? [];
   const sev = { critical: s.sevBad, high: s.sevWarn, medium: s.sevWarn, low: s.sevMuted };
   const status = { open: s.sevAccent, confirmed: s.sevGood, rejected: s.sevMuted };
@@ -249,7 +250,7 @@ function RootCauses({ state }: { state: RunState }) {
   );
 }
 
-function Evidence({ scenario, state }: { scenario: ScenarioSummary; state: RunState }) {
+export function Evidence({ scenario, state }: { scenario: ScenarioSummary; state: RunState }) {
   return (
     <div className={s.stack}>
       <p className={s.sectionLabel}>Incident ticket</p>
@@ -272,7 +273,7 @@ function Evidence({ scenario, state }: { scenario: ScenarioSummary; state: RunSt
   );
 }
 
-function ReproTests({ state, files }: { state: RunState; files: FileDiff[] }) {
+export function ReproTests({ state, files }: { state: RunState; files: FileDiff[] }) {
   const tests = files.filter((f) => f.isNew && isTestPath(f.path));
   const failingBefore = Object.entries(state.baseline ?? {}).filter(([, o]) => o !== "passed");
   if (tests.length) {
@@ -301,7 +302,7 @@ function ReproTests({ state, files }: { state: RunState; files: FileDiff[] }) {
   return <p className={s.muted}>No reproducing test yet.</p>;
 }
 
-function TestResults({ state }: { state: RunState }) {
+export function TestResults({ state }: { state: RunState }) {
   const v = state.verification;
   const baseline = state.baseline;
   if (!baseline) return <p className={s.muted}>The harness runs the tests before any change.</p>;
@@ -353,7 +354,7 @@ function TestResults({ state }: { state: RunState }) {
   );
 }
 
-function Review({ state }: { state: RunState }) {
+export function Review({ state }: { state: RunState }) {
   const o = state.secondOpinion;
   if (!o) return <p className={s.muted}>{state.report?.outcome === "no_code_change" ? "No patch, so nothing to review." : "Muse Spark Open reviews the patch once the tests pass."}</p>;
   const tone = { approve: s.sevGood, concerns: s.sevWarn, reject: s.sevBad, unavailable: s.sevMuted }[o.verdict];
@@ -393,7 +394,7 @@ function Review({ state }: { state: RunState }) {
 
 const VERDICT = { approve: "Approved", concerns: "Concerns raised", reject: "Rejected", unavailable: "Unavailable" };
 
-function Summary({ scenario, state, files }: { scenario: ScenarioSummary; state: RunState; files: FileDiff[] }) {
+export function Summary({ scenario, state, files }: { scenario: ScenarioSummary; state: RunState; files: FileDiff[] }) {
   const r = state.report;
   const usage = r?.usage;
   const tokens = usage ? usage.input_tokens + usage.output_tokens : undefined;
@@ -403,7 +404,7 @@ function Summary({ scenario, state, files }: { scenario: ScenarioSummary; state:
   const removed = code.reduce((a, f) => a + f.lines.filter((l) => l.startsWith("-") && !l.startsWith("---")).length, 0);
   const newTests = files.filter((f) => f.isNew && isTestPath(f.path)).length;
   const confirmed = state.hypotheses.filter((h) => h.status === "confirmed");
-  const status = state.phase === "done" ? "Completed" : state.phase === "failed" ? "Failed" : "Running";
+  const status = state.phase === "done" ? "Completed" : state.phase === "failed" ? (state.error === "Stopped by the user" ? "Stopped" : "Failed") : "Running";
   const outcome = !r ? "…" : noCode ? "No code change needed" : state.verification?.verified ? "Fix verified" : "Not verified";
   const rows: [string, React.ReactNode, string?][] = [
     ["Status", status, state.phase === "done" ? s.good : state.phase === "failed" ? s.bad : s.accent],
@@ -481,7 +482,7 @@ export function Console({
         <Icon name="check" size={13} /> Completed
       </span>
     ) : state.phase === "failed" ? (
-      <span className={cx(s.pill, s.pillBad)}>Failed</span>
+      <span className={cx(s.pill, state.error === "Stopped by the user" ? s.pillAccent : s.pillBad)}>{state.error === "Stopped by the user" ? "Stopped" : "Failed"}</span>
     ) : (
       <span className={cx(s.pill, s.pillAccent)}>
         <span className={s.pulse} /> Running

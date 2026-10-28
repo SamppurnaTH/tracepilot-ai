@@ -23,6 +23,10 @@ from .tools import FIX_TOOLS, INVESTIGATION_TOOLS, Workspace, execute_tool, tool
 
 EventSink = Callable[[dict], None]
 
+
+class Cancelled(Exception):
+    """Raised when the user stops a running investigation."""
+
 MAX_INVESTIGATION_STEPS = 16
 MAX_FIX_STEPS = 10
 MAX_FIX_ATTEMPTS = 2
@@ -246,6 +250,7 @@ class Investigation:
         self._regression_files: dict[str, list[str]] = {}  # file the agent wrote -> its test ids
         self.observed_failures: dict[str, str] = {}  # existing tests the agent saw fail during the investigation
         self.token_budget = TOKEN_BUDGET
+        self.should_stop: Callable[[], bool] | None = None  # set by the API so a user can stop a run
         self.protect_tests = True  # existing tests are ground truth (the plain baseline turns this off)
         self._attempts = 0
         self.events: list[dict] = []
@@ -273,6 +278,8 @@ class Investigation:
 
     def _create(self, input_items: list, tools: list[dict] | None = None, chain: bool = True, **kwargs):
         """One model call. With chain=False it runs in a fresh context: cheaper, and the transcript is untouched."""
+        if self.should_stop and self.should_stop():
+            raise Cancelled("stopped by the user")
         params: dict[str, Any] = {"model": self.model, "input": input_items, **kwargs}
         if tools:
             params["tools"] = tools

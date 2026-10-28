@@ -238,3 +238,27 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - **The site:** the Evidence tab shows the screenshot, captioned as given to the model as an image. Scenario cards get a "Screenshot" badge, and the exporter publishes screenshots next to the recordings.
 - **Also fixed:** the reviewer benchmark now only covers scenarios that have a test-gaming fix. It would have crashed on refunds, which has no code fix. A checkout gaming fix was added, and a checkout hidden test is in `eval/hidden/`.
 - 125 backend tests pass (1 skipped by design: refunds has no reference code fix).
+
+**Full product UI (10 screens, from a reference mockup) and bring-your-own-project from the browser:**
+
+- **New routes:**
+  - `/` (marketing landing with a 3D workflow stack and measured stats)
+  - `/examples` (filters; Run live and View details)
+  - `/investigate` (upload a ZIP, a Git repository or an example; logs, screenshots and Java options)
+  - `/run` (the live console while running; a light summary when done; separate views for a verified fix and for no code change)
+  - `/results` (charts plus a per-incident table)
+  - `/runs` (recordings plus the backend's saved runs, with search)
+  - `/docs`
+- **Backend:**
+  - `POST /api/investigations/custom` accepts a ZIP up to 50 MB, or a shallow clone of a public `https://` repository on GitHub, GitLab or Bitbucket, plus logs and screenshots. Uploads are guarded: path traversal and symlinks are rejected, sizes and file counts are capped, and everything is deleted when the run ends.
+  - `POST /api/investigations/{id}/cancel` stops a run before its next model call; the run status becomes `cancelled`.
+  - `python-multipart` 0.0.32 was added.
+  - 11 new tests.
+- **Replays for external projects:** the shipping module and ShipSpace (Java) runs are stored in `bench/runs/` and published as recordings. The comparison summary now carries per-incident averages for the detailed table.
+- **Honest deviations from the mockup:**
+  - No `pip install` (TracePilot isn't published), so the docs show the real install steps.
+  - "Copy PR description" instead of "Create Pull Request", since there's no GitHub integration.
+  - A Markdown report instead of a PDF.
+  - All numbers are real.
+- **Verified in the browser:** every screen; a live run started from the New investigation page and stopped with Stop (the backend reported `cancelled`); and phone width on every route. One fix came out of that: a visually hidden table label could widen the page.
+- 136 backend tests pass.

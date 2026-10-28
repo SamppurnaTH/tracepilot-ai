@@ -182,6 +182,8 @@ What this shows, honestly:
 | `GET /api/investigations/{id}/events` | Live event stream (server-sent events) |
 | `GET /api/investigations/{id}` | Status and final report |
 | `GET /api/runs`, `GET /api/runs/{name}` | Saved runs, for replay |
+| `POST /api/investigations/custom` (multipart) | Investigate your own project: a ZIP or a public repository URL, plus optional logs, screenshots and Java test options |
+| `POST /api/investigations/{id}/cancel` | Stop a running investigation before its next model call |
 
 ## Tech stack
 
@@ -222,8 +224,19 @@ npm run dev                   # http://localhost:3000
 
 ## The interface
 
-The frontend (`frontend/`) shows each investigation as a flight log: every check the agent runs, hypotheses moving from open to confirmed or rejected, a before/after test gauge, the patch, and the findings.
-It replays real recorded runs (`frontend/public/recordings/`), so the hosted demo works without a backend. With the API running, it can start live investigations and stream them.
+The web app (`frontend/`, Next.js) has a landing page and six app screens:
+
+| Screen | What it shows |
+|---|---|
+| Landing | The pitch, the measured results, how it works |
+| Example scenarios | Every recorded run, with filters for Python, Java, bug fix, no code change and screenshot |
+| New investigation | Upload a project ZIP or give a public repository, add logs and screenshots, and start (needs a backend) |
+| Run | While running: the live console with a Stop button. Once done: the outcome, the patch or the recommended action, tests, the AI review, evidence and the full log |
+| Comparison results | The same-model comparison and the reviewer benchmark |
+| My runs | Recorded runs, plus the backend's saved runs when one is connected |
+| Documentation | Getting started and the CLI guide |
+
+The hosted demo has no backend, so it replays real recordings (`frontend/public/recordings/`, exported from `runs/` and `bench/runs/`). Every number on the site comes from those recordings or from `eval/`.
 
 ## Build progress
 

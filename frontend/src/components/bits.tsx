@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import s from "./ui.module.css";
+import s from "./app.module.css";
 
 export const cx = (...names: (string | false | undefined | null)[]) => names.filter(Boolean).join(" ");
 

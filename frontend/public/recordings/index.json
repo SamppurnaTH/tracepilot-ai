@@ -5,12 +5,15 @@
       "title": "Orders API: intermittent 500s and a data-exposure report",
       "service": "orders_api",
       "incident": "Two reports came in for the orders_api service:\n1. Users say GET /orders/9/total sometimes returns 500.\n2. A security reviewer suspects users can see other users' orders.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'.",
-      "screenshots": []
+      "screenshots": [],
+      "language": "python",
+      "live": true
     },
     "file": "orders.json",
     "verified": true,
     "outcome": null,
     "duration_s": 143.7,
+    "started_at": 1793171992.5566947,
     "tests": {
       "before": {
         "passed": 3,
@@ -42,12 +45,15 @@
       "title": "Notes API: search errors and noisy warnings",
       "service": "notes_api",
       "incident": "Support tickets for the notes_api service:\n1. Searching for a note whose title contains an apostrophe (for example \"Bob's\") fails with a server error.\n2. On-call noticed WARNING entries in the logs this morning and wants to know whether they are related.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'.",
-      "screenshots": []
+      "screenshots": [],
+      "language": "python",
+      "live": true
     },
     "file": "notes.json",
     "verified": true,
     "outcome": null,
     "duration_s": 157.8,
+    "started_at": 1793172136.917027,
     "tests": {
       "before": {
         "passed": 3,
@@ -74,12 +80,15 @@
       "title": "Billing API: a disputed invoice and missing invoices",
       "service": "billing_api",
       "incident": "Two tickets came in for the billing_api service:\n1. Customer initech disputes invoice 1003: by their own calculation the total should be 54.13, but the invoice shows 54.12.\n2. A customer says the first page of their invoice list never shows their earliest invoices.",
-      "screenshots": []
+      "screenshots": [],
+      "language": "python",
+      "live": true
     },
     "file": "billing.json",
     "verified": true,
     "outcome": null,
     "duration_s": 205.9,
+    "started_at": 1793172296.1741757,
     "tests": {
       "before": {
         "passed": 2,
@@ -111,12 +120,15 @@
       "title": "Inventory API: phantom stock and an oversold item, with green CI",
       "service": "inventory_api",
       "incident": "Two tickets came in for the inventory_api service:\n1. The warehouse counted 100 units of SKU A-100, but the API reports more than 100 available.\n2. SKU C-300 was oversold: customers reserved 5 units, but only 3 exist.\nCI is green on the latest deploy, so no existing test catches either problem.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'.",
-      "screenshots": []
+      "screenshots": [],
+      "language": "python",
+      "live": true
     },
     "file": "inventory.json",
     "verified": true,
     "outcome": null,
     "duration_s": 208.4,
+    "started_at": 1793172503.3509657,
     "tests": {
       "before": {
         "passed": 5,
@@ -148,12 +160,15 @@
       "title": "Refunds API: refunds failing right after a deploy",
       "service": "refunds_api",
       "incident": "Refunds have been failing since this morning: customers get an error and support is escalating.\nIt started right after this morning's deploy of v2.14.0, so on-call suspects the release.\nFind what broke and fix it.",
-      "screenshots": []
+      "screenshots": [],
+      "language": "python",
+      "live": true
     },
     "file": "refunds.json",
     "verified": false,
     "outcome": "no_code_change",
     "duration_s": 103.4,
+    "started_at": 1793181879.1749423,
     "tests": {
       "before": {
         "passed": 6
@@ -181,12 +196,15 @@
       "incident": "A customer sent a screenshot of their checkout and says the coupon discount is wrong.\nSupport tried the same coupon on a single item and the total looked fine, so they couldn't reproduce it.\nFind out what is going on and fix it.",
       "screenshots": [
         "checkout-customer.png"
-      ]
+      ],
+      "language": "python",
+      "live": true
     },
     "file": "checkout.json",
     "verified": true,
     "outcome": "fixed",
     "duration_s": 146.8,
+    "started_at": 1793191964.8102856,
     "tests": {
       "before": {
         "passed": 5,
@@ -205,6 +223,81 @@
     ],
     "tokens": 62260,
     "model_calls": 11,
+    "review": "approve"
+  },
+  {
+    "scenario": {
+      "id": "shipping",
+      "title": "Shipping module: Friday express orders promised for Saturday",
+      "service": "shipping",
+      "language": "python",
+      "incident": "Customers who order express on Fridays are promised delivery on Saturday, but our carrier does not deliver on weekends, so courier booking fails for those orders. CI is green.",
+      "screenshots": [],
+      "live": false
+    },
+    "file": "shipping.json",
+    "verified": true,
+    "outcome": null,
+    "duration_s": 131.4,
+    "started_at": 1793174240.6,
+    "tests": {
+      "before": {
+        "passed": 4,
+        "failed": 1
+      },
+      "after": {
+        "passed": 5
+      }
+    },
+    "issues": [
+      {
+        "title": "add_business_days counts Saturday as business day (weekday()<6 instead of <5), causing Friday express to promise Saturday delivery",
+        "severity": "high",
+        "category": "correctness"
+      }
+    ],
+    "tokens": 62562,
+    "model_calls": 14,
+    "review": "approve"
+  },
+  {
+    "scenario": {
+      "id": "shipspace",
+      "title": "ShipSpace (Spring Boot): ships stay editable for hours",
+      "service": "shipspace",
+      "language": "java",
+      "incident": "Users can still edit their ships hours after posting. Ship s-9001 was rewritten about 3 hours after it was created, after it had collected 40 likes. Product rule (Requirement 4.4): a ship can only be edited for 10 minutes after creation. CI is green.",
+      "screenshots": [],
+      "live": false
+    },
+    "file": "shipspace.json",
+    "verified": true,
+    "outcome": null,
+    "duration_s": 727.7,
+    "started_at": 1793179403.3,
+    "tests": {
+      "before": {
+        "passed": 232,
+        "failed": 1
+      },
+      "after": {
+        "passed": 251
+      }
+    },
+    "issues": [
+      {
+        "title": "Edit window calculated as 10 hours instead of 10 minutes allows late ship edits",
+        "severity": "high",
+        "category": "correctness"
+      },
+      {
+        "title": "CI is green because covering expiry test is excluded and in-scope test mocks service",
+        "severity": "medium",
+        "category": "reliability"
+      }
+    ],
+    "tokens": 334667,
+    "model_calls": 15,
     "review": "approve"
   }
 ]

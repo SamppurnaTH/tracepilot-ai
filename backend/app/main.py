@@ -9,14 +9,20 @@ import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 
-from fastapi import FastAPI, HTTPException
+import shutil
+from pathlib import Path
+
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from .agent import Investigation
+from .agent import Cancelled, Investigation
+from .cli import detect_app
+from .reviewer import Reviewer
 from .config import REPO_ROOT, get_settings
-from .sandbox import Sandbox, docker_available, ensure_image
+from .sandbox import Sandbox, detect_kind, docker_available, ensure_image, project_image
+from .uploads import UploadError, clone_repo, extract_zip, save_attachment, workdir
 from .scenarios import SCENARIOS
 
 RUNS_DIR = REPO_ROOT / "runs"
@@ -30,11 +36,13 @@ class Run:
     id: str
     scenario: str
     provider: str
-    status: str = "running"  # running | completed | failed
+    status: str = "running"  # running | completed | failed | cancelled
+    title: str = ""
     started_at: float = field(default_factory=time.time)
     events: list[dict] = field(default_factory=list)
     report: dict | None = None
     error: str | None = None
+    stop: threading.Event = field(default_factory=threading.Event, repr=False)
 
     def summary(self) -> dict:
         verification = (self.report or {}).get("verification", {})
@@ -43,6 +51,8 @@ class Run:
             "scenario": self.scenario,
             "provider": self.provider,
             "status": self.status,
+            "title": self.title,
+            "outcome": (self.report or {}).get("outcome"),
             "started_at": self.started_at,
             "events": len(self.events),
             "verified": verification.get("verified"),
@@ -53,33 +63,51 @@ class Run:
 class RunManager:
     """Runs investigations in background threads and keeps their events for streaming."""
 
-    def __init__(self, factory=Investigation.from_scenario):
+    def __init__(self, factory=Investigation.from_scenario, custom_factory=Investigation):
         self.factory = factory
+        self.custom_factory = custom_factory  # builds investigations of uploaded or cloned projects
         self.runs: dict[str, Run] = {}
         self.lock = threading.Lock()
 
     def active(self) -> int:
         return sum(1 for r in self.runs.values() if r.status == "running")
 
-    def start(self, scenario_id: str, provider: str) -> Run:
+    def _reserve(self, scenario: str, provider: str, title: str) -> Run:
         with self.lock:
             if self.active() >= MAX_CONCURRENT:
                 raise HTTPException(429, f"{MAX_CONCURRENT} investigations already running; try again shortly")
-            run = Run(id=uuid.uuid4().hex[:12], scenario=scenario_id, provider=provider)
+            run = Run(id=uuid.uuid4().hex[:12], scenario=scenario, provider=provider, title=title)
             self.runs[run.id] = run
-        threading.Thread(target=self._execute, args=(run,), daemon=True).start()
         return run
 
-    def _execute(self, run: Run) -> None:
+    def start(self, scenario_id: str, provider: str) -> Run:
+        run = self._reserve(scenario_id, provider, SCENARIOS[scenario_id].title)
+        build = lambda: self.factory(SCENARIOS[run.scenario], provider=run.provider, on_event=run.events.append)  # noqa: E731
+        threading.Thread(target=self._execute, args=(run, build), daemon=True).start()
+        return run
+
+    def start_custom(self, title: str, build, cleanup=None) -> Run:
+        """Run an investigation of an uploaded or cloned project; build(run) returns the Investigation."""
+        run = self._reserve("custom", "meta", title)
+        threading.Thread(target=self._execute, args=(run, lambda: build(run), cleanup), daemon=True).start()
+        return run
+
+    def _execute(self, run: Run, build, cleanup=None) -> None:
         try:
-            investigation = self.factory(SCENARIOS[run.scenario], provider=run.provider, on_event=run.events.append)
+            investigation = build()
+            investigation.should_stop = run.stop.is_set
             report = investigation.run()
             report.pop("events", None)  # already in run.events
             run.report, run.status = report, "completed"
+        except Cancelled:
+            run.error, run.status = "stopped by the user", "cancelled"
+            run.events.append({"seq": len(run.events) + 1, "type": "cancelled", "message": run.error})
         except Exception as exc:  # surface any failure to the client instead of dying silently
             run.error, run.status = f"{type(exc).__name__}: {exc}", "failed"
             run.events.append({"seq": len(run.events) + 1, "type": "error", "message": run.error})
         finally:
+            if cleanup:
+                cleanup()
             self.save(run)
 
     @staticmethod
@@ -112,7 +140,7 @@ app = FastAPI(title="TracePilot AI", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("TRACEPILOT_CORS_ORIGINS", "*").split(",")],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST"],  # uploads are multipart POSTs
     allow_headers=["*"],
 )
 manager = RunManager()
@@ -144,6 +172,65 @@ def start_investigation(body: StartRequest) -> dict:
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc
     return manager.start(body.scenario, body.provider).summary()
+
+
+def _check_key() -> None:
+    try:
+        get_settings("meta")
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+
+@app.post("/api/investigations/custom", status_code=202)
+async def start_custom_investigation(
+    incident: str = Form(..., min_length=10, max_length=4000),
+    project: UploadFile | None = File(None),
+    repo_url: str | None = Form(None),
+    logs: list[UploadFile] = File([]),
+    screenshots: list[UploadFile] = File([]),
+    tests: str | None = Form(None),
+    test_args: str | None = Form(None),
+) -> dict:
+    """Investigate your own project: upload a ZIP or give a public repository URL, plus optional logs and screenshots."""
+    _check_key()
+    if bool(project) == bool(repo_url):
+        raise HTTPException(400, "provide either a project ZIP or a repository URL")
+    base = workdir()
+    try:
+        if project:
+            root = extract_zip(await project.read(), base / "project")
+            title = Path(project.filename or "project").stem
+        else:
+            root = clone_repo(repo_url or "", base / "project")
+            title = (repo_url or "").rstrip("/").removesuffix(".git").rsplit("/", 1)[-1]
+        log_paths = [save_attachment(f.filename or "app.log", await f.read(), base / "logs", {".log", ".txt", ".json", ".jsonl"}) for f in logs]
+        shot_paths = [save_attachment(f.filename or "shot.png", await f.read(), base / "shots", {".png", ".jpg", ".jpeg", ".webp", ".gif"}) for f in screenshots]
+    except UploadError as exc:
+        shutil.rmtree(base, ignore_errors=True)
+        raise HTTPException(400, str(exc)) from exc
+    kind = detect_kind(root)
+    scope = [t.strip() for t in (tests or "").split(",") if t.strip()] or None
+
+    def build(run: Run):
+        image = project_image(root, kind) if docker_available() else None
+        if kind == "maven" and image is None:
+            raise RuntimeError("Java projects need Docker")
+        return manager.custom_factory(
+            incident.strip(), root, on_event=run.events.append, kind=kind, app=detect_app(root) if kind == "python" else None,
+            logs=log_paths, images=shot_paths, image=image, test_scope=scope, test_args=(test_args or "").split() or None,
+            reviewer=Reviewer.from_env(),
+        )  # fmt: skip
+
+    return manager.start_custom(title, build, cleanup=lambda: shutil.rmtree(base, ignore_errors=True)).summary()
+
+
+@app.post("/api/investigations/{run_id}/cancel")
+def cancel_investigation(run_id: str) -> dict:
+    """Ask a running investigation to stop; it ends before its next model call."""
+    run = _get_run(run_id)
+    if run.status == "running":
+        run.stop.set()
+    return run.summary()
 
 
 @app.get("/api/investigations")
@@ -194,7 +281,15 @@ def list_saved_runs() -> list[dict]:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             continue
-        runs.append({"name": path.stem, **{k: data.get(k) for k in ("scenario", "provider", "status", "verified")}})
+        report = data.get("report") or {}
+        usage = report.get("usage") or {}
+        runs.append({
+            "name": path.stem,
+            **{k: data.get(k) for k in ("scenario", "provider", "status", "verified", "title", "started_at")},
+            "outcome": report.get("outcome"),
+            "duration_s": report.get("duration_s"),
+            "tokens": (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0),
+        })  # fmt: skip
     return runs
 
 

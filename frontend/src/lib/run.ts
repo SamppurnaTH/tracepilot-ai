@@ -87,6 +87,8 @@ export interface ScenarioSummary {
   service: string;
   incident: string;
   screenshots?: string[];
+  language?: "python" | "java";
+  live?: boolean; // can be started on a backend (demo scenarios only)
 }
 
 export interface Recording {
@@ -132,6 +134,7 @@ export interface RunState {
   brief?: string;
   regressionTests: string[]; // tests the agent wrote that reproduce a bug
   images: string[]; // screenshots given to the model as evidence
+  incident?: string;
   reviewRetries: number;
 }
 
@@ -204,6 +207,7 @@ export function reduce(state: RunState, e: RunEvent): RunState {
 
   switch (e.type) {
     case "start":
+      s.incident = (e.incident as string) ?? s.incident;
       s.model = e.model as string;
       s.isolation = e.isolation as string;
       reach("sandbox");
@@ -313,6 +317,11 @@ export function reduce(state: RunState, e: RunEvent): RunState {
       s.verification = s.verification ?? s.report.verification;
       s.secondOpinion = s.secondOpinion ?? s.report.second_opinion ?? undefined;
       s.phase = "done";
+      break;
+    case "cancelled":
+      s.error = "Stopped by the user";
+      s.phase = "failed";
+      add({ kind: "alert", title: "Investigation stopped", detail: "stopped by the user before the next model call", tone: "neutral" });
       break;
     case "error":
       s.error = e.message as string;

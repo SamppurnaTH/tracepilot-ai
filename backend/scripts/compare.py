@@ -236,7 +236,13 @@ def summarize(rows: list[dict]) -> dict:
         }
     for case in dict.fromkeys(r["case"] for r in scored):
         out["cases"][case] = {
-            system: {"runs": len(rs), "correct": sum(r["hidden_pass"] for r in rs), "false_success": sum(r["claimed_fixed"] and not r["hidden_pass"] for r in rs)}
+            system: {
+                "runs": len(rs),
+                "correct": sum(r["hidden_pass"] for r in rs),
+                "false_success": sum(r["claimed_fixed"] and not r["hidden_pass"] for r in rs),
+                "avg_tokens": round(sum(r["tokens"] + r.get("reviewer_tokens", 0) for r in rs) / len(rs)),
+                "avg_duration_s": round(sum(r["duration_s"] or 0 for r in rs) / len(rs), 1),
+            }
             for system in ("plain", "tracepilot")
             if (rs := [r for r in scored if r["system"] == system and r["case"] == case])
         }

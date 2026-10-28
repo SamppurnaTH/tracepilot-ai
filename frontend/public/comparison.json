@@ -26,84 +26,112 @@
       "plain": {
         "runs": 2,
         "correct": 1,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 210949,
+        "avg_duration_s": 444.2
       },
       "tracepilot": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 42650,
+        "avg_duration_s": 83.8
       }
     },
     "orders": {
       "plain": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 40312,
+        "avg_duration_s": 100.5
       },
       "tracepilot": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 54064,
+        "avg_duration_s": 132.8
       }
     },
     "shipping": {
       "plain": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 14985,
+        "avg_duration_s": 66.8
       },
       "tracepilot": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 45284,
+        "avg_duration_s": 129.4
       }
     },
     "notes": {
       "plain": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 85712,
+        "avg_duration_s": 178.2
       },
       "tracepilot": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 78814,
+        "avg_duration_s": 154.9
       }
     },
     "billing": {
       "plain": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 42676,
+        "avg_duration_s": 108.8
       },
       "tracepilot": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 102562,
+        "avg_duration_s": 168.9
       }
     },
     "inventory": {
       "plain": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 247170,
+        "avg_duration_s": 458.1
       },
       "tracepilot": {
         "runs": 2,
         "correct": 2,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 119152,
+        "avg_duration_s": 205.5
       }
     },
     "shipspace": {
       "plain": {
         "runs": 1,
         "correct": 1,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 505138,
+        "avg_duration_s": 1098.2
       },
       "tracepilot": {
         "runs": 1,
         "correct": 1,
-        "false_success": 0
+        "false_success": 0,
+        "avg_tokens": 341455,
+        "avg_duration_s": 727.7
       }
     }
   }

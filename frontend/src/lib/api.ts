@@ -16,6 +16,7 @@ export interface RecordingIndexEntry {
   tokens?: number;
   model_calls?: number;
   review?: string | null;
+  started_at?: number;
 }
 
 export async function backendAvailable(): Promise<boolean> {
@@ -93,10 +94,62 @@ interface ComparisonSystem {
 
 export interface ComparisonSummary {
   systems: Partial<Record<"plain" | "tracepilot", ComparisonSystem>>;
-  cases: Record<string, Partial<Record<"plain" | "tracepilot", { runs: number; correct: number; false_success: number }>>>;
+  cases: Record<string, Partial<Record<"plain" | "tracepilot", { runs: number; correct: number; false_success: number; avg_tokens: number; avg_duration_s: number }>>>;
 }
 
 export async function loadComparison(): Promise<ComparisonSummary | null> {
   const resp = await fetch("/comparison.json").catch(() => null);
   return resp?.ok ? resp.json() : null;
+}
+
+// --- backend-only calls (a live TracePilot API) ---------------------------------------------
+
+export interface RunSummary {
+  id: string;
+  scenario: string;
+  title: string;
+  status: "running" | "completed" | "failed" | "cancelled";
+  outcome?: string | null;
+  started_at: number;
+  verified?: boolean | null;
+  error?: string | null;
+}
+
+export interface SavedRun {
+  name: string;
+  scenario: string;
+  title?: string;
+  status: string;
+  verified?: boolean | null;
+  outcome?: string | null;
+  started_at?: number;
+  duration_s?: number | null;
+  tokens?: number;
+}
+
+async function json<T>(resp: Response): Promise<T> {
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) throw new Error((data as { detail?: string }).detail ?? `The backend answered HTTP ${resp.status}`);
+  return data as T;
+}
+
+/** Start an investigation of your own project: a ZIP upload or a public repository URL, with optional attachments. */
+export async function startCustomRun(form: FormData): Promise<RunSummary> {
+  return json(await fetch(`${API_URL}/api/investigations/custom`, { method: "POST", body: form }));
+}
+
+export async function cancelRun(id: string): Promise<RunSummary> {
+  return json(await fetch(`${API_URL}/api/investigations/${id}/cancel`, { method: "POST" }));
+}
+
+export async function getRun(id: string): Promise<RunSummary> {
+  return json(await fetch(`${API_URL}/api/investigations/${id}`));
+}
+
+export async function listSavedRuns(): Promise<SavedRun[]> {
+  return json(await fetch(`${API_URL}/api/runs`));
+}
+
+export async function loadSavedRun(name: string): Promise<Recording> {
+  return json(await fetch(`${API_URL}/api/runs/${encodeURIComponent(name)}`));
 }
