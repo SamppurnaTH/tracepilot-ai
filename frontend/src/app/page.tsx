@@ -6,7 +6,7 @@ import { RunView } from "@/components/RunView";
 import { Logo, Severity } from "@/components/bits";
 import { API_URL, backendAvailable, loadEval, loadRecording, loadRecordingIndex, startLiveRun, streamRun, type EvalSummary, type RecordingIndexEntry } from "@/lib/api";
 import { publicTicket } from "@/lib/report";
-import { formatTally, initialState, reduce, type RunEvent, type RunState, type ScenarioSummary } from "@/lib/run";
+import { estimateCost, formatTally, initialState, reduce, type RunEvent, type RunState, type ScenarioSummary } from "@/lib/run";
 
 type Action = { type: "event"; event: RunEvent } | { type: "events"; events: RunEvent[] } | { type: "reset" };
 
@@ -89,6 +89,7 @@ function Evaluation({ data }: { data: EvalSummary }) {
               <th scope="col">Reviewer approved</th>
               <th scope="col">Tests written</th>
               <th scope="col">Avg tokens</th>
+              <th scope="col">Est. cost</th>
               <th scope="col">Avg time</th>
             </tr>
           </thead>
@@ -107,6 +108,7 @@ function Evaluation({ data }: { data: EvalSummary }) {
                 </td>
                 <td>{a.regression_tests || "—"}</td>
                 <td>{kTokens(a.avg_tokens)}</td>
+                <td>{estimateCost(a.avg_tokens)}</td>
                 <td>{minutes(a.avg_duration_s)}</td>
               </tr>
             ))}
@@ -208,7 +210,7 @@ function Landing({
           <div className={s.metric}>
             <span className={s.metricValue}>{avgTokens ? kTokens(avgTokens) : "…"}</span>
             <span className={s.metricLabel}>
-              average tokens per investigation{saving > 0 ? `; ${saving}% fewer than our first version on the same incidents` : ""}
+              average tokens per investigation, about {estimateCost(avgTokens)} each{saving > 0 ? `; ${saving}% fewer than our first version on the same incidents` : ""}
             </span>
           </div>
         </section>

@@ -312,6 +312,15 @@ export function reduce(state: RunState, e: RunEvent): RunState {
   return s;
 }
 
+// Measured, not list price: the Meta Model API billing page showed $2.51 spent for about 2.0M tokens
+// on Oct 28 (cache hits make input cheaper). The open-weight reviewer runs on separate Baseten credits.
+export const USD_PER_MILLION_TOKENS = 1.25;
+
+export function estimateCost(tokens: number): string {
+  const usd = (tokens / 1_000_000) * USD_PER_MILLION_TOKENS;
+  return usd < 0.01 ? "<$0.01" : `$${usd.toFixed(2)}`;
+}
+
 export function formatTally(tally: Record<string, number> | undefined): string {
   if (!tally) return "";
   const passed = tally.passed ?? 0;

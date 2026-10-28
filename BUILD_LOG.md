@@ -152,3 +152,19 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - In one billing run the reviewer flagged a real latent crash the tests missed: `sum()` over an empty invoice returns the int `0`, which has no `.quantize()`.
 - The landing page shows an Evaluation section generated from the same data, and the token saving is computed per incident from the eval averages.
 - 98 backend tests pass.
+
+**TracePilot on your own project** (`tracepilot.py`, `backend/app/cli.py`):
+
+- `python tracepilot.py investigate --repo <path> --incident "..." [--logs ...] [--apply]` runs the full loop on any Python project with pytest tests. It writes a hand-off folder: `fix.patch`, `pr.md`, `report.md` and `run.json`.
+- **Sandbox:** the project's `requirements.txt` is installed into a cached derived image, so the network is used only at build time. Copies skip VCS data, virtualenvs, caches and build output, with a file-count guard. User log files are copied in as evidence.
+- **Logs:** plain-text logs are parsed too. Indented lines and tracebacks attach to their entry, and repeated lines are grouped with numbers, ids and timestamps masked.
+- **No HTTP app:** without one, `send_request` is withdrawn instead of failing.
+- **Patches:** they now apply with `git apply`, using `/dev/null` for new files and "No newline at end of file" markers. `--apply` applies only a verified patch.
+- **Real test on an unseen project:** a non-web shipping module with plain-text logs, `python-dateutil` and green CI. Muse Spark wrote the reproducing test, found `weekday() < 6` counting Saturdays as business days, and fixed it: 4/5 → 5/5, approved by Muse Spark Open. It cost 62K tokens (about $0.08) in 131 s, and `--apply` put the fix and the new test into the working tree.
+- 7 new tests (`test_cli.py`). 105 backend tests pass.
+
+**Sharing and cost:**
+
+- A link-preview card for X, Discord and Slack (`opengraph-image.tsx`), with numbers drawn from `eval.json`. Open Graph and Twitter metadata were added.
+- An estimated cost is shown per run, in the eval table and on the landing page. It uses $1.25 per million tokens, measured from the billing page ($2.51 for about 2.0M tokens).
+- The README now leads with a 3-command quickstart for your own project and a Mermaid architecture diagram.

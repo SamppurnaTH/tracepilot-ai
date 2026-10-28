@@ -18,7 +18,7 @@ from .llm import get_client
 from .reviewer import Reviewer, changed_files
 from .sandbox import Sandbox
 from .scenarios import Scenario
-from .tools import FIX_TOOLS, INVESTIGATION_TOOLS, Workspace, execute_tool
+from .tools import FIX_TOOLS, INVESTIGATION_TOOLS, Workspace, execute_tool, tools_for
 
 EventSink = Callable[[dict], None]
 
@@ -173,8 +173,10 @@ class Investigation:
         client: Any = None,
         model: str | None = None,
         isolation: str = "auto",
-        app: str = "orders_api.app:app",
+        app: str | None = "orders_api.app:app",
         seed_requests: list[dict] | None = None,
+        logs: list[Path] | None = None,
+        image: str | None = None,
         reviewer: Reviewer | None = None,
     ):
         self.incident = incident
@@ -184,6 +186,8 @@ class Investigation:
         self.isolation = isolation
         self.app = app
         self.seed_requests = seed_requests or []
+        self.logs = logs or []
+        self.image = image
         self.reviewer = reviewer
         if client is None:
             client, model = get_client(provider)
@@ -341,7 +345,7 @@ class Investigation:
 
     def _fix(self, workspace: Workspace, baseline: dict, prompt: str, attempts: int) -> dict:
         """Fix rounds until the harness verifies the patch or the attempts run out."""
-        fix_tools = INVESTIGATION_TOOLS + FIX_TOOLS
+        fix_tools = tools_for(self.app, INVESTIGATION_TOOLS) + FIX_TOOLS
         verification = compare_outcomes(baseline, baseline)
         for _ in range(attempts):
             self._attempts += 1
@@ -388,7 +392,8 @@ class Investigation:
 
     def run(self) -> dict:
         self._started = time.monotonic()
-        with Sandbox(self.source, isolation=self.isolation, app=self.app) as sandbox:
+        extra = {"image": self.image} if self.image else {}
+        with Sandbox(self.source, isolation=self.isolation, app=self.app, logs=self.logs, **extra) as sandbox:
             workspace = Workspace(sandbox)
             self._emit("start", incident=self.incident, provider=self.provider, model=self.model, isolation=sandbox.isolation)
 
@@ -404,7 +409,7 @@ class Investigation:
             brief = workspace.brief(log_digest, baseline, reasons)
             self._emit("brief", text=brief)
 
-            investigate_tools = INVESTIGATION_TOOLS + HYPOTHESIS_TOOLS + [REGRESSION_TOOL]
+            investigate_tools = tools_for(self.app, INVESTIGATION_TOOLS) + HYPOTHESIS_TOOLS + [REGRESSION_TOOL]
             self._run_phase(
                 workspace,
                 "investigate",

@@ -50,6 +50,33 @@ def compact_traceback(tb: str) -> str:
     return "\n".join(kept + [final])
 
 
+_LEVEL = re.compile(r"\b(CRITICAL|FATAL|ERROR|WARN(?:ING)?|INFO|DEBUG)\b")
+_NOISE = re.compile(r"\d{4}-\d{2}-\d{2}[T ][\d:.,]+Z?|\b[0-9a-f]{8,}\b|\d+")
+
+
+def parse_log(text: str) -> list[dict]:
+    """Log entries from JSON lines or plain text. Indented lines and tracebacks join the entry above them."""
+    entries: list[dict] = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+            if isinstance(entry, dict):
+                entries.append(entry)
+                continue
+        except json.JSONDecodeError:
+            pass
+        level = _LEVEL.search(line)
+        continuation = line[:1].isspace() or line.startswith("Traceback") or (entries and "traceback" in entries[-1] and not level)
+        if continuation and entries and "line" in entries[-1]:
+            entries[-1]["traceback"] = entries[-1].get("traceback", "") + line + "\n"
+            continue
+        name = level.group(1).upper() if level else "INFO"
+        entries.append({"level": {"WARN": "WARNING", "FATAL": "CRITICAL"}.get(name, name), "line": line})
+    return entries
+
+
 class Workspace:
     """The tools, bound to one open sandbox."""
 
@@ -76,29 +103,30 @@ class Workspace:
 
     def read_log(
         self,
-        service: str = "orders_api",
+        service: str | None = None,
         level: str | None = None,
         path_contains: str | None = None,
         request_id: str | None = None,
         limit: int = 30,
     ) -> dict:
-        if not re.fullmatch(r"[a-z0-9_]+", service):
-            raise ValueError("service must be lowercase letters, digits or underscores")
+        available = sorted(p.stem for p in (self.root / "logs").glob("*.log"))
+        if service is None:
+            if len(available) != 1:
+                return {"error": "choose a log with 'service'", "available": available}
+            service = available[0]
+        if not re.fullmatch(r"[A-Za-z0-9_.\-]+", service) or ".." in service:
+            raise ValueError("service must be a log name like 'orders_api'")
         log_file = self.root / "logs" / f"{service}.log"
         if not log_file.exists():
-            return {"error": f"no log file for service '{service}'"}
+            return {"error": f"no log file for service '{service}'", "available": available}
 
         entries = []
-        for line in log_file.read_text(encoding="utf-8").splitlines():
-            try:
-                entry = json.loads(line)
-            except json.JSONDecodeError:
-                continue
+        for entry in parse_log(log_file.read_text(encoding="utf-8", errors="replace")):
             if level and entry.get("level", "").upper() != level.upper():
                 continue
-            if path_contains and path_contains not in entry.get("path", ""):
+            if path_contains and path_contains not in entry.get("path", entry.get("line", "")):
                 continue
-            if request_id and entry.get("request_id") != request_id:
+            if request_id and entry.get("request_id") != request_id and request_id not in entry.get("line", ""):
                 continue
             if isinstance(entry.get("traceback"), str):
                 entry["traceback"] = compact_traceback(entry["traceback"])
@@ -150,6 +178,8 @@ class Workspace:
 
     def send_batch(self, requests: list[dict], timeout: int = 120) -> list[dict] | dict:
         """Send several requests to one app instance in one sandbox process (also used to seed traffic)."""
+        if not self.sandbox.app:
+            return {"error": "no HTTP app is configured for this project, so requests can't be sent"}
         spec = {"app": self.sandbox.app, "requests": requests}
         result = self.sandbox.python(["-c", REQUEST_RUNNER], stdin=json.dumps(spec), timeout=timeout)
         if result.timed_out:
@@ -183,17 +213,21 @@ class Workspace:
         for log_file in sorted((self.root / "logs").glob("*.log")):
             groups: dict[tuple, list[str]] = {}
             levels: dict[str, int] = {}
-            for line in log_file.read_text(encoding="utf-8").splitlines():
-                try:
-                    e = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
+            for e in parse_log(log_file.read_text(encoding="utf-8", errors="replace")):
                 levels[e.get("level", "?")] = levels.get(e.get("level", "?"), 0) + 1
-                if e.get("level") in ("WARNING", "ERROR"):
+                if e.get("level") not in ("WARNING", "ERROR", "CRITICAL"):
+                    continue
+                if "line" in e:  # plain text: group lines that differ only in numbers, ids and timestamps
+                    key = (e["level"], None, _NOISE.sub("#", e["line"]).lstrip("#,. ")[:160], None, "")
+                    groups.setdefault(key, []).append(e["line"][:40])
+                else:
                     key = (e.get("level"), e.get("method"), e.get("path"), e.get("status"), e.get("error", ""))
                     groups.setdefault(key, []).append(str(e.get("request_id")))
             out.append(f"Log {log_file.stem}: " + ", ".join(f"{n} {lvl}" for lvl, n in sorted(levels.items())))
             for (level, method, path, status, error), ids in groups.items():
+                if method is None:
+                    out.append(f"  {level} x{len(ids)}: {path}")
+                    continue
                 detail = f" {error}" if error else ""
                 out.append(f"  {level} x{len(ids)}: {method} {path} -> {status}{detail} (e.g. {', '.join(ids[:3])})")
         return self.scrub(out)
@@ -257,7 +291,7 @@ INVESTIGATION_TOOLS: list[dict] = [
         "parameters": {
             "type": "object",
             "properties": {
-                "service": {"type": "string", "description": "Service name, e.g. 'orders_api'"},
+                "service": {"type": "string", "description": "Log name (file name without .log); optional when there is only one log"},
                 "level": {"type": "string", "enum": ["INFO", "WARNING", "ERROR"]},
                 "path_contains": {"type": "string", "description": "Only entries whose request path contains this text"},
                 "request_id": {"type": "string"},
@@ -351,3 +385,8 @@ def execute_tool(workspace: Workspace, name: str, arguments: str | dict, allowed
     except (PermissionError, ValueError, TypeError) as exc:
         result = {"error": str(exc)}
     return json.dumps(result, default=str)
+
+
+def tools_for(app: str | None, tools: list[dict]) -> list[dict]:
+    """Drop send_request when the project has no HTTP app to send requests to."""
+    return [t for t in tools if app or t["name"] != "send_request"]

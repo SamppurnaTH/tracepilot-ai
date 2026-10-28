@@ -5,7 +5,6 @@ The full run (report + every event) is saved to runs/ in the same format the API
 """
 
 import argparse
-import json
 import sys
 import uuid
 from pathlib import Path
@@ -13,47 +12,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.agent import Investigation  # noqa: E402
+from app.cli import print_event  # noqa: E402
 from app.main import Run, RunManager  # noqa: E402
 from app.scenarios import SCENARIOS  # noqa: E402
-
-
-def print_event(event: dict) -> None:
-    t, kind = f"{event['t']:6.1f}s", event["type"]
-    if kind == "start":
-        print(f"{t}  START  model={event['model']} sandbox={event['isolation']}")
-    elif kind == "seeded":
-        print(f"{t}  SEEDED {event['requests']} requests, statuses {event['statuses']}")
-    elif kind == "baseline":
-        print(f"{t}  BASELINE tests: {event['tally']}")
-    elif kind == "phase":
-        print(f"\n{t}  === {event['phase'].upper()} ===")
-    elif kind == "thinking":
-        print(f"{t}  (thinking) {event['text'][:200]}")
-    elif kind == "hypothesis":
-        print(f"{t}  ? {event['id']} proposed: {event['claim']}")
-    elif kind == "hypothesis_update":
-        mark = "CONFIRMED" if event["status"] == "confirmed" else "REJECTED"
-        print(f"{t}  {'+' if mark == 'CONFIRMED' else 'x'} {event['id']} {mark}: {event['reason'][:160]}")
-    elif kind == "tool_call":
-        print(f"{t}    -> {event['tool']}({json.dumps(event['args'])[:140]})")
-    elif kind == "patch":
-        print(f"{t}  PATCH {event['path']}")
-    elif kind == "blocked":
-        print(f"{t}  BLOCKED {event['tool']} ({event['reason']})")
-    elif kind == "verification":
-        status = "VERIFIED" if event["verified"] else "NOT VERIFIED"
-        print(f"{t}  {status} (attempt {event['attempt']}): before {event['before']} -> after {event['after']}")
-    elif kind == "budget":
-        print(f"{t}  step budget reached in {event['phase']}")
-    elif kind == "second_opinion":
-        if event["verdict"] == "unavailable":
-            print(f"{t}  SECOND OPINION unavailable: {event.get('error', '')}")
-        else:
-            print(f"{t}  SECOND OPINION ({event['model']}): {event['verdict'].upper()} [{event['confidence']}] {event['summary']}")
-            for risk in event.get("risks", []):
-                print(f"{t}    risk: {risk}")
-    elif kind == "skip_fix":
-        print(f"{t}  no fix attempted: {event['reason']}")
 
 
 def main() -> None:

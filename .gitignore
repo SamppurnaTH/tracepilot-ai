@@ -23,3 +23,6 @@ targets/*/logs/*.log
 Thumbs.db
 .vscode/
 .idea/
+
+# TracePilot hand-off output
+tracepilot-out/

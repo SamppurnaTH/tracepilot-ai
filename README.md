@@ -1,10 +1,58 @@
 # TracePilot AI
 
-An evidence-driven software reliability and security investigation agent, built for the Meta Global AI Developer Hackathon (Indie Developer track, problem statement: Push the Frontier).
+**The AI debugger that proves its fix.** TracePilot investigates a software incident in a sandbox, writes a test that reproduces the bug, patches the code, and calls it fixed only when the test suite and an independent open-weight model agree. Built for the Meta Global AI Developer Hackathon (Indie Developer track, problem statement: Push the Frontier).
 
-**Live demo: [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app)**, which replays real recorded investigations of all three scenarios.
+**Live demo: [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app)** replays real, unedited investigations of four incidents. **Results: [eval/RESULTS.md](eval/RESULTS.md)**: 8/8 runs verified, 8/8 test-gaming patches caught, about $0.10 per investigation.
 
-> Status: project started during the hackathon building period (Oct 27 to Nov 4, 2026). See `BUILD_LOG.md` for what was built and when.
+## Quickstart: run it on your own project
+
+Needs Python 3.11+, Docker (recommended), and a Meta Model API key. A Baseten key is optional and enables the second opinion.
+
+```bash
+python -m venv .venv && .venv/Scripts/python -m pip install -r backend/requirements.txt   # .venv/bin/python on macOS/Linux
+cp .env.example .env                                                                       # add MODEL_API_KEY (and BASETEN_API_KEY)
+.venv/Scripts/python tracepilot.py investigate --repo path/to/your/service --logs path/to/app.log --incident "Orders placed on Friday are promised for Saturday"
+```
+
+It works on Python projects with pytest tests. Logs can be JSON lines or plain text. A FastAPI app is detected automatically, so the agent can also send requests to it.
+
+1. **Isolation:** the project is copied into a Docker sandbox with no network, a read-only root and a non-root user. Its `requirements.txt` is installed once into a cached image. Your files are never touched.
+2. **Hand-off:** you get `tracepilot-out/<time>/` containing `fix.patch` (including any test the agent wrote), `pr.md` (a ready PR description), `report.md` and `run.json`.
+3. **Applying:** add `--apply` to apply the patch with `git apply`, which only happens if it was verified. The exit code is 0 when verified and 1 when not.
+
+Tested on a project it had never seen: a non-web shipping module with plain-text logs, an extra dependency and green CI. The agent wrote the failing test itself and fixed an off-by-one that promised Saturday deliveries, going from 4/5 to 5/5 tests. The reviewer approved, and it cost 62K tokens (about $0.08) in 2.2 minutes.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    I["Incident + logs<br/>+ your repo"] --> H
+    subgraph H["Harness (owns the facts)"]
+        B["Evidence brief<br/>log patterns, failing tests<br/>(free, no model call)"]
+        V["Verification<br/>per-test before/after"]
+    end
+    subgraph S["Docker sandbox<br/>no network, read-only, non-root"]
+        C["Copy of the code"]
+        T["pytest"]
+    end
+    subgraph M1["muse-spark-1.3 · Meta Model API"]
+        A["Investigator<br/>hypotheses, tool calls,<br/>regression test, patch"]
+    end
+    subgraph M2["Muse Spark Open · Baseten"]
+        R["Independent reviewer<br/>sees facts + patch,<br/>not the transcript"]
+    end
+    B --> A
+    A -- "read_log · read_file · send_request<br/>run_tests · write_regression_test · edit_file" --> S
+    S --> V
+    V --> R
+    R -- "reject: objections go back<br/>for one more fix round" --> A
+    R --> O["Hand-off<br/>fix.patch · pr.md · report.md"]
+    V --> O
+```
+
+The model does the reasoning and the harness owns the facts. Hypotheses need cited evidence. A reproducing test is kept only if it fails before the fix. Existing tests are read-only. "Verified" is decided by comparing test outcomes, never by the model.
+
+> Built during the hackathon building period (Oct 27 to Nov 4, 2026). See `BUILD_LOG.md` for what was built and when.
 
 ## The problem
 
@@ -95,7 +143,7 @@ That's **about 34% fewer tokens** on the same incidents. Runs vary, and the sing
 - Fixes are verified before being suggested as final.
 - API keys are read from environment variables and never committed.
 
-## Setup
+## Development setup
 
 ```bash
 # Backend
@@ -104,7 +152,9 @@ python -m venv .venv
 cp .env.example .env          # set MODEL_API_KEY, and BASETEN_API_KEY for the reviewer (never commit .env)
 .venv/Scripts/python backend/scripts/smoke_test.py   # checks the Meta Model API
 docker build -t tracepilot-sandbox:1 sandbox          # optional; built automatically on first use
-.venv/Scripts/python backend/scripts/investigate.py --scenario orders   # one full run from the CLI
+.venv/Scripts/python backend/scripts/investigate.py --scenario orders   # one demo scenario from the CLI
+.venv/Scripts/python backend/scripts/eval.py agent --runs 2            # repeated runs -> eval/RESULTS.md
+.venv/Scripts/python backend/scripts/eval.py reviewer                  # reviewer benchmark
 cd backend && ../.venv/Scripts/python -m pytest && cd ..   # backend tests
 cd backend && ../.venv/Scripts/uvicorn app.main:app --reload   # API on http://localhost:8000
 

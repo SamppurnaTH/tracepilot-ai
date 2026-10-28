@@ -6,6 +6,7 @@ import { CopyButton, Severity, cx } from "./bits";
 import { downloadText, markdownReport, prDescription, publicTicket } from "@/lib/report";
 import {
   STAGES,
+  estimateCost,
   formatTally,
   shortTest,
   type Hypothesis,
@@ -129,6 +130,7 @@ function Outcome({ scenario, state }: { scenario: ScenarioSummary; state: RunSta
         <Kpi label="Second opinion" value={review ? REVIEW[review.verdict][0] : "—"} tone={review ? REVIEW[review.verdict][1] : undefined} />
         <Kpi label="Time" value={formatClock(r.duration_s)} />
         <Kpi label="Tokens" value={tokens ? kTokens(tokens) : "—"} />
+        <Kpi label="Est. cost" value={tokens ? estimateCost(tokens) : "—"} />
         <Kpi label="Model calls" value={String(r.usage.model_calls)} />
       </dl>
       <div className={s.outcomeActions}>
