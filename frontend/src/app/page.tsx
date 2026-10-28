@@ -164,6 +164,7 @@ export default function Home() {
               <li>confirm or reject</li>
               <li>patch</li>
               <li>verify with tests</li>
+              <li>second opinion</li>
             </ul>
           </section>
 

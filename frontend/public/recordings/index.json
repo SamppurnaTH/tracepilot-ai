@@ -8,7 +8,7 @@
     },
     "file": "orders.json",
     "verified": true,
-    "duration_s": 215.9
+    "duration_s": 142.8
   },
   {
     "scenario": {
@@ -19,7 +19,7 @@
     },
     "file": "notes.json",
     "verified": true,
-    "duration_s": 221.7
+    "duration_s": 181.5
   },
   {
     "scenario": {
@@ -30,6 +30,6 @@
     },
     "file": "billing.json",
     "verified": true,
-    "duration_s": 176.2
+    "duration_s": 205.0
   }
 ]

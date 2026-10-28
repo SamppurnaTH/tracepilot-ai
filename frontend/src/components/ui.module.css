@@ -576,7 +576,7 @@
 
 .test {
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
+  grid-template-columns: 92px minmax(0, 1fr);
   gap: 10px;
   align-items: baseline;
 }
@@ -635,6 +635,17 @@
 
 .diffHunk {
   color: var(--muted);
+}
+
+/* ---- second opinion ---- */
+.review {
+  display: grid;
+  gap: 10px;
+}
+
+.review .summary,
+.review .tests {
+  margin: 0;
 }
 
 /* ---- findings ---- */

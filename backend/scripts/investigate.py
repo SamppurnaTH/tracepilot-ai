@@ -45,6 +45,13 @@ def print_event(event: dict) -> None:
         print(f"{t}  {status} (attempt {event['attempt']}): before {event['before']} -> after {event['after']}")
     elif kind == "budget":
         print(f"{t}  step budget reached in {event['phase']}")
+    elif kind == "second_opinion":
+        if event["verdict"] == "unavailable":
+            print(f"{t}  SECOND OPINION unavailable: {event.get('error', '')}")
+        else:
+            print(f"{t}  SECOND OPINION ({event['model']}): {event['verdict'].upper()} [{event['confidence']}] {event['summary']}")
+            for risk in event.get("risks", []):
+                print(f"{t}    risk: {risk}")
     elif kind == "skip_fix":
         print(f"{t}  no fix attempted: {event['reason']}")
 

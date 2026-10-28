@@ -21,9 +21,12 @@ Developers spend hours investigating failures: reading logs, replaying API calls
 
 ## Meta tooling
 
-TracePilot's agent loop runs on Meta's models through the Meta Model API: multi-step reasoning, tool calling, and structured output. It currently uses `muse-spark-1.3` through the Responses API.
+TracePilot uses two Meta models with different jobs:
 
-Muse Spark Open (Meta open weights), served by Baseten, passes the same tool-calling and structured-output checks (`backend/scripts/smoke_test_baseten.py`).
+- **`muse-spark-1.3`** (Meta Model API, Responses API) runs the investigation: multi-step tool calling, hypothesis tracking, sandboxed fixes, and a structured final report.
+- **Muse Spark Open** (`meta-models/muse-spark-open-1026`, Meta open weights served by Baseten) is the **independent reviewer**. After the fix, it gets the incident, the confirmed hypotheses and their evidence, the patch and the patched files, but none of the investigation transcript. It rates each hypothesis as supported, weak or unsupported, and approves the patch, raises concerns or rejects it.
+
+Passing tests aren't proof on their own. `backend/scripts/check_reviewer.py` builds a patch that passes all 5 orders tests but only blocks the one order id the test requests, and Muse Spark Open rejects it: "IDOR remains for all other orders".
 
 ## How it works
 
@@ -31,7 +34,8 @@ Muse Spark Open (Meta open weights), served by Baseten, passes the same tool-cal
 2. **Investigate:** the model registers hypotheses (`propose_hypothesis`), gathers evidence with tools (`read_log`, `read_file`, `send_request`, `run_tests`), and confirms or rejects each one (`resolve_hypothesis`). A confirmation without evidence is refused.
 3. **Fix:** with confirmed root causes, the model edits the sandbox copy (`edit_file`). Tests can't be edited.
 4. **Verify:** the harness, not the model, compares every test's outcome before and after. A fix counts only if all failures are fixed and nothing regressed. Otherwise the model gets one more attempt.
-5. **Report:** a structured report (issues, severity, root cause, evidence, fix), the diff, and the verification result. Every step streams live as an event.
+5. **Second opinion:** Muse Spark Open reviews the causes and the patch cold, looking for weak evidence, symptom-only fixes and the same flaw surviving elsewhere. Its verdict is advisory and is shown next to the test result. The run continues if the reviewer is unavailable.
+6. **Report:** a structured report (issues, severity, root cause, evidence, fix), the diff, and the verification result. Every step streams live as an event.
 
 ## API
 
@@ -47,7 +51,7 @@ Muse Spark Open (Meta open weights), served by Baseten, passes the same tool-cal
 
 - Backend: Python, FastAPI
 - Frontend: Next.js
-- Models: Meta Model API
+- Models: `muse-spark-1.3` on the Meta Model API (investigator); Muse Spark Open on Baseten (reviewer)
 - Sandbox: Docker container per investigation, running a disposable copy of the target app, with a process fallback when Docker isn't available
 
 ## Safety principles
@@ -59,13 +63,13 @@ Muse Spark Open (Meta open weights), served by Baseten, passes the same tool-cal
 - Fixes are verified before being suggested as final.
 - API keys are read from environment variables and never committed.
 
-## Setup (to be completed during the build)
+## Setup
 
 ```bash
 # Backend
 python -m venv .venv
 .venv/Scripts/python -m pip install -r backend/requirements.txt   # .venv/bin/python on macOS/Linux
-cp .env.example .env          # then set MODEL_API_KEY in .env (never commit it)
+cp .env.example .env          # set MODEL_API_KEY, and BASETEN_API_KEY for the reviewer (never commit .env)
 .venv/Scripts/python backend/scripts/smoke_test.py   # checks the Meta Model API
 docker build -t tracepilot-sandbox:1 sandbox          # optional; built automatically on first use
 .venv/Scripts/python backend/scripts/investigate.py --scenario orders   # one full run from the CLI
@@ -83,19 +87,17 @@ npm run dev                   # http://localhost:3000
 The frontend (`frontend/`) shows each investigation as a flight log: every check the agent runs, hypotheses moving from open to confirmed or rejected, a before/after test gauge, the patch, and the findings.
 It replays real recorded runs (`frontend/public/recordings/`), so the hosted demo works without a backend. With the API running, it can start live investigations and stream them.
 
-## Build plan
+## Build progress
 
-| Day | Goal |
+| Date | Milestone |
 |---|---|
-| Oct 27 | Foundation: first Meta API call, repo structure, sandbox, sample app |
-| Oct 28 | Evidence ingestion and tools |
-| Oct 29 | Hypothesis generation with structured output |
-| Oct 30 | Sandbox check runner with tool calling |
-| Oct 31 | Agent loop: hypothesis, check, update, next step |
-| Nov 1 | Fix and verify step; security scenario |
-| Nov 2 | Next.js UI: live view and report |
-| Nov 3 | Hardening, tests, feature freeze, backup demo |
-| Nov 4 | Final demo recording and submission |
+| Oct 27 | Meta Model API working; evidence tools; Docker sandbox; agent loop (investigate, fix, verify, report); first real verified run |
+| Oct 28 | Muse Spark Open on Baseten; three scenarios; streaming API; transcript recovery; Next.js flight-recorder UI; deployed; independent reviewer |
+| Oct 29 – Nov 2 | Multimodal evidence, eval table, architecture diagram |
+| Nov 3 | Feature freeze, hardening, demo recording |
+| Nov 4 | Submission |
+
+The detailed, timestamped history is in `BUILD_LOG.md`.
 
 ## Demo scenarios
 

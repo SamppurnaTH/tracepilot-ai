@@ -78,7 +78,11 @@ def test_run_streams_events_and_ends(client):
 def test_run_is_saved_for_replay(client):
     run_id = client.post("/api/investigations", json={"scenario": "notes"}).json()["id"]
     wait_done(client, run_id)
-    saved = client.get("/api/runs").json()
+    for _ in range(100):  # the file is written just after the status flips to completed
+        saved = client.get("/api/runs").json()
+        if saved:
+            break
+        time.sleep(0.05)
     assert saved[0]["scenario"] == "notes" and saved[0]["verified"] is True
     replay = client.get(f"/api/runs/{saved[0]['name']}").json()
     assert [e["type"] for e in replay["events"]] == ["start", "verification"]

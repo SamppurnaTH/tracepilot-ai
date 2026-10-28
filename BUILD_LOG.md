@@ -111,3 +111,13 @@ The agent now keeps its own transcript. If the chain is lost, it replays the ful
 
 **Deployed:** [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app). It's the Vercel Hobby plan with root directory `frontend`, and it redeploys on every push to `main`.
 Verified as a visitor: replay mode works and the console is clean. Live runs need the backend, which requires Docker for the sandbox, so they run locally.
+
+**Independent second opinion from Muse Spark Open** (`backend/app/reviewer.py`):
+
+- After verification, Muse Spark Open (Meta open weights on Baseten) reviews the work cold. It sees the incident, the confirmed hypotheses and their evidence, the patch, the full patched files and the test results, but none of the investigation transcript.
+- It returns a verdict (approve, concerns or reject), a confidence, a per-hypothesis assessment (supported, weak or unsupported) and concrete risks. It uses prompt-based JSON with validation and one retry.
+- The verdict is advisory: the harness's test comparison still decides "verified". The final report is told about the review, and a reviewer failure never fails the run.
+- The UI shows it as a "Second opinion" panel and a flight-log entry.
+- 7 new tests with a fake Chat Completions client. Also fixed a race in an API test (the run file is written just after the status flips). 84 backend tests, all passing.
+- Real orders run: verified 3/5 → 5/5, and Muse Spark Open **approved in 5 seconds**, noting the ownership check now matches the `/total` endpoint.
+- **Can it catch a gamed fix?** `backend/scripts/check_reviewer.py` builds a patch that passes all 5 tests but only blocks order 7, the one the IDOR test requests. Muse Spark Open **rejected it with high confidence**, saying the IDOR remains for every other order. Passing tests alone would have called that patch verified.

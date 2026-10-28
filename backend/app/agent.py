@@ -14,6 +14,7 @@ from typing import Any, Callable
 import openai
 
 from .llm import get_client
+from .reviewer import Reviewer, changed_files
 from .sandbox import Sandbox
 from .scenarios import Scenario
 from .tools import FIX_TOOLS, INVESTIGATION_TOOLS, Workspace, execute_tool
@@ -148,6 +149,7 @@ class Investigation:
         isolation: str = "auto",
         app: str = "orders_api.app:app",
         seed_requests: list[dict] | None = None,
+        reviewer: Reviewer | None = None,
     ):
         self.incident = incident
         self.source = source
@@ -156,6 +158,7 @@ class Investigation:
         self.isolation = isolation
         self.app = app
         self.seed_requests = seed_requests or []
+        self.reviewer = reviewer
         if client is None:
             client, model = get_client(provider)
         self.client, self.model = client, model
@@ -169,6 +172,8 @@ class Investigation:
 
     @classmethod
     def from_scenario(cls, scenario: Scenario, **kwargs) -> "Investigation":
+        """A scenario run, with the Muse Spark Open reviewer whenever a Baseten key is configured."""
+        kwargs.setdefault("reviewer", Reviewer.from_env())
         return cls(scenario.incident, scenario.target, app=scenario.app, seed_requests=scenario.seed_requests(), **kwargs)
 
     # --- plumbing -----------------------------------------------------------
@@ -344,7 +349,8 @@ class Investigation:
             else:
                 self._emit("skip_fix", reason="no confirmed root cause")
 
-            findings = self._final_report(verification)
+            second_opinion = self._second_opinion(sandbox, verification) if confirmed else None
+            findings = self._final_report(verification, second_opinion)
             report = {
                 "incident": self.incident,
                 "provider": self.provider,
@@ -354,6 +360,7 @@ class Investigation:
                 "findings": findings,
                 "diff": sandbox.diff(),
                 "verification": verification,
+                "second_opinion": second_opinion,
                 "usage": self.usage,
                 "duration_s": round(time.monotonic() - self._started, 1),
             }
@@ -361,12 +368,33 @@ class Investigation:
         report["events"] = self.events
         return report
 
-    def _final_report(self, verification: dict) -> dict:
+    def _second_opinion(self, sandbox: Sandbox, verification: dict) -> dict | None:
+        """Have an independent model review the confirmed causes and the patch. Never fails the run."""
+        if self.reviewer is None:
+            return None
+        self._emit("phase", phase="review")
+        diff = sandbox.diff()
+        files = {}
+        for path in changed_files(diff):
+            try:
+                files[path] = sandbox.resolve(path).read_text(encoding="utf-8")
+            except (OSError, ValueError):
+                continue
+        try:
+            opinion = self.reviewer.review(self.incident, [asdict(h) for h in self.hypotheses.values()], diff, files, verification)
+        except Exception as exc:  # the reviewer is advisory: report the failure and carry on
+            opinion = {"verdict": "unavailable", "error": f"{type(exc).__name__}: {exc}"[:300], "model": self.reviewer.model}
+        self._emit("second_opinion", **opinion)
+        return opinion
+
+    def _final_report(self, verification: dict, second_opinion: dict | None = None) -> dict:
         self._emit("phase", phase="report")
         facts = {
             "hypotheses": [asdict(h) for h in self.hypotheses.values()],
             "verification": {k: verification[k] for k in ("verified", "fixed", "still_failing", "regressions")},
         }
+        if second_opinion and second_opinion.get("verdict") != "unavailable":
+            facts["independent_review"] = {k: second_opinion[k] for k in ("verdict", "summary", "risks")}
         response = self._create(
             [
                 {

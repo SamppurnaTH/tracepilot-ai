@@ -42,6 +42,19 @@ export interface Usage {
   tool_calls: number;
 }
 
+// Independent review of the confirmed causes and the patch by Muse Spark Open (Meta open weights).
+export interface SecondOpinion {
+  verdict: "approve" | "concerns" | "reject" | "unavailable";
+  confidence?: "high" | "medium" | "low";
+  summary?: string;
+  hypotheses?: { id: string; assessment: "supported" | "weak" | "unsupported"; note: string }[];
+  risks?: string[];
+  model?: string;
+  tokens?: number;
+  duration_s?: number;
+  error?: string;
+}
+
 export interface Report {
   incident: string;
   model: string;
@@ -50,6 +63,7 @@ export interface Report {
   findings: { summary: string; issues: Issue[] };
   diff: string;
   verification: Verification;
+  second_opinion?: SecondOpinion | null;
   usage: Usage;
   duration_s: number;
 }
@@ -78,7 +92,7 @@ export interface Recording {
   events: RunEvent[];
 }
 
-export type Phase = "starting" | "investigate" | "fix" | "report" | "done" | "failed";
+export type Phase = "starting" | "investigate" | "fix" | "review" | "report" | "done" | "failed";
 
 export interface TimelineItem {
   seq: number;
@@ -97,6 +111,7 @@ export interface RunState {
   hypotheses: Hypothesis[];
   baseline?: Record<string, Outcome>;
   verification?: Verification;
+  secondOpinion?: SecondOpinion;
   diff: string;
   report?: Report;
   error?: string;
@@ -180,7 +195,7 @@ export function reduce(state: RunState, e: RunEvent): RunState {
     case "phase": {
       const phase = e.phase as Phase;
       s.phase = phase;
-      const titles: Record<string, string> = { investigate: "Investigating", fix: "Fixing in the sandbox", report: "Writing the report" };
+      const titles: Record<string, string> = { investigate: "Investigating", fix: "Fixing in the sandbox", review: "Independent review", report: "Writing the report" };
       add({ kind: "phase", title: titles[phase] ?? phase });
       break;
     }
@@ -220,6 +235,18 @@ export function reduce(state: RunState, e: RunEvent): RunState {
       });
       break;
     }
+    case "second_opinion": {
+      const o = e as unknown as SecondOpinion;
+      s.secondOpinion = o;
+      const labels = { approve: "approved the fix", concerns: "raised concerns", reject: "rejected the fix", unavailable: "unavailable" };
+      add({
+        kind: "verify",
+        title: `Reviewer ${labels[o.verdict] ?? o.verdict}`,
+        detail: o.verdict === "unavailable" ? o.error : o.summary,
+        tone: o.verdict === "approve" ? "good" : o.verdict === "unavailable" ? "neutral" : "bad",
+      });
+      break;
+    }
     case "recovered":
       add({ kind: "alert", title: "Recovered the conversation", detail: e.reason as string, tone: "neutral" });
       break;
@@ -233,6 +260,7 @@ export function reduce(state: RunState, e: RunEvent): RunState {
       s.report = e.report as Report;
       s.diff = s.report.diff || s.diff;
       s.verification = s.verification ?? s.report.verification;
+      s.secondOpinion = s.secondOpinion ?? s.report.second_opinion ?? undefined;
       s.phase = "done";
       break;
     case "error":

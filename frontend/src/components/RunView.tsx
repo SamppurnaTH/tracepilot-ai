@@ -10,6 +10,7 @@ import {
   type Outcome,
   type RunState,
   type ScenarioSummary,
+  type SecondOpinion,
   type TimelineItem,
   type Verification,
 } from "@/lib/run";
@@ -28,7 +29,7 @@ function StatusBadge({ state, mode }: { state: RunState; mode: "live" | "replay"
     const ok = state.verification?.verified;
     return <span className={cx(s.status, ok ? s.statusGood : s.statusBad)}>{ok ? "Fix verified" : "Not verified"}</span>;
   }
-  const label = state.phase === "starting" ? "Starting sandbox" : state.phase === "fix" ? "Fixing" : state.phase === "report" ? "Reporting" : "Investigating";
+  const label = state.phase === "starting" ? "Starting sandbox" : state.phase === "fix" ? "Fixing" : state.phase === "review" ? "Reviewing" : state.phase === "report" ? "Reporting" : "Investigating";
   return (
     <span className={cx(s.status, s.statusRunning)}>
       <span className={s.pulse} aria-hidden="true" />
@@ -229,6 +230,52 @@ function DiffPanel({ diff }: { diff: string }) {
   );
 }
 
+function SecondOpinionPanel({ opinion }: { opinion?: SecondOpinion }) {
+  if (!opinion) return null;
+  const verdict = {
+    approve: ["Approved", s.pillConfirmed],
+    concerns: ["Concerns", s.pillOpen],
+    reject: ["Rejected", s.pillRejected],
+    unavailable: ["Unavailable", s.sevLow],
+  }[opinion.verdict] ?? [opinion.verdict, s.sevLow];
+  const assessment = { supported: s.tagFixed, weak: s.tagStill, unsupported: s.tagBroken };
+  return (
+    <section className={s.panel} aria-labelledby="review-title">
+      <div className={s.panelHead}>
+        <h2 id="review-title" className={s.panelTitle}>Second opinion</h2>
+        <span className={s.panelMeta}>{opinion.model ?? "Independent reviewer"} · saw none of the investigation</span>
+      </div>
+      <div className={cx(s.panelBody, s.review)}>
+        <div className={s.issueTop}>
+          <span className={cx(s.pill, verdict[1])}>{verdict[0]}</span>
+          {opinion.confidence && <span className={s.category}>{opinion.confidence} confidence</span>}
+          {opinion.tokens ? <span className={s.category}>· {opinion.tokens.toLocaleString()} tokens</span> : null}
+        </div>
+        <p className={s.summary}>{opinion.verdict === "unavailable" ? opinion.error : opinion.summary}</p>
+        {opinion.hypotheses && opinion.hypotheses.length > 0 && (
+          <ul className={s.tests}>
+            {opinion.hypotheses.map((h) => (
+              <li key={h.id} className={s.test}>
+                <span className={cx(s.testTag, assessment[h.assessment])}>{h.assessment}</span>
+                <span>
+                  <span className="mono">{h.id}</span> {h.note}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {opinion.risks && opinion.risks.length > 0 && (
+          <ul className={s.evidence}>
+            {opinion.risks.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function IssueCard({ issue }: { issue: Issue }) {
   const sev = { critical: s.sevCritical, high: s.sevHigh, medium: s.sevMedium, low: s.sevLow }[issue.severity];
   return (
@@ -309,6 +356,7 @@ export function RunView({
           <Hypotheses list={state.hypotheses} />
           <VerificationPanel baseline={state.baseline} v={state.verification} />
           <DiffPanel diff={state.diff} />
+          <SecondOpinionPanel opinion={state.secondOpinion} />
           <Findings state={state} />
         </div>
       </div>
