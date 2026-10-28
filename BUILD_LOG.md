@@ -121,3 +121,17 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - 7 new tests with a fake Chat Completions client. Also fixed a race in an API test (the run file is written just after the status flips). 84 backend tests, all passing.
 - Real orders run: verified 3/5 → 5/5, and Muse Spark Open **approved in 5 seconds**, noting the ownership check now matches the `/total` endpoint.
 - **Can it catch a gamed fix?** `backend/scripts/check_reviewer.py` builds a patch that passes all 5 tests but only blocks order 7, the one the IDOR test requests. Muse Spark Open **rejected it with high confidence**, saying the IDOR remains for every other order. Passing tests alone would have called that patch verified.
+
+**Token economy** (input tokens are ~95% of spend, since every call re-sends the conversation):
+
+- Found that each logged 500 carried a ~5,000-character traceback, almost all starlette and anyio frames, re-billed on every later call. `compact_traceback` keeps only the app's own frames and the exception.
+- The harness now builds a free evidence brief: the workspace files, grouped log warnings and errors with example request ids (taken before any test run pollutes the log), and each failing test with its full assertion message. pytest is run with a wide virtual terminal so the messages aren't truncated.
+- Green test runs return only the summary. The report is written in a fresh context from the recorded facts and the patch. The system prompt asks for batched tool calls. Usage is now tracked by phase, along with cached tokens.
+- Real runs, all verified 5/5 and approved by Muse Spark Open: orders 95K → 48K, notes 117K → 55K, billing 117K → 67K tokens. That's **48% fewer**, and each run is 40–50 s faster.
+
+**UI redesign:** the "flight recorder" look is replaced with a calm developer-tool design (Geist type, neutral palette, one blue accent) built outcome-first.
+
+- **Landing page:** a hero with a clear promise; proof metrics computed from the recordings (3/3 verified, 6 root causes, average time, tokens per run and the saving); incident cards with severity tags and results; how it works in six steps; and a "spend less, get more" section.
+- **Run page:** a progress stepper (sandbox → investigate → patch → verify → second opinion → report). An outcome card shows tests before and after, the reviewer verdict, time and tokens. Then root causes with collapsible evidence, hypotheses, verification, the second opinion and the patch. A sticky activity log and a token-spend-by-phase chart sit in the sidebar.
+- **Hand-off, zero tokens:** copy the patch, copy a PR description, or download a Markdown incident report, all generated in the browser.
+- Test credentials are hidden from the displayed tickets (only the agent needs them). Checked at desktop and 375 px, in dark and light, with no horizontal overflow. 89 backend tests pass.

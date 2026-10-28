@@ -204,3 +204,17 @@ def test_step_budget_forces_summary(monkeypatch):
     report, client = run([loop, loop, "Summary after budget.", json.dumps({"summary": "-", "issues": []})])
     assert any(e["type"] == "budget" for e in report["events"])
     assert "tools" not in client.requests[2]
+
+
+def test_report_runs_in_a_fresh_context_and_usage_is_split_by_phase():
+    report, client = run(
+        investigation_script()
+        + [[call("edit_file", path="orders_api/app.py", old=COUPON_BUG, new=COUPON_FIX), call("edit_file", path="orders_api/app.py", old=IDOR_BUG, new=IDOR_FIX)], "Fixed both.", REPORT]
+    )
+    report_request = client.requests[-1]
+    assert "previous_response_id" not in report_request
+    assert "bob GET /orders/7 -> 200" in report_request["input"][0]["content"]  # the facts carry the evidence
+    assert set(report["usage"]["by_phase"]) == {"investigate", "fix", "report"}
+    # The first prompt carries the harness's evidence brief.
+    assert "Evidence brief" in client.requests[0]["input"][1]["content"]
+    assert "brief" in [e["type"] for e in report["events"]]

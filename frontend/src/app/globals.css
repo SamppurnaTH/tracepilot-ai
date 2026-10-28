@@ -1,66 +1,92 @@
-/* Layout concept: a flight recorder for software incidents. The investigation log runs down the
-   left like a cockpit voice recorder; the right side is the instrument panel (hypotheses,
-   verification gauge, patch, findings). Amber is the single signal color; green/red are state only. */
+/* TracePilot design tokens. A quiet, neutral developer-tool palette with a single blue accent;
+   green, red and amber only ever mean state (verified, failing, needs attention). */
 :root {
-  --bg: #eef1f5;
-  --panel: #ffffff;
-  --panel-2: #f6f8fb;
-  --line: #d5dce6;
-  --ink: #132033;
-  --muted: #5a6a80;
-  --signal: #a95a06;
-  --signal-wash: #fbefdf;
-  --good: #16744b;
-  --good-wash: #e3f4ec;
-  --bad: #bb2537;
-  --bad-wash: #fbe7ea;
-  --code-bg: #f3f5f9;
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f2f4f7;
+  --border: #e3e6eb;
+  --border-strong: #cdd3dc;
+  --text: #0f1419;
+  --text-2: #4f5968;
+  --text-3: #858e9c;
+  --accent: #2f5bea;
+  --accent-hover: #254ad0;
+  --accent-wash: #edf1fe;
+  --on-accent: #ffffff;
+  --good: #12805c;
+  --good-wash: #e6f4ee;
+  --bad: #c62f3c;
+  --bad-wash: #fcebed;
+  --warn: #a35c00;
+  --warn-wash: #fdf2e1;
+  --code-bg: #f6f7f9;
+  --shadow: 0 1px 2px rgb(15 20 25 / 0.04), 0 1px 1px rgb(15 20 25 / 0.03);
+  --shadow-lg: 0 12px 32px -12px rgb(15 20 25 / 0.14);
 
-  --font-display: var(--font-chakra), "Segoe UI", system-ui, sans-serif;
-  --font-body: var(--font-plex), "Segoe UI", system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains), ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --font-sans: var(--font-geist), "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "Cascadia Mono", Consolas, monospace;
 
-  --step--1: 0.8125rem;
-  --step-0: 0.9375rem;
-  --step-1: 1.125rem;
-  --step-2: 1.5rem;
-  --step-3: clamp(1.75rem, 1.2rem + 2.2vw, 2.6rem);
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-lg: 1.0625rem;
+  --text-xl: 1.375rem;
+  --text-2xl: clamp(1.5rem, 1.2rem + 1.2vw, 1.875rem);
+  --text-hero: clamp(2.1rem, 1.4rem + 3vw, 3.5rem);
   --radius: 10px;
+  --radius-sm: 6px;
+  --max: 1200px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #0d1420;
-    --panel: #142030;
-    --panel-2: #182638;
-    --line: #26354c;
-    --ink: #e2e8f1;
-    --muted: #8d9cb3;
-    --signal: #f0a03c;
-    --signal-wash: #2e2414;
-    --good: #43d692;
-    --good-wash: #13291f;
-    --bad: #ff7083;
-    --bad-wash: #321820;
-    --code-bg: #0f1926;
+    --bg: #0b0d10;
+    --surface: #121519;
+    --surface-2: #181c21;
+    --border: #232830;
+    --border-strong: #313843;
+    --text: #e8eaed;
+    --text-2: #a4acb8;
+    --text-3: #6f7886;
+    --accent: #6f8cff;
+    --accent-hover: #8aa1ff;
+    --accent-wash: #19203d;
+    --on-accent: #0b0d10;
+    --good: #3ecf8e;
+    --good-wash: #0f261c;
+    --bad: #ff6b76;
+    --bad-wash: #2c1418;
+    --warn: #f0b04a;
+    --warn-wash: #2a2010;
+    --code-bg: #0e1013;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-lg: 0 16px 40px -16px rgb(0 0 0 / 0.6);
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --bg: #0d1420;
-  --panel: #142030;
-  --panel-2: #182638;
-  --line: #26354c;
-  --ink: #e2e8f1;
-  --muted: #8d9cb3;
-  --signal: #f0a03c;
-  --signal-wash: #2e2414;
-  --good: #43d692;
-  --good-wash: #13291f;
-  --bad: #ff7083;
-  --bad-wash: #321820;
-  --code-bg: #0f1926;
+  --bg: #0b0d10;
+  --surface: #121519;
+  --surface-2: #181c21;
+  --border: #232830;
+  --border-strong: #313843;
+  --text: #e8eaed;
+  --text-2: #a4acb8;
+  --text-3: #6f7886;
+  --accent: #6f8cff;
+  --accent-hover: #8aa1ff;
+  --accent-wash: #19203d;
+  --on-accent: #0b0d10;
+  --good: #3ecf8e;
+  --good-wash: #0f261c;
+  --bad: #ff6b76;
+  --bad-wash: #2c1418;
+  --warn: #f0b04a;
+  --warn-wash: #2a2010;
+  --code-bg: #0e1013;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 16px 40px -16px rgb(0 0 0 / 0.6);
   color-scheme: dark;
 }
 
@@ -75,19 +101,20 @@ body {
 
 body {
   background: var(--bg);
-  color: var(--ink);
-  font-family: var(--font-body);
-  font-size: var(--step-0);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 h1,
 h2,
 h3 {
-  font-family: var(--font-display);
   font-weight: 600;
-  line-height: 1.15;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
   margin: 0;
   text-wrap: balance;
 }
@@ -103,15 +130,16 @@ pre,
 }
 
 a {
-  color: var(--signal);
+  color: inherit;
 }
 
 button {
   font: inherit;
+  color: inherit;
 }
 
 :focus-visible {
-  outline: 2px solid var(--signal);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 

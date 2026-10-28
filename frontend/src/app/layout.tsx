@@ -1,20 +1,20 @@
 import type { Metadata } from "next";
-import { Chakra_Petch, IBM_Plex_Sans, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const chakra = Chakra_Petch({ variable: "--font-chakra", subsets: ["latin"], weight: ["500", "600", "700"] });
-const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight: ["400", "500", "600"] });
-const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], weight: ["400", "500"] });
+const sans = Geist({ variable: "--font-geist", subsets: ["latin"] });
+const mono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "TracePilot AI",
-  description: "An agent that investigates software failures, tests its hypotheses, and proves its fixes in a sandbox. Built on Meta's Muse Spark models.",
+  title: "TracePilot AI: root cause, patch and proof for every incident",
+  description:
+    "An AI agent that investigates software incidents in a sandbox, patches the code, and proves the fix with your tests and an independent model review. Built on Meta Muse Spark.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     // Font variables sit on <html> so the :root design tokens in globals.css can reference them.
-    <html lang="en" className={`${chakra.variable} ${plex.variable} ${jetbrains.variable}`}>
+    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   );

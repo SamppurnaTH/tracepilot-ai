@@ -10,6 +10,11 @@ export interface RecordingIndexEntry {
   file: string;
   verified: boolean;
   duration_s: number;
+  tests?: { before: Record<string, number>; after: Record<string, number> };
+  issues?: { title: string; severity: "critical" | "high" | "medium" | "low"; category: string }[];
+  tokens?: number;
+  model_calls?: number;
+  review?: string | null;
 }
 
 export async function backendAvailable(): Promise<boolean> {

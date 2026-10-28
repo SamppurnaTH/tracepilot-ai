@@ -36,7 +36,10 @@ Rules:
   you gathered with tools: log request ids, file paths with line numbers, reproduced request results, test names.
 - Never confirm a hypothesis from intuition alone. If evidence contradicts it, reject it and form a better one.
 - Look for the cause of every reported symptom, and note any closely related defect you discover.
-- Tests are the ground truth: never weaken or edit them."""
+- Tests are the ground truth: never weaken or edit them.
+- Be economical: every round trip re-sends the whole conversation. Batch independent tool calls into one turn
+  (several reads, requests or hypotheses at once), use the evidence brief instead of re-discovering it,
+  and read only the code you need."""
 
 HYPOTHESIS_TOOLS: list[dict] = [
     {
@@ -164,7 +167,8 @@ class Investigation:
         self.client, self.model = client, model
         self.hypotheses: dict[str, Hypothesis] = {}
         self.events: list[dict] = []
-        self.usage = {"input_tokens": 0, "output_tokens": 0, "model_calls": 0, "tool_calls": 0}
+        self.usage = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0, "model_calls": 0, "tool_calls": 0, "by_phase": {}}
+        self._phase = "investigate"
         self._previous_id: str | None = None
         self._history: list = []
         self._call_counts: dict[str, int] = {}
@@ -183,10 +187,15 @@ class Investigation:
         self.events.append(event)
         self.on_event(event)
 
-    def _create(self, input_items: list, tools: list[dict] | None = None, **kwargs):
+    def _create(self, input_items: list, tools: list[dict] | None = None, chain: bool = True, **kwargs):
+        """One model call. With chain=False it runs in a fresh context: cheaper, and the transcript is untouched."""
         params: dict[str, Any] = {"model": self.model, "input": input_items, **kwargs}
         if tools:
             params["tools"] = tools
+        if not chain:
+            response = self.client.responses.create(**params)
+            self._count(response)
+            return response
         if self._previous_id:
             params["previous_response_id"] = self._previous_id
         # Keep our own transcript so a run survives the server losing the response chain.
@@ -202,16 +211,24 @@ class Investigation:
             response = self.client.responses.create(**params)
         self._previous_id = response.id
         self._history.extend(item for item in map(_as_input_item, response.output) if item)
-        self.usage["model_calls"] += 1
-        if getattr(response, "usage", None):
-            self.usage["input_tokens"] += response.usage.input_tokens or 0
-            self.usage["output_tokens"] += response.usage.output_tokens or 0
+        self._count(response)
         for item in response.output:
             if item.type == "reasoning":
                 summary = " ".join(getattr(part, "text", "") for part in (getattr(item, "summary", None) or []))
                 if summary.strip():
                     self._emit("thinking", text=summary.strip())
         return response
+
+    def _count(self, response) -> None:
+        self.usage["model_calls"] += 1
+        usage = getattr(response, "usage", None)
+        if not usage:
+            return
+        spent = (usage.input_tokens or 0) + (usage.output_tokens or 0)
+        self.usage["input_tokens"] += usage.input_tokens or 0
+        self.usage["output_tokens"] += usage.output_tokens or 0
+        self.usage["cached_tokens"] += getattr(getattr(usage, "input_tokens_details", None), "cached_tokens", 0) or 0
+        self.usage["by_phase"][self._phase] = self.usage["by_phase"].get(self._phase, 0) + spent
 
     def _dispatch(self, workspace: Workspace, name: str, arguments: str, allowed: list[dict]) -> str:
         self.usage["tool_calls"] += 1
@@ -268,6 +285,7 @@ class Investigation:
         return {"id": hyp.id, "status": hyp.status}
 
     def _run_phase(self, workspace: Workspace, phase: str, prompt_items: list, tools: list[dict], max_steps: int) -> str:
+        self._phase = phase
         self._emit("phase", phase=phase)
         response = self._create(prompt_items, tools)
         for step in range(1, max_steps + 1):
@@ -306,8 +324,11 @@ class Investigation:
                     raise RuntimeError(f"seeding traffic failed: {seeded}")
                 self._emit("seeded", requests=len(seeded), statuses=[r["status"] for r in seeded])
 
-            baseline = workspace.test_outcomes()
+            log_digest = workspace.log_digest()  # before the test runs add their own log entries
+            baseline, reasons = workspace.test_report()
             self._emit("baseline", tests=baseline, tally=_tally(baseline))
+            brief = workspace.brief(log_digest, baseline, reasons)
+            self._emit("brief", text=brief)
 
             investigate_tools = INVESTIGATION_TOOLS + HYPOTHESIS_TOOLS
             self._run_phase(
@@ -317,7 +338,8 @@ class Investigation:
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {
                         "role": "user",
-                        "content": f"Incident:\n{self.incident}\n\nInvestigate now. Do not change any code in this phase. "
+                        "content": f"Incident:\n{self.incident}\n\nEvidence brief (computed by the harness):\n{brief}\n\n"
+                        "Investigate now. Do not change any code in this phase. "
                         "When every reported symptom has a confirmed root cause, or you have exhausted your options, "
                         "reply with a short summary and no tool calls.",
                     },
@@ -350,7 +372,7 @@ class Investigation:
                 self._emit("skip_fix", reason="no confirmed root cause")
 
             second_opinion = self._second_opinion(sandbox, verification) if confirmed else None
-            findings = self._final_report(verification, second_opinion)
+            findings = self._final_report(verification, second_opinion, sandbox.diff())
             report = {
                 "incident": self.incident,
                 "provider": self.provider,
@@ -372,6 +394,7 @@ class Investigation:
         """Have an independent model review the confirmed causes and the patch. Never fails the run."""
         if self.reviewer is None:
             return None
+        self._phase = "review"
         self._emit("phase", phase="review")
         diff = sandbox.diff()
         files = {}
@@ -387,11 +410,15 @@ class Investigation:
         self._emit("second_opinion", **opinion)
         return opinion
 
-    def _final_report(self, verification: dict, second_opinion: dict | None = None) -> dict:
+    def _final_report(self, verification: dict, second_opinion: dict | None = None, diff: str = "") -> dict:
+        """Write the report from the recorded facts in a fresh context, not the whole investigation transcript."""
+        self._phase = "report"
         self._emit("phase", phase="report")
         facts = {
+            "incident": self.incident,
             "hypotheses": [asdict(h) for h in self.hypotheses.values()],
             "verification": {k: verification[k] for k in ("verified", "fixed", "still_failing", "regressions")},
+            "patch": diff or "(no changes)",
         }
         if second_opinion and second_opinion.get("verdict") != "unavailable":
             facts["independent_review"] = {k: second_opinion[k] for k in ("verdict", "summary", "risks")}
@@ -399,10 +426,12 @@ class Investigation:
             [
                 {
                     "role": "user",
-                    "content": "Write the final investigation report. Base it only on what you established. "
+                    "content": "Write the final report of a software incident investigation. Base it only on these recorded facts; "
+                    "each issue's evidence must come from the hypotheses' evidence.\n"
                     f"Recorded facts:\n{json.dumps(facts, indent=2)}",
                 }
             ],
+            chain=False,
             text={"format": {"type": "json_schema", "name": "InvestigationReport", "schema": REPORT_SCHEMA, "strict": True}},
         )
         try:

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from app.config import REPO_ROOT
-from app.tools import FIX_TOOLS, INVESTIGATION_TOOLS, Workspace, execute_tool
+from app.tools import FIX_TOOLS, INVESTIGATION_TOOLS, Workspace, compact_traceback, execute_tool
 
 
 def call(ws: Workspace, name: str, allowed=INVESTIGATION_TOOLS, **args) -> dict:
@@ -116,3 +116,38 @@ def test_unknown_tool(ws):
 
 def test_private_methods_are_not_tools(ws):
     assert "error" in call(ws, "_scrub_bases")
+
+
+# --- token economy ----------------------------------------------------------
+
+
+def test_logged_tracebacks_keep_only_app_frames(ws):
+    tb = call(ws, "read_log", level="ERROR")["entries"][0]["traceback"]
+    assert "site-packages" not in tb and "starlette" not in tb
+    assert "compute_total" in tb and tb.endswith("TypeError: 'NoneType' object is not subscriptable")
+
+
+def test_compact_traceback_handles_both_path_styles():
+    tb = (
+        "Traceback (most recent call last):\n"
+        '  File "/usr/local/lib/python3.11/site-packages/starlette/routing.py", line 73, in app\n'
+        "    response = await f(request)\n"
+        '  File "/workspace/orders_api/app.py", line 101, in compute_total\n'
+        '    discount = order["coupon"]["percent"]\n'
+        "TypeError: boom\n"
+    )
+    assert compact_traceback(tb) == '/workspace/orders_api/app.py:101 in compute_total: discount = order["coupon"]["percent"]\nTypeError: boom'
+
+
+def test_green_test_run_returns_only_the_summary(ws):
+    result = call(ws, "run_tests", selector="tests/test_orders.py::test_total_with_coupon")
+    assert result == {"exit_code": 0, "summary": result["summary"]} and "1 passed" in result["summary"]
+
+
+def test_brief_digests_logs_and_failures(ws):
+    digest = ws.log_digest()
+    outcomes, reasons = ws.test_report()
+    brief = ws.brief(digest, outcomes, reasons)
+    assert "ERROR x2: GET /orders/9/total -> 500 TypeError" in brief
+    assert "FAILING tests/test_orders.py::test_total_without_coupon: assert 500 == 200" in brief
+    assert "orders_api/app.py" in brief and "logs/" not in brief

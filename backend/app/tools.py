@@ -15,6 +15,7 @@ from .config import REPO_ROOT
 from .sandbox import TEXT_SUFFIXES, Sandbox
 
 MAX_OUTPUT_CHARS = 8000
+MAX_TEST_OUTPUT_CHARS = 4000
 MAX_FILE_LINES = 400
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 REQUEST_RUNNER = (REPO_ROOT / "sandbox" / "request_runner.py").read_text(encoding="utf-8")
@@ -24,6 +25,29 @@ def _truncate(text: str, limit: int = MAX_OUTPUT_CHARS) -> str:
     if len(text) <= limit:
         return text
     return text[:limit] + f"\n... [truncated {len(text) - limit} chars]"
+
+
+_FRAME = re.compile(r'^\s*File "(?P<path>[^"]+)", line (?P<line>\d+), in (?P<func>.+)$')
+# Matched against the frame's path with forward slashes.
+_LIBRARY_MARKERS = ("site-packages/", "dist-packages/", "/lib/python3", "/Lib/", "<frozen")
+
+
+def compact_traceback(tb: str) -> str:
+    """Keep only the application's own frames and the final exception line.
+
+    Framework frames (starlette, anyio, ...) make up most of a web traceback and say nothing
+    about the bug, yet every later model call would pay for them again.
+    """
+    lines = tb.rstrip().splitlines()
+    kept: list[str] = []
+    for i, line in enumerate(lines):
+        match = _FRAME.match(line)
+        if not match or any(m in match["path"].replace("\\", "/") for m in _LIBRARY_MARKERS):
+            continue
+        code = lines[i + 1].strip() if i + 1 < len(lines) and not _FRAME.match(lines[i + 1]) else ""
+        kept.append(f'{match["path"]}:{match["line"]} in {match["func"]}: {code}')
+    final = next((line for line in reversed(lines) if line and not line.startswith(" ")), "")
+    return "\n".join(kept + [final])
 
 
 class Workspace:
@@ -56,7 +80,7 @@ class Workspace:
         level: str | None = None,
         path_contains: str | None = None,
         request_id: str | None = None,
-        limit: int = 50,
+        limit: int = 30,
     ) -> dict:
         if not re.fullmatch(r"[a-z0-9_]+", service):
             raise ValueError("service must be lowercase letters, digits or underscores")
@@ -76,6 +100,8 @@ class Workspace:
                 continue
             if request_id and entry.get("request_id") != request_id:
                 continue
+            if isinstance(entry.get("traceback"), str):
+                entry["traceback"] = compact_traceback(entry["traceback"])
             entries.append(entry)
 
         limit = max(1, min(limit, 200))
@@ -143,18 +169,68 @@ class Workspace:
             (line.strip("= ") for line in reversed(output.splitlines()) if re.search(r"\d+ (passed|failed|error)", line)),
             "no summary",
         )
-        return {"exit_code": result.exit_code, "summary": summary, "output": _truncate(output[-MAX_OUTPUT_CHARS:])}
+        if result.exit_code == 0:  # all green: the summary says everything
+            return {"exit_code": 0, "summary": summary}
+        return {"exit_code": result.exit_code, "summary": summary, "output": _truncate(output[-MAX_TEST_OUTPUT_CHARS:], MAX_TEST_OUTPUT_CHARS)}
+
+    def log_digest(self) -> list[str]:
+        """Warning and error patterns per log, grouped. Take it before any test run adds entries."""
+        out = []
+        for log_file in sorted((self.root / "logs").glob("*.log")):
+            groups: dict[tuple, list[str]] = {}
+            levels: dict[str, int] = {}
+            for line in log_file.read_text(encoding="utf-8").splitlines():
+                try:
+                    e = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                levels[e.get("level", "?")] = levels.get(e.get("level", "?"), 0) + 1
+                if e.get("level") in ("WARNING", "ERROR"):
+                    key = (e.get("level"), e.get("method"), e.get("path"), e.get("status"), e.get("error", ""))
+                    groups.setdefault(key, []).append(str(e.get("request_id")))
+            out.append(f"Log {log_file.stem}: " + ", ".join(f"{n} {lvl}" for lvl, n in sorted(levels.items())))
+            for (level, method, path, status, error), ids in groups.items():
+                detail = f" {error}" if error else ""
+                out.append(f"  {level} x{len(ids)}: {method} {path} -> {status}{detail} (e.g. {', '.join(ids[:3])})")
+        return self.scrub(out)
+
+    def brief(self, log_digest: list[str], outcomes: dict[str, str], reasons: dict[str, str]) -> str:
+        """A digest the harness computes for free: files, log patterns and failing tests.
+
+        Handing this over up front saves the model several exploratory round trips,
+        each of which would re-send the whole conversation.
+        """
+        files = sorted(
+            p.relative_to(self.root).as_posix()
+            for p in self.root.rglob("*")
+            if p.is_file() and p.suffix in TEXT_SUFFIXES and "__pycache__" not in p.parts and p.parent.name != "logs"
+        )
+        failing = sorted(t for t, o in outcomes.items() if o != "passed")
+        out = ["Workspace files: " + ", ".join(files), *log_digest]
+        out.append(f"Tests: {len(outcomes) - len(failing)} passed, {len(failing)} failing")
+        out.extend(f"  FAILING {t}" + (f": {reasons[t]}" if t in reasons else "") for t in failing)
+        return self.scrub("\n".join(out))
 
     def test_outcomes(self) -> dict[str, str]:
         """Per-test outcomes ({node_id: "passed" | "failed" | "error"}), for harness-side verification."""
-        args = ["-m", "pytest", "-q", "-rA", "--tb=no", "-p", "no:cacheprovider"]
-        result = self.sandbox.python(args, timeout=180)
-        outcomes = {}
+        return self.test_report()[0]
+
+    def test_report(self) -> tuple[dict[str, str], dict[str, str]]:
+        """Per-test outcomes, plus pytest's one-line failure message for each failing test."""
+        # A wide virtual terminal stops pytest from truncating the failure messages.
+        code = (
+            "import os, sys; os.environ['COLUMNS'] = '400'; import pytest; "
+            "sys.exit(pytest.main(['-q', '-rA', '--tb=no', '-p', 'no:cacheprovider']))"
+        )
+        result = self.sandbox.python(["-c", code], timeout=180)
+        outcomes, reasons = {}, {}
         for line in (result.stdout + result.stderr).splitlines():
-            match = re.match(r"^(PASSED|FAILED|ERROR) (\S+)", line)
+            match = re.match(r"^(PASSED|FAILED|ERROR) (\S+)(?: - (.+))?$", line)
             if match:
                 outcomes[match.group(2)] = match.group(1).lower()
-        return outcomes
+                if match.group(3):
+                    reasons[match.group(2)] = self.scrub(match.group(3))[:240]
+        return outcomes, reasons
 
     # --- fix tools ----------------------------------------------------------
 

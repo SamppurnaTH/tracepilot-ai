@@ -38,8 +38,10 @@ export interface Verification {
 export interface Usage {
   input_tokens: number;
   output_tokens: number;
+  cached_tokens?: number;
   model_calls: number;
   tool_calls: number;
+  by_phase?: Record<string, number>;
 }
 
 // Independent review of the confirmed causes and the patch by Muse Spark Open (Meta open weights).
@@ -94,6 +96,10 @@ export interface Recording {
 
 export type Phase = "starting" | "investigate" | "fix" | "review" | "report" | "done" | "failed";
 
+// The stages of a run, in order, as shown in the progress stepper.
+export const STAGES = ["sandbox", "investigate", "fix", "verify", "review", "report"] as const;
+export type Stage = (typeof STAGES)[number];
+
 export interface TimelineItem {
   seq: number;
   t: number;
@@ -117,6 +123,8 @@ export interface RunState {
   error?: string;
   toolCalls: number;
   timeline: TimelineItem[];
+  reached: Stage[];
+  brief?: string;
 }
 
 export const initialState: RunState = {
@@ -126,6 +134,7 @@ export const initialState: RunState = {
   diff: "",
   toolCalls: 0,
   timeline: [],
+  reached: [],
 };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -176,11 +185,15 @@ export function reduce(state: RunState, e: RunEvent): RunState {
   const add = (item: Omit<TimelineItem, "seq" | "t">) => {
     s.timeline = [...s.timeline, { seq: e.seq, t, ...item }];
   };
+  const reach = (stage: Stage) => {
+    if (!s.reached.includes(stage)) s.reached = [...s.reached, stage];
+  };
 
   switch (e.type) {
     case "start":
       s.model = e.model as string;
       s.isolation = e.isolation as string;
+      reach("sandbox");
       add({ kind: "note", title: "Sandbox ready", detail: `${e.isolation} isolation, ${e.model}`, tone: "neutral" });
       break;
     case "seeded": {
@@ -192,9 +205,14 @@ export function reduce(state: RunState, e: RunEvent): RunState {
     case "baseline":
       s.baseline = e.tests as Record<string, Outcome>;
       break;
+    case "brief":
+      s.brief = e.text as string;
+      add({ kind: "note", title: "Evidence brief prepared", detail: "log patterns and failing tests, computed by the harness at no token cost", tone: "neutral" });
+      break;
     case "phase": {
       const phase = e.phase as Phase;
       s.phase = phase;
+      if (phase === "investigate" || phase === "fix" || phase === "review" || phase === "report") reach(phase);
       const titles: Record<string, string> = { investigate: "Investigating", fix: "Fixing in the sandbox", review: "Independent review", report: "Writing the report" };
       add({ kind: "phase", title: titles[phase] ?? phase });
       break;
@@ -227,6 +245,7 @@ export function reduce(state: RunState, e: RunEvent): RunState {
     case "verification": {
       const v = e as unknown as Verification;
       s.verification = v;
+      reach("verify");
       add({
         kind: "verify",
         title: v.verified ? "Fix verified" : "Fix not verified",

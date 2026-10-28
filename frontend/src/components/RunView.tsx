@@ -2,7 +2,10 @@
 
 import { useEffect, useRef } from "react";
 import s from "./ui.module.css";
+import { CopyButton, Severity, cx } from "./bits";
+import { downloadText, markdownReport, prDescription, publicTicket } from "@/lib/report";
 import {
+  STAGES,
   formatTally,
   shortTest,
   type Hypothesis,
@@ -11,11 +14,10 @@ import {
   type RunState,
   type ScenarioSummary,
   type SecondOpinion,
+  type Stage,
   type TimelineItem,
   type Verification,
 } from "@/lib/run";
-
-const cx = (...names: (string | false | undefined)[]) => names.filter(Boolean).join(" ");
 
 function formatClock(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -23,123 +25,248 @@ function formatClock(seconds: number): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
-function StatusBadge({ state, mode }: { state: RunState; mode: "live" | "replay" }) {
-  if (state.phase === "failed") return <span className={cx(s.status, s.statusBad)}>Failed</span>;
+const kTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}K` : String(n));
+const passing = (tally?: Record<string, number>) => formatTally(tally).replace(" passing", "");
+
+const STAGE_LABEL: Record<Stage, string> = {
+  sandbox: "Sandbox",
+  investigate: "Investigate",
+  fix: "Patch",
+  verify: "Verify",
+  review: "Second opinion",
+  report: "Report",
+};
+
+const REVIEW: Record<SecondOpinion["verdict"], [string, string]> = {
+  approve: ["Approved", s.goodText],
+  concerns: ["Concerns", s.warnText],
+  reject: ["Rejected", s.badText],
+  unavailable: ["Unavailable", s.muted],
+};
+
+function StatusBadge({ state }: { state: RunState }) {
+  if (state.phase === "failed") return <span className={cx(s.badge, s.badgeBad)}>Failed</span>;
   if (state.phase === "done") {
     const ok = state.verification?.verified;
-    return <span className={cx(s.status, ok ? s.statusGood : s.statusBad)}>{ok ? "Fix verified" : "Not verified"}</span>;
+    return <span className={cx(s.badge, ok ? s.badgeGood : s.badgeBad)}>{ok ? "Fix verified" : "Not verified"}</span>;
   }
-  const label = state.phase === "starting" ? "Starting sandbox" : state.phase === "fix" ? "Fixing" : state.phase === "review" ? "Reviewing" : state.phase === "report" ? "Reporting" : "Investigating";
   return (
-    <span className={cx(s.status, s.statusRunning)}>
+    <span className={cx(s.badge, s.badgeRunning)}>
       <span className={s.pulse} aria-hidden="true" />
-      {mode === "replay" ? `Replay: ${label}` : label}
+      Running
     </span>
   );
 }
 
-function Stats({ state }: { state: RunState }) {
-  const usage = state.report?.usage;
-  const tokens = usage ? usage.input_tokens + usage.output_tokens : undefined;
-  const confirmed = state.hypotheses.filter((h) => h.status === "confirmed").length;
-  const items = [
-    ["Elapsed", formatClock(state.report?.duration_s ?? state.elapsed)],
-    ["Hypotheses", `${confirmed}/${state.hypotheses.length} confirmed`],
-    ["Tool calls", String(usage?.tool_calls ?? state.toolCalls)],
-    ["Tokens", tokens ? `${Math.round(tokens / 1000)}K` : "…"],
-    ["Model", state.model ?? "…"],
-    ["Sandbox", state.isolation ?? "…"],
-  ];
+function Stepper({ state }: { state: RunState }) {
+  const done = state.phase === "done";
+  const furthest = Math.max(-1, ...state.reached.map((r) => STAGES.indexOf(r)));
   return (
-    <div className={s.stats}>
-      {items.map(([label, value]) => (
-        <div key={label} className={s.stat}>
-          <span className={s.statLabel}>{label}</span>
-          <span className={s.statValue}>{value}</span>
-        </div>
-      ))}
-    </div>
+    <ol className={s.stepper} aria-label="Progress">
+      {STAGES.map((stage, i) => {
+        const reached = state.reached.includes(stage);
+        const status = done ? (reached ? "done" : "skipped") : i < furthest ? "done" : i === furthest ? "current" : "pending";
+        return (
+          <li key={stage} className={cx(s.stage, s[`stage_${status}`])} aria-current={status === "current" ? "step" : undefined}>
+            <span className={s.stageMark} aria-hidden="true">
+              {status === "done" ? "✓" : status === "skipped" ? "–" : i + 1}
+            </span>
+            <span className={s.stageLabel}>{STAGE_LABEL[stage]}</span>
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
-function Timeline({ items }: { items: TimelineItem[] }) {
-  const list = useRef<HTMLOListElement>(null);
-  useEffect(() => {
-    // Follow the newest entry inside the log only; never scroll the page itself.
-    const el = list.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [items.length]);
-  const markClass = { good: s.markGood, bad: s.markBad, signal: s.markSignal, neutral: undefined };
+function Outcome({ scenario, state }: { scenario: ScenarioSummary; state: RunState }) {
+  const r = state.report;
+  const v = state.verification;
+  const confirmed = state.hypotheses.filter((h) => h.status === "confirmed").length;
+  const tokens = r ? r.usage.input_tokens + r.usage.output_tokens : undefined;
+  const review = state.secondOpinion;
+
+  if (!r) {
+    const last = [...state.timeline].reverse().find((item) => item.kind !== "phase");
+    return (
+      <section className={cx(s.card, s.outcome)} aria-live="polite">
+        <div className={s.outcomeHead}>
+          <span className={cx(s.outcomeIcon, s.outcomeIconRunning)} aria-hidden="true">
+            <span className={s.pulse} />
+          </span>
+          <div className={s.outcomeText}>
+            <h2 className={s.outcomeTitle}>{state.phase === "failed" ? "Investigation failed" : "Investigating…"}</h2>
+            <p className={s.muted}>{state.error ?? (last ? `${last.title}${last.detail ? `: ${last.detail}` : ""}` : "Starting the sandbox")}</p>
+          </div>
+        </div>
+        <dl className={s.kpis}>
+          <Kpi label="Elapsed" value={formatClock(state.elapsed)} />
+          <Kpi label="Hypotheses" value={`${confirmed} of ${state.hypotheses.length} confirmed`} />
+          <Kpi label="Checks run" value={String(state.toolCalls)} />
+          <Kpi label="Tests before" value={state.baseline ? passing(tallyOf(state.baseline)) : "…"} />
+        </dl>
+      </section>
+    );
+  }
+
+  const ok = v?.verified;
+  const slug = scenario.id;
   return (
-    <section className={s.panel} aria-labelledby="log-title">
-      <div className={s.panelHead}>
-        <h2 id="log-title" className={s.panelTitle}>Flight log</h2>
-        <span className={s.panelMeta}>{items.filter((i) => i.kind === "tool").length} checks run</span>
+    <section className={cx(s.card, s.outcome)}>
+      <div className={s.outcomeHead}>
+        <span className={cx(s.outcomeIcon, ok ? s.outcomeIconGood : s.outcomeIconBad)} aria-hidden="true">
+          {ok ? "✓" : "!"}
+        </span>
+        <div className={s.outcomeText}>
+          <h2 className={s.outcomeTitle}>{ok ? "Fixed and verified" : "Not verified"}</h2>
+          <p className={s.outcomeSummary}>{r.findings.summary}</p>
+        </div>
       </div>
-      <ol ref={list} className={s.timeline}>
-        {items.length === 0 && <li className={cx(s.entry, s.empty)}>Waiting for the sandbox…</li>}
-        {items.map((item) =>
-          item.kind === "phase" ? (
-            <li key={item.seq} className={s.phaseRow}>
-              {item.title}
-            </li>
-          ) : (
-            <li key={item.seq} className={cx(s.entry, item.kind === "tool" && s.entryTool)}>
-              <span className={s.entryTime}>{formatClock(item.t)}</span>
-              <span className={cx(s.entryMark, item.tone && markClass[item.tone])} aria-hidden="true" />
-              <span className={s.entryText}>
-                <span className={s.entryTitle}>{item.title}</span>
-                {item.detail && <span className={s.entryDetail}> · {item.detail}</span>}
-              </span>
-            </li>
-          ),
-        )}
-      </ol>
+      <dl className={s.kpis}>
+        <Kpi label="Tests" value={v ? `${passing(v.before)} → ${passing(v.after)}` : "—"} tone={ok ? s.goodText : s.badText} />
+        <Kpi label="Root causes" value={`${confirmed} confirmed`} />
+        <Kpi label="Second opinion" value={review ? REVIEW[review.verdict][0] : "—"} tone={review ? REVIEW[review.verdict][1] : undefined} />
+        <Kpi label="Time" value={formatClock(r.duration_s)} />
+        <Kpi label="Tokens" value={tokens ? kTokens(tokens) : "—"} />
+        <Kpi label="Model calls" value={String(r.usage.model_calls)} />
+      </dl>
+      <div className={s.outcomeActions}>
+        {state.diff && <CopyButton text={state.diff} label="Copy patch" className={cx(s.btn, s.btnPrimary)} />}
+        <CopyButton text={prDescription(scenario, state)} label="Copy PR description" />
+        <button type="button" className={s.btn} onClick={() => downloadText(`tracepilot-${slug}-report.md`, markdownReport(scenario, state))}>
+          Download report
+        </button>
+      </div>
     </section>
   );
 }
 
-function HypothesisCard({ h }: { h: Hypothesis }) {
-  const tone = { open: [s.hypOpen, s.pillOpen], confirmed: [s.hypConfirmed, s.pillConfirmed], rejected: [s.hypRejected, s.pillRejected] }[h.status];
+function tallyOf(tests: Record<string, Outcome>): Record<string, number> {
+  const t: Record<string, number> = {};
+  Object.values(tests).forEach((o) => (t[o] = (t[o] ?? 0) + 1));
+  return t;
+}
+
+function Kpi({ label, value, tone }: { label: string; value: string; tone?: string }) {
   return (
-    <article className={cx(s.hypothesis, tone[0])}>
-      <div className={s.hypTop}>
-        <span className={s.hypId}>{h.id}</span>
-        <span className={cx(s.pill, tone[1])}>{h.status}</span>
+    <div className={s.kpi}>
+      <dt>{label}</dt>
+      <dd className={tone}>{value}</dd>
+    </div>
+  );
+}
+
+function Panel({ title, meta, children, flush }: { title: string; meta?: React.ReactNode; children: React.ReactNode; flush?: boolean }) {
+  const id = `panel-${title.toLowerCase().replace(/\W+/g, "-")}`;
+  return (
+    <section className={s.card} aria-labelledby={id}>
+      <header className={s.cardHead}>
+        <h2 id={id} className={s.cardTitle}>
+          {title}
+        </h2>
+        {meta && <span className={s.cardMeta}>{meta}</span>}
+      </header>
+      <div className={flush ? undefined : s.cardBody}>{children}</div>
+    </section>
+  );
+}
+
+function Findings({ state }: { state: RunState }) {
+  const issues = state.report?.findings.issues ?? [];
+  if (!issues.length) return null;
+  return (
+    <Panel title="Root causes" meta={`${issues.length} found`}>
+      <div className={s.issues}>
+        {issues.map((issue, i) => (
+          <IssueCard key={i} issue={issue} hypotheses={state.hypotheses} />
+        ))}
       </div>
-      <p className={s.hypClaim}>{h.claim}</p>
-      {h.symptom && <p className={s.hypMeta}>Explains: {h.symptom}</p>}
-      {h.status === "open" && h.next_check && <p className={s.hypMeta}>Next check: {h.next_check}</p>}
-      {h.evidence.length > 0 && (
-        <ul className={s.evidence}>
-          {h.evidence.map((e, i) => (
-            <li key={i}>{e}</li>
-          ))}
-        </ul>
+    </Panel>
+  );
+}
+
+function IssueCard({ issue, hypotheses }: { issue: Issue; hypotheses: Hypothesis[] }) {
+  const evidence = issue.evidence.length ? issue.evidence : hypotheses.filter((h) => issue.hypothesis_ids.includes(h.id)).flatMap((h) => h.evidence);
+  return (
+    <article className={s.issue}>
+      <div className={s.tagRow}>
+        <Severity level={issue.severity} />
+        <span className={s.tagPlain}>{issue.category}</span>
+        {issue.hypothesis_ids.length > 0 && <span className={s.tagPlain}>{issue.hypothesis_ids.join(", ")}</span>}
+      </div>
+      <h3 className={s.issueTitle}>{issue.title}</h3>
+      <p className={s.issueText}>{issue.root_cause}</p>
+      {evidence.length > 0 && (
+        <details className={s.disclosure}>
+          <summary>Evidence ({evidence.length})</summary>
+          <ul className={s.evidence}>
+            {evidence.map((e, i) => (
+              <li key={i}>{e}</li>
+            ))}
+          </ul>
+        </details>
       )}
+      <p className={s.issueFix}>
+        <span>Fix</span> {issue.fix}
+      </p>
     </article>
   );
 }
 
 function Hypotheses({ list }: { list: Hypothesis[] }) {
+  const status = { open: [s.hypOpen, "Testing"], confirmed: [s.hypConfirmed, "Confirmed"], rejected: [s.hypRejected, "Rejected"] } as const;
   return (
-    <section className={s.panel} aria-labelledby="hyp-title">
-      <div className={s.panelHead}>
-        <h2 id="hyp-title" className={s.panelTitle}>Hypotheses</h2>
-        <span className={s.panelMeta}>Each one needs evidence to be confirmed</span>
-      </div>
-      <div className={s.panelBody}>
-        {list.length === 0 ? (
-          <p className={s.empty}>The agent registers each suspected cause here before testing it.</p>
-        ) : (
-          <div className={s.hypotheses}>
-            {list.map((h) => (
-              <HypothesisCard key={h.id} h={h} />
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
+    <Panel title="Hypotheses" meta="Each needs cited evidence to be confirmed">
+      {list.length === 0 ? (
+        <p className={s.muted}>Suspected causes appear here before the agent tests them.</p>
+      ) : (
+        <ul className={s.hypotheses}>
+          {list.map((h) => (
+            <li key={h.id} className={s.hypothesis}>
+              <span className={s.hypId}>{h.id}</span>
+              <div className={s.hypBody}>
+                <p className={s.hypClaim}>{h.claim}</p>
+                {h.status === "open" ? (
+                  h.next_check && <p className={s.hypMeta}>Next check: {h.next_check}</p>
+                ) : (
+                  h.reason && <p className={s.hypMeta}>{h.reason}</p>
+                )}
+              </div>
+              <span className={cx(s.tag, status[h.status][0])}>{status[h.status][1]}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
+  );
+}
+
+function DiffView({ diff }: { diff: string }) {
+  if (!diff) return null;
+  const lines = diff.replace(/\n$/, "").split("\n");
+  const added = lines.filter((l) => l.startsWith("+") && !l.startsWith("+++")).length;
+  const removed = lines.filter((l) => l.startsWith("-") && !l.startsWith("---")).length;
+  return (
+    <Panel
+      title="Patch"
+      flush
+      meta={
+        <>
+          <span className={s.goodText}>+{added}</span> <span className={s.badText}>−{removed}</span> · sandbox copy only
+        </>
+      }
+    >
+      <pre className={s.diff}>
+        {lines.map((line, i) => {
+          const cls = line.startsWith("+++") || line.startsWith("---") ? s.diffFile : line.startsWith("@@") ? s.diffHunk : line.startsWith("+") ? s.diffAdd : line.startsWith("-") ? s.diffDel : undefined;
+          return (
+            <code key={i} className={cx(s.diffLine, cls)}>
+              {line || " "}
+            </code>
+          );
+        })}
+      </pre>
+    </Panel>
   );
 }
 
@@ -155,110 +282,77 @@ function Cells({ tests }: { tests?: Record<string, Outcome> }) {
 }
 
 function VerificationPanel({ baseline, v }: { baseline?: Record<string, Outcome>; v?: Verification }) {
-  const before = baseline ? Object.values(baseline).filter((o) => o === "passed").length : 0;
-  const total = baseline ? Object.keys(baseline).length : 0;
   const rows: [string, string, string][] = v
     ? [
-        ...v.fixed.map((t): [string, string, string] => [t, "fixed", s.tagFixed]),
-        ...v.regressions.map((t): [string, string, string] => [t, "broke", s.tagBroken]),
-        ...v.still_failing.map((t): [string, string, string] => [t, "failing", s.tagStill]),
+        ...v.fixed.map((t): [string, string, string] => [t, "Fixed", s.sevPass]),
+        ...v.regressions.map((t): [string, string, string] => [t, "Broke", s.sevCritical]),
+        ...v.still_failing.map((t): [string, string, string] => [t, "Failing", s.sevMedium]),
       ]
     : [];
   return (
-    <section className={s.panel} aria-labelledby="verify-title">
-      <div className={s.panelHead}>
-        <h2 id="verify-title" className={s.panelTitle}>Verification</h2>
-        <span className={s.panelMeta}>Decided by the test suite, not the model</span>
-      </div>
-      <div className={s.panelBody}>
-        {!baseline ? (
-          <p className={s.empty}>The harness runs the app&apos;s tests before any change.</p>
-        ) : (
-          <>
-            <div className={s.gauge}>
-              <div className={s.gaugeSide}>
-                <span className={s.gaugeLabel}>Before</span>
-                <span className={s.gaugeValue}>
-                  {before}/{total}
-                </span>
-                <Cells tests={baseline} />
-              </div>
-              <span className={s.arrow} aria-hidden="true">→</span>
-              <div className={s.gaugeSide}>
-                <span className={s.gaugeLabel}>After fix</span>
-                <span className={s.gaugeValue}>{v ? formatTally(v.after).replace(" passing", "") : "…"}</span>
-                {v?.tests ? <Cells tests={v.tests} /> : <div className={s.cells} />}
-              </div>
+    <Panel title="Verification" meta="Decided by the test suite, not the model">
+      {!baseline ? (
+        <p className={s.muted}>The harness runs the service&apos;s tests before any change.</p>
+      ) : (
+        <>
+          <div className={s.gauge}>
+            <div className={s.gaugeSide}>
+              <span className={s.gaugeLabel}>Before</span>
+              <span className={s.gaugeValue}>{passing(tallyOf(baseline))}</span>
+              <Cells tests={baseline} />
             </div>
-            {rows.length > 0 && (
-              <ul className={s.tests}>
-                {rows.map(([id, label, cls]) => (
-                  <li key={id + label} className={s.test}>
-                    <span className={cx(s.testTag, cls)}>{label}</span>
-                    <span className="mono">{shortTest(id)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function DiffPanel({ diff }: { diff: string }) {
-  if (!diff) return null;
-  const lines = diff.replace(/\n$/, "").split("\n");
-  return (
-    <section className={s.panel} aria-labelledby="diff-title">
-      <div className={s.panelHead}>
-        <h2 id="diff-title" className={s.panelTitle}>Patch</h2>
-        <span className={s.panelMeta}>Applied to the sandbox copy only</span>
-      </div>
-      <pre className={s.diff}>
-        {lines.map((line, i) => {
-          const cls = line.startsWith("+++") || line.startsWith("---") || line.startsWith("@@") ? s.diffHunk : line.startsWith("+") ? s.diffAdd : line.startsWith("-") ? s.diffDel : undefined;
-          return (
-            <code key={i} className={cx(s.diffLine, cls)}>
-              {line || " "}
-            </code>
-          );
-        })}
-      </pre>
-    </section>
+            <span className={s.gaugeArrow} aria-hidden="true">
+              →
+            </span>
+            <div className={s.gaugeSide}>
+              <span className={s.gaugeLabel}>After patch</span>
+              <span className={s.gaugeValue}>{v ? passing(v.after) : "…"}</span>
+              {v?.tests ? <Cells tests={v.tests} /> : <div className={s.cells} />}
+            </div>
+          </div>
+          {rows.length > 0 && (
+            <ul className={s.testRows}>
+              {rows.map(([id, label, cls]) => (
+                <li key={id + label}>
+                  <span className={cx(s.tag, cls)}>{label}</span>
+                  <span className={s.testName}>{shortTest(id)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </Panel>
   );
 }
 
 function SecondOpinionPanel({ opinion }: { opinion?: SecondOpinion }) {
   if (!opinion) return null;
-  const verdict = {
-    approve: ["Approved", s.pillConfirmed],
-    concerns: ["Concerns", s.pillOpen],
-    reject: ["Rejected", s.pillRejected],
-    unavailable: ["Unavailable", s.sevLow],
-  }[opinion.verdict] ?? [opinion.verdict, s.sevLow];
-  const assessment = { supported: s.tagFixed, weak: s.tagStill, unsupported: s.tagBroken };
+  const [label, tone] = REVIEW[opinion.verdict] ?? [opinion.verdict, s.muted];
+  const assessment = { supported: s.sevPass, weak: s.sevMedium, unsupported: s.sevCritical };
   return (
-    <section className={s.panel} aria-labelledby="review-title">
-      <div className={s.panelHead}>
-        <h2 id="review-title" className={s.panelTitle}>Second opinion</h2>
-        <span className={s.panelMeta}>{opinion.model ?? "Independent reviewer"} · saw none of the investigation</span>
-      </div>
-      <div className={cx(s.panelBody, s.review)}>
-        <div className={s.issueTop}>
-          <span className={cx(s.pill, verdict[1])}>{verdict[0]}</span>
-          {opinion.confidence && <span className={s.category}>{opinion.confidence} confidence</span>}
-          {opinion.tokens ? <span className={s.category}>· {opinion.tokens.toLocaleString()} tokens</span> : null}
-        </div>
-        <p className={s.summary}>{opinion.verdict === "unavailable" ? opinion.error : opinion.summary}</p>
+    <Panel
+      title="Second opinion"
+      meta={
+        <>
+          {opinion.model ?? "Independent reviewer"}
+          {opinion.tokens ? ` · ${kTokens(opinion.tokens)} tokens` : ""}
+        </>
+      }
+    >
+      <div className={s.review}>
+        <p className={s.reviewVerdict}>
+          <span className={tone}>{label}</span>
+          {opinion.confidence && <span className={s.muted}> · {opinion.confidence} confidence · saw none of the investigation</span>}
+        </p>
+        <p className={s.issueText}>{opinion.verdict === "unavailable" ? opinion.error : opinion.summary}</p>
         {opinion.hypotheses && opinion.hypotheses.length > 0 && (
-          <ul className={s.tests}>
+          <ul className={s.testRows}>
             {opinion.hypotheses.map((h) => (
-              <li key={h.id} className={s.test}>
-                <span className={cx(s.testTag, assessment[h.assessment])}>{h.assessment}</span>
+              <li key={h.id}>
+                <span className={cx(s.tag, assessment[h.assessment])}>{h.assessment}</span>
                 <span>
-                  <span className="mono">{h.id}</span> {h.note}
+                  <span className={s.hypId}>{h.id}</span> {h.note}
                 </span>
               </li>
             ))}
@@ -272,48 +366,66 @@ function SecondOpinionPanel({ opinion }: { opinion?: SecondOpinion }) {
           </ul>
         )}
       </div>
-    </section>
+    </Panel>
   );
 }
 
-function IssueCard({ issue }: { issue: Issue }) {
-  const sev = { critical: s.sevCritical, high: s.sevHigh, medium: s.sevMedium, low: s.sevLow }[issue.severity];
+function Activity({ items }: { items: TimelineItem[] }) {
+  const list = useRef<HTMLOListElement>(null);
+  useEffect(() => {
+    // Follow the newest entry inside the log only; never scroll the page itself.
+    const el = list.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [items.length]);
+  const tone = { good: s.dotGood, bad: s.dotBad, signal: s.dotAccent, neutral: undefined };
   return (
-    <article className={s.issue}>
-      <div className={s.issueTop}>
-        <span className={cx(s.pill, sev)}>{issue.severity}</span>
-        <span className={s.category}>{issue.category}</span>
-        {issue.hypothesis_ids.length > 0 && <span className={s.category}>· {issue.hypothesis_ids.join(", ")}</span>}
-      </div>
-      <p className={s.issueTitle}>{issue.title}</p>
-      <p className={s.issueRow}>
-        <strong>Root cause:</strong> {issue.root_cause}
-      </p>
-      <p className={s.issueRow}>
-        <strong>Fix:</strong> {issue.fix}
-      </p>
-    </article>
+    <Panel title="Activity" meta={`${items.filter((i) => i.kind === "tool").length} checks`} flush>
+      <ol ref={list} className={s.activity}>
+        {items.length === 0 && <li className={s.activityEmpty}>Waiting for the sandbox…</li>}
+        {items.map((item) =>
+          item.kind === "phase" ? (
+            <li key={item.seq} className={s.activityPhase}>
+              {item.title}
+            </li>
+          ) : (
+            <li key={item.seq} className={s.activityItem}>
+              <span className={cx(s.activityDot, item.tone && tone[item.tone])} aria-hidden="true" />
+              <span className={s.activityText}>
+                <span className={item.kind === "tool" ? s.activityTool : s.activityTitle}>{item.title}</span>
+                {item.detail && <span className={s.activityDetail}>{item.detail}</span>}
+              </span>
+              <span className={s.activityTime}>{formatClock(item.t)}</span>
+            </li>
+          ),
+        )}
+      </ol>
+    </Panel>
   );
 }
 
-function Findings({ state }: { state: RunState }) {
-  const findings = state.report?.findings;
-  if (!findings) return null;
+function TokenSpend({ state }: { state: RunState }) {
+  const usage = state.report?.usage;
+  const phases = Object.entries(usage?.by_phase ?? {});
+  if (!usage || !phases.length) return null;
+  const review = state.secondOpinion?.tokens ?? 0;
+  const rows: [string, number][] = [...phases, ...(review ? [["review (open model)", review] as [string, number]] : [])];
+  const max = Math.max(...rows.map(([, n]) => n));
+  const total = rows.reduce((a, [, n]) => a + n, 0);
   return (
-    <section className={s.panel} aria-labelledby="findings-title">
-      <div className={s.panelHead}>
-        <h2 id="findings-title" className={s.panelTitle}>Findings</h2>
-        <span className={s.panelMeta}>{findings.issues.length} issues</span>
-      </div>
-      <div className={s.panelBody}>
-        <p className={s.summary}>{findings.summary}</p>
-        <div className={s.issues}>
-          {findings.issues.map((issue, i) => (
-            <IssueCard key={i} issue={issue} />
-          ))}
-        </div>
-      </div>
-    </section>
+    <Panel title="Token spend" meta={`${kTokens(total)} total`}>
+      <ul className={s.spend}>
+        {rows.map(([phase, n]) => (
+          <li key={phase}>
+            <span className={s.spendLabel}>{phase}</span>
+            <span className={s.spendBar}>
+              <span style={{ width: `${Math.max(4, (n / max) * 100)}%` }} />
+            </span>
+            <span className={s.spendValue}>{kTokens(n)}</span>
+          </li>
+        ))}
+      </ul>
+      {usage.cached_tokens ? <p className={s.footnote}>{kTokens(usage.cached_tokens)} input tokens served from the provider&apos;s cache.</p> : null}
+    </Panel>
   );
 }
 
@@ -322,44 +434,57 @@ export function RunView({
   state,
   mode,
   onBack,
-  replayControls,
+  controls,
 }: {
   scenario: ScenarioSummary;
   state: RunState;
   mode: "live" | "replay";
   onBack: () => void;
-  replayControls?: React.ReactNode;
+  controls?: React.ReactNode;
 }) {
+  const done = state.phase === "done";
   return (
-    <>
-      <header className={s.runHeader}>
-        <div className={s.runHeaderRow}>
-          <div>
-            <p className={s.service}>{scenario.service}</p>
-            <h1 className={s.runTitle}>{scenario.title}</h1>
-          </div>
-          <StatusBadge state={state} mode={mode} />
-        </div>
-        <p className={s.ticket}>{scenario.incident}</p>
-        <div className={s.replayBar}>
-          <button type="button" className={s.button} onClick={onBack}>
-            ← All scenarios
-          </button>
-          {replayControls}
-        </div>
-        {state.error && <p className={s.errorText}>{state.error}</p>}
-        <Stats state={state} />
-      </header>
-      <div className={s.grid}>
-        <Timeline items={state.timeline} />
-        <div className={s.stack}>
-          <Hypotheses list={state.hypotheses} />
-          <VerificationPanel baseline={state.baseline} v={state.verification} />
-          <DiffPanel diff={state.diff} />
-          <SecondOpinionPanel opinion={state.secondOpinion} />
-          <Findings state={state} />
+    <div className={s.run}>
+      <div className={s.runBar}>
+        <button type="button" className={s.backLink} onClick={onBack}>
+          ← All incidents
+        </button>
+        <div className={s.runBarRight}>
+          <span className={s.muted}>{mode === "replay" ? "Recorded run" : "Live run"}</span>
+          {controls}
         </div>
       </div>
-    </>
+
+      <header className={s.runHead}>
+        <div className={s.runHeadTop}>
+          <div className={s.runHeadText}>
+            <span className={s.service}>{scenario.service}</span>
+            <h1 className={s.runTitle}>{scenario.title}</h1>
+          </div>
+          <StatusBadge state={state} />
+        </div>
+        <details className={s.ticket}>
+          <summary>Incident ticket</summary>
+          <p>{publicTicket(scenario.incident)}</p>
+        </details>
+      </header>
+
+      <Stepper state={state} />
+      <Outcome scenario={scenario} state={state} />
+
+      <div className={s.runGrid}>
+        <div className={s.runMain}>
+          {done && <Findings state={state} />}
+          <Hypotheses list={state.hypotheses} />
+          <VerificationPanel baseline={state.baseline} v={state.verification} />
+          <SecondOpinionPanel opinion={state.secondOpinion} />
+          <DiffView diff={state.diff} />
+        </div>
+        <aside className={s.runAside}>
+          <Activity items={state.timeline} />
+          <TokenSpend state={state} />
+        </aside>
+      </div>
+    </div>
   );
 }

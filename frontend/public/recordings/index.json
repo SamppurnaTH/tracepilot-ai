@@ -8,7 +8,31 @@
     },
     "file": "orders.json",
     "verified": true,
-    "duration_s": 142.8
+    "duration_s": 103.4,
+    "tests": {
+      "before": {
+        "passed": 3,
+        "failed": 2
+      },
+      "after": {
+        "passed": 5
+      }
+    },
+    "issues": [
+      {
+        "title": "GET /orders/9/total 500 due to missing None coupon handling",
+        "severity": "high",
+        "category": "reliability"
+      },
+      {
+        "title": "Order detail endpoint lacks ownership check allowing cross-user reads",
+        "severity": "critical",
+        "category": "security"
+      }
+    ],
+    "tokens": 47528,
+    "model_calls": 9,
+    "review": "approve"
   },
   {
     "scenario": {
@@ -19,7 +43,31 @@
     },
     "file": "notes.json",
     "verified": true,
-    "duration_s": 181.5
+    "duration_s": 134.0,
+    "tests": {
+      "before": {
+        "passed": 3,
+        "failed": 2
+      },
+      "after": {
+        "passed": 5
+      }
+    },
+    "issues": [
+      {
+        "title": "Search for title with apostrophe fails with 500 due to SQL string interpolation",
+        "severity": "high",
+        "category": "reliability"
+      },
+      {
+        "title": "SQL injection in search bypasses owner filter and leaks other users' notes",
+        "severity": "critical",
+        "category": "security"
+      }
+    ],
+    "tokens": 55126,
+    "model_calls": 9,
+    "review": "approve"
   },
   {
     "scenario": {
@@ -30,6 +78,30 @@
     },
     "file": "billing.json",
     "verified": true,
-    "duration_s": 205.0
+    "duration_s": 155.9,
+    "tests": {
+      "before": {
+        "passed": 2,
+        "failed": 3
+      },
+      "after": {
+        "passed": 5
+      }
+    },
+    "issues": [
+      {
+        "title": "Invoice total uses banker's rounding instead of ROUND_HALF_UP",
+        "severity": "medium",
+        "category": "correctness"
+      },
+      {
+        "title": "Invoice list pagination off-by-one skips earliest invoices",
+        "severity": "high",
+        "category": "correctness"
+      }
+    ],
+    "tokens": 66884,
+    "model_calls": 11,
+    "review": "approve"
   }
 ]

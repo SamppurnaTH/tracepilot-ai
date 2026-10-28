@@ -34,12 +34,20 @@ def main() -> None:
         data["events"] = [e for e in data["events"] if e.get("type") not in DROP_EVENTS]
         name = f"{scenario_id}.json"
         (OUT / name).write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
+        report = data["report"]
+        usage, verification = report["usage"], report["verification"]
         index.append(
             {
                 "scenario": SCENARIOS[scenario_id].summary(),
                 "file": name,
                 "verified": True,
-                "duration_s": data["report"]["duration_s"],
+                "duration_s": report["duration_s"],
+                # Headline facts, so the landing page can show results without loading every recording.
+                "tests": {"before": verification["before"], "after": verification["after"]},
+                "issues": [{k: i[k] for k in ("title", "severity", "category")} for i in report["findings"].get("issues", [])],
+                "tokens": usage["input_tokens"] + usage["output_tokens"],
+                "model_calls": usage["model_calls"],
+                "review": (report.get("second_opinion") or {}).get("verdict"),
             }
         )
         print(f"{scenario_id}: {path.name} -> {name} ({len(data['events'])} events)")

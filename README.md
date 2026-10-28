@@ -37,6 +37,26 @@ Passing tests aren't proof on their own. `backend/scripts/check_reviewer.py` bui
 5. **Second opinion:** Muse Spark Open reviews the causes and the patch cold, looking for weak evidence, symptom-only fixes and the same flaw surviving elsewhere. Its verdict is advisory and is shown next to the test result. The run continues if the reviewer is unavailable.
 6. **Report:** a structured report (issues, severity, root cause, evidence, fix), the diff, and the verification result. Every step streams live as an event.
 
+## Token economy
+
+Every model call re-sends the whole conversation, so input tokens are about 95% of the cost. TracePilot does the cheap work itself:
+
+- **Evidence brief:** before the first model call, the harness groups log warnings and errors and lists each failing test with its assertion message, at no token cost.
+- **Compact stack traces:** framework frames are dropped from logged tracebacks, so about 5,000 characters become the app's own frames plus the exception.
+- **Lean tool output:** a green test run returns only its summary, and failing output is capped.
+- **Fresh-context report:** the final report is written from the recorded facts and the patch, not the full transcript.
+- **Batched calls:** the model is told to batch independent tool calls into one turn.
+
+Measured on the same three scenarios, all still verified and approved by the reviewer:
+
+| Scenario | Before | After | Time |
+|---|---|---|---|
+| orders | 95K tokens | 48K | 143 s → 103 s |
+| notes | 117K | 55K | 182 s → 134 s |
+| billing | 117K | 67K | 205 s → 156 s |
+
+That's **48% fewer tokens** on average. Each run reports its tokens by phase.
+
 ## API
 
 | Endpoint | Purpose |
