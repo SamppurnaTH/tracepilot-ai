@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import s from "./app.module.css";
-import { Logo, cx } from "./bits";
+import { Logo, Wordmark, cx } from "./bits";
 import { Icon, type IconName } from "./icons";
 
 const LINKS: [string, string, IconName][] = [
@@ -25,9 +25,9 @@ export function AppShell({ live, children }: { live?: boolean | null; children: 
           <Logo />
           <span className={s.brandText}>
             <span className={s.brandName}>
-              TracePilot AI <span className={s.beta}>beta</span>
+              <Wordmark /> <span className={s.beta}>beta</span>
             </span>
-            <span className={s.brandSub}>Debug. Verify. Fix.</span>
+            <span className={s.tagline}>AI Debug. Verify. Fix.</span>
           </span>
         </Link>
         <nav className={s.nav} aria-label="App">

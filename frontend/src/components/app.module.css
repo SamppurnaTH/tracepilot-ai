@@ -49,31 +49,30 @@
   color: var(--nav-muted);
 }
 
-.brandSub {
-  font-size: var(--text-xs);
-  color: var(--nav-muted);
-}
-
 .logo {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   flex: none;
 }
 
-.logoBg {
-  fill: #6a4dff;
+.wordmark {
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
-.logoTrace {
-  fill: none;
-  stroke: #ffffff;
-  stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+.wordmarkAi {
+  background: linear-gradient(90deg, #6366F1, #8B5CF6 60%, #0EA5E9);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
-.logoDot {
-  fill: #4ade80;
+.tagline {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--nav-muted);
 }
 
 .nav {
@@ -250,7 +249,7 @@
 }
 
 .btnPrimary {
-  background: linear-gradient(135deg, #5a3ff2, #8b5cf6);
+  background: linear-gradient(135deg, #6366F1, #8b5cf6);
   border-color: transparent;
   color: #fff;
 }
@@ -855,7 +854,7 @@
 }
 
 .barPrimary {
-  background: linear-gradient(180deg, #8b5cf6, #5a3ff2);
+  background: linear-gradient(180deg, #8b5cf6, #6366F1);
 }
 
 .barMuted {

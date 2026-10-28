@@ -4,7 +4,7 @@ import Link from "next/link";
 import s from "./landing.module.css";
 import a from "@/components/app.module.css";
 import { REPO_URL } from "@/components/AppShell";
-import { Logo, cx } from "@/components/bits";
+import { Logo, Wordmark, cx } from "@/components/bits";
 import { Icon, type IconName } from "@/components/icons";
 import { estimateCost } from "@/lib/run";
 import { kTokens, minutes, useData } from "@/lib/useData";
@@ -42,7 +42,13 @@ export default function Landing() {
         <div className={s.inner}>
           <nav className={s.nav} aria-label="Main">
             <Link href="/" className={s.brand}>
-              <Logo /> TracePilot AI <span className={s.beta}>beta</span>
+              <Logo size={38} />
+              <span className={s.brandText}>
+                <span>
+                  <Wordmark /> <span className={s.beta}>beta</span>
+                </span>
+                <span className={s.tagline}>AI Debug. Verify. Fix.</span>
+              </span>
             </Link>
             <div className={s.links}>
               <a href="#product">Product</a>

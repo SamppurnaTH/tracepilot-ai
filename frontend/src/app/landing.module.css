@@ -10,7 +10,7 @@
   background:
     radial-gradient(900px 500px at 78% 30%, rgb(110 80 255 / 0.28), transparent 60%),
     radial-gradient(700px 400px at 10% 90%, rgb(60 90 255 / 0.18), transparent 60%),
-    linear-gradient(180deg, #0b0d24, #0e1130 70%, #10133a);
+    linear-gradient(180deg, #0B1020, #0E1430 70%, #121A42);
 }
 
 .inner {
@@ -36,6 +36,19 @@
   text-decoration: none;
   font-weight: 800;
   font-size: var(--text-lg);
+}
+
+.brandText {
+  display: grid;
+  gap: 2px;
+}
+
+.tagline {
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #9aa3d6;
 }
 
 .beta {
@@ -73,7 +86,7 @@
   height: 40px;
   padding: 0 18px;
   border-radius: 10px;
-  background: linear-gradient(135deg, #4f5bff, #7a5cff);
+  background: linear-gradient(135deg, #6366F1, #8B5CF6);
   color: #fff !important;
   font-weight: 700;
   font-size: var(--text-sm);
@@ -115,7 +128,7 @@
 }
 
 .gradient {
-  background: linear-gradient(90deg, #6d7bff, #a78bfa 60%, #7c9cff);
+  background: linear-gradient(90deg, #818CF8, #a78bfa 60%, #38BDF8);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
