@@ -111,4 +111,4 @@ Everything in this repository was built during the hackathon building period. Th
 
 ## License
 
-To be decided.
+[MIT](LICENSE)
