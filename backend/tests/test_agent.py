@@ -214,6 +214,8 @@ def test_report_runs_in_a_fresh_context_and_usage_is_split_by_phase():
     report_request = client.requests[-1]
     assert "previous_response_id" not in report_request
     assert "bob GET /orders/7 -> 200" in report_request["input"][0]["content"]  # the facts carry the evidence
+    # The hand-off may only claim what the patch changes; advice is labelled as such.
+    assert "Recommended, not in this patch:" in report_request["input"][0]["content"]
     assert set(report["usage"]["by_phase"]) == {"investigate", "fix", "report"}
     # The first prompt carries the harness's evidence brief.
     assert "Evidence brief" in client.requests[0]["input"][1]["content"]

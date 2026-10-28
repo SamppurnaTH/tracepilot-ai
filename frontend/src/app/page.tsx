@@ -407,6 +407,16 @@ export default function Home() {
     backendAvailable().then(setLive);
   }, [open]);
 
+  // A shared "#scenario" link pasted into an already open page switches to that run.
+  useEffect(() => {
+    const onHash = () => {
+      const entry = index.find((e) => e.scenario.id === window.location.hash.slice(1));
+      if (entry && entry.scenario.id !== active?.scenario.id) open(entry, false);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, [index, active, open]);
+
   // Play the next recorded event after a gap compressed from the real timing.
   useEffect(() => {
     if (active?.mode !== "replay" || cursor >= queue.length) return;

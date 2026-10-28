@@ -615,7 +615,9 @@ class Investigation:
                     "role": "user",
                     "content": "Write the final report of a software incident investigation. Base it only on these recorded facts; "
                     "each issue's evidence must come from the hypotheses' evidence. For a cause whose fix_in is not code, the fix field "
-                    "must say exactly what to change outside the code and who should do it.\n"
+                    "must say exactly what to change outside the code and who should do it. For a code cause, the fix field describes only "
+                    "what the patch below actually changes; anything else you advise (CI, data backfills, monitoring) must start with "
+                    "'Recommended, not in this patch:'.\n"
                     f"Recorded facts:\n{json.dumps(facts, indent=2)}",
                 }
             ],

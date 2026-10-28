@@ -349,7 +349,7 @@ function Review({ state }: { state: RunState }) {
   return (
     <div className={s.stack}>
       <div className={s.tags}>
-        <span className={cx(s.tag, tone)}>{o.verdict}</span>
+        <span className={cx(s.tag, tone)}>{VERDICT[o.verdict]}</span>
         <span className={s.tagPlain}>
           {o.model} · {o.confidence} confidence{o.tokens ? ` · ${kTokens(o.tokens)} tokens` : ""}
         </span>
@@ -379,6 +379,8 @@ function Review({ state }: { state: RunState }) {
 
 // --- summary -------------------------------------------------------------------------------
 
+const VERDICT = { approve: "Approved", concerns: "Concerns raised", reject: "Rejected", unavailable: "Unavailable" };
+
 function Summary({ scenario, state, files }: { scenario: ScenarioSummary; state: RunState; files: FileDiff[] }) {
   const r = state.report;
   const usage = r?.usage;
@@ -399,7 +401,7 @@ function Summary({ scenario, state, files }: { scenario: ScenarioSummary; state:
     ["Checks run", String(state.toolCalls)],
     ["Tests written", newTests ? `${newTests} file${newTests > 1 ? "s" : ""}` : "None"],
     ["Code changes", code.length ? `${code.length} file${code.length > 1 ? "s" : ""}, +${added} −${removed}` : r ? "None" : "…"],
-    ["Second opinion", state.secondOpinion?.verdict ?? (r ? "Not needed" : "…")],
+    ["Second opinion", state.secondOpinion ? VERDICT[state.secondOpinion.verdict] : r ? "Not needed" : "…", state.secondOpinion?.verdict === "approve" ? s.good : undefined],
     ["Execution time", r ? minutes(r.duration_s) : clock(state.elapsed)],
     ["Tokens used", tokens ? tokens.toLocaleString() : "…"],
     ["Est. cost", tokens ? estimateCost(tokens) : "…"],
