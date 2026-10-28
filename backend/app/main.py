@@ -107,21 +107,24 @@ class RunManager:
         return run
 
     def _execute(self, run: Run, build, cleanup=None) -> None:
+        # The final status is published only after cleanup, so a finished run never has uploads left on disk.
+        status, report, error = "failed", None, None
         try:
             investigation = build()
             investigation.should_stop = run.stop.is_set
             report = investigation.run()
             report.pop("events", None)  # already in run.events
-            run.report, run.status = report, "completed"
+            status = "completed"
         except Cancelled:
-            run.error, run.status = "stopped by the user", "cancelled"
-            run.events.append({"seq": len(run.events) + 1, "type": "cancelled", "message": run.error})
+            status, error = "cancelled", "stopped by the user"
+            run.events.append({"seq": len(run.events) + 1, "type": "cancelled", "message": error})
         except Exception as exc:  # surface any failure to the client instead of dying silently
-            run.error, run.status = f"{type(exc).__name__}: {exc}", "failed"
-            run.events.append({"seq": len(run.events) + 1, "type": "error", "message": run.error})
+            error = f"{type(exc).__name__}: {exc}"
+            run.events.append({"seq": len(run.events) + 1, "type": "error", "message": error})
         finally:
             if cleanup:
                 cleanup()
+            run.report, run.error, run.status = report, error, status
             self.save(run)
 
     @staticmethod
