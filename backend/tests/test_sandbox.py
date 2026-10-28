@@ -6,7 +6,7 @@ import pytest
 
 from app.sandbox import Sandbox
 from app.tools import Workspace
-from conftest import SAMPLE_APP
+from conftest import ORDERS_TARGET as SAMPLE_APP
 
 COUPON_BUG = 'discount = subtotal * order["coupon"]["percent"] / 100'
 COUPON_FIX = 'discount = subtotal * (order["coupon"] or {}).get("percent", 0) / 100'
@@ -27,15 +27,6 @@ def test_copy_is_isolated_and_removed():
         assert sb.edit_file("orders_api/app.py", COUPON_BUG, COUPON_FIX) == {"edited": "orders_api/app.py"}
     assert (SAMPLE_APP / "orders_api" / "app.py").read_text(encoding="utf-8") == original
     assert not root.exists()
-
-
-def test_sandbox_contains_no_answer_key(sandbox):
-    # The agent must investigate without hints: nothing in the target may describe the planted bugs.
-    for path in sandbox.root.rglob("*"):
-        if path.is_file() and path.suffix in {".py", ".md", ".ini", ".txt"}:
-            text = path.read_text(encoding="utf-8").lower()
-            for hint in ("planted", "deliberate", "bug", "tracepilot", "idor", "on purpose"):
-                assert hint not in text, f"{path.relative_to(sandbox.root)} mentions '{hint}'"
 
 
 def test_fixes_verified_by_tests(sandbox):

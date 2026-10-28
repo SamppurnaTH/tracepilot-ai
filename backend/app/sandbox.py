@@ -27,7 +27,8 @@ from .config import REPO_ROOT
 
 IMAGE = "tracepilot-sandbox:1"
 IMAGE_DIR = REPO_ROOT / "sandbox"
-COPY_IGNORE = shutil.ignore_patterns("__pycache__", ".pytest_cache", ".env*", ".venv", "node_modules", ".git")
+# Logs are not copied: each investigation seeds fresh logs inside its own sandbox.
+COPY_IGNORE = shutil.ignore_patterns("__pycache__", ".pytest_cache", ".env*", ".venv", "node_modules", ".git", "*.log")
 TEXT_SUFFIXES = {".py", ".md", ".ini", ".txt", ".json", ".toml", ".cfg"}
 SECRET_MARKERS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL")
 

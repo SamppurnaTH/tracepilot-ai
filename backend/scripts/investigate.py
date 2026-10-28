@@ -1,27 +1,28 @@
 """Run a full TracePilot investigation (investigate -> fix -> verify -> report) and stream events.
 
-Run from the repo root:  .venv/Scripts/python backend/scripts/investigate.py [--provider meta|baseten]
-The full run (report + every event) is saved to runs/<timestamp>.json for replay.
+Run from the repo root:  .venv/Scripts/python backend/scripts/investigate.py --scenario orders|notes|billing
+The full run (report + every event) is saved to runs/ in the same format the API replays.
 """
 
 import argparse
 import json
 import sys
-import time
+import uuid
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "demo"))
 
 from app.agent import Investigation  # noqa: E402
-from app.config import REPO_ROOT  # noqa: E402
-from incidents import ORDERS_API  # noqa: E402
+from app.main import Run, RunManager  # noqa: E402
+from app.scenarios import SCENARIOS  # noqa: E402
 
 
 def print_event(event: dict) -> None:
     t, kind = f"{event['t']:6.1f}s", event["type"]
     if kind == "start":
         print(f"{t}  START  model={event['model']} sandbox={event['isolation']}")
+    elif kind == "seeded":
+        print(f"{t}  SEEDED {event['requests']} requests, statuses {event['statuses']}")
     elif kind == "baseline":
         print(f"{t}  BASELINE tests: {event['tally']}")
     elif kind == "phase":
@@ -50,14 +51,20 @@ def print_event(event: dict) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--provider", default="meta", choices=["meta", "baseten"])
+    parser.add_argument("--scenario", default="orders", choices=sorted(SCENARIOS))
     parser.add_argument("--isolation", default="auto", choices=["auto", "docker", "process"])
     args = parser.parse_args()
 
-    investigation = Investigation(
-        ORDERS_API, REPO_ROOT / "sample_app", provider=args.provider, on_event=print_event, isolation=args.isolation
-    )
+    run = Run(id=uuid.uuid4().hex[:12], scenario=args.scenario, provider="meta")
+
+    def on_event(event: dict) -> None:
+        run.events.append(event)
+        print_event(event)
+
+    investigation = Investigation.from_scenario(SCENARIOS[args.scenario], on_event=on_event, isolation=args.isolation)
     report = investigation.run()
+    report.pop("events", None)
+    run.report, run.status = report, "completed"
 
     print("\n=== FINDINGS ===")
     print(report["findings"].get("summary", ""))
@@ -69,11 +76,8 @@ def main() -> None:
     print(f"Usage: {u['model_calls']} model calls, {u['tool_calls']} tool calls, "
           f"{u['input_tokens'] + u['output_tokens']} tokens, {report['duration_s']}s")
 
-    runs = REPO_ROOT / "runs"
-    runs.mkdir(exist_ok=True)
-    out = runs / f"{time.strftime('%Y%m%d-%H%M%S')}-{args.provider}.json"
-    out.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(f"Saved {out.relative_to(REPO_ROOT)}")
+    RunManager.save(run)
+    print(f"Saved run {run.id} to runs/")
 
 
 if __name__ == "__main__":

@@ -21,6 +21,26 @@ Developers spend hours investigating failures: reading logs, replaying API calls
 
 TracePilot's agent loop runs on Meta's models through the Meta Model API: multi-step reasoning, tool calling, and structured output. It currently uses `muse-spark-1.3` through the Responses API.
 
+Muse Spark Open (Meta open weights), served by Baseten, passes the same tool-calling and structured-output checks (`backend/scripts/smoke_test_baseten.py`).
+
+## How it works
+
+1. **Sandbox:** the target app is copied into a fresh, locked-down Docker container. Realistic traffic is replayed inside it to produce logs.
+2. **Investigate:** the model registers hypotheses (`propose_hypothesis`), gathers evidence with tools (`read_log`, `read_file`, `send_request`, `run_tests`), and confirms or rejects each one (`resolve_hypothesis`). A confirmation without evidence is refused.
+3. **Fix:** with confirmed root causes, the model edits the sandbox copy (`edit_file`). Tests can't be edited.
+4. **Verify:** the harness, not the model, compares every test's outcome before and after. A fix counts only if all failures are fixed and nothing regressed. Otherwise the model gets one more attempt.
+5. **Report:** a structured report (issues, severity, root cause, evidence, fix), the diff, and the verification result. Every step streams live as an event.
+
+## API
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /api/scenarios` | Demo scenarios (incident text only) |
+| `POST /api/investigations` `{"scenario": "notes"}` | Start an investigation |
+| `GET /api/investigations/{id}/events` | Live event stream (server-sent events) |
+| `GET /api/investigations/{id}` | Status and final report |
+| `GET /api/runs`, `GET /api/runs/{name}` | Saved runs, for replay |
+
 ## Tech stack
 
 - Backend: Python, FastAPI
@@ -46,10 +66,9 @@ python -m venv .venv
 cp .env.example .env          # then set MODEL_API_KEY in .env (never commit it)
 .venv/Scripts/python backend/scripts/smoke_test.py   # checks the Meta Model API
 docker build -t tracepilot-sandbox:1 sandbox          # optional; built automatically on first use
-.venv/Scripts/python demo/simulate_traffic.py        # generate synthetic logs for the demo app
-.venv/Scripts/python backend/scripts/investigate.py  # full run: investigate -> fix -> verify -> report
+.venv/Scripts/python backend/scripts/investigate.py --scenario orders   # one full run from the CLI
 cd backend && ../.venv/Scripts/python -m pytest && cd ..   # backend tests
-cd backend && ../.venv/Scripts/uvicorn app.main:app --reload
+cd backend && ../.venv/Scripts/uvicorn app.main:app --reload   # API on http://localhost:8000
 
 # Frontend
 cd frontend
@@ -73,10 +92,13 @@ npm run dev
 
 ## Demo scenarios
 
-- A sample API with a seeded reliability bug (500 error from a bad null check).
-- A sample API with a seeded security bug (missing authorization check).
+Three synthetic services in `targets/`, covering five planted defects plus a red herring:
 
-The target app is `sample_app/`. The answer key and the traffic generator live in `demo/`, outside the sandbox, so the agent investigates without hints.
+- **orders:** a 500 from a missing null check (reliability), and a missing ownership check (IDOR, security)
+- **notes:** search breaks on apostrophes, which is really SQL injection (security); slow-export warnings are a red herring
+- **billing:** a disputed cent from float rounding, and a pagination off-by-one (correctness)
+
+The answer key is in `demo/README.md`, outside the sandbox. The agent only sees code, logs and a symptom-only incident report.
 
 ## What was built during the hackathon
 

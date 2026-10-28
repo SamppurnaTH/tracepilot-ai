@@ -1,4 +1,4 @@
-# Dependencies of the application under investigation (sample_app).
+# Dependencies of the application under investigation (all apps in targets/).
 fastapi==0.115.12
 httpx==0.28.1
 pytest==8.3.5

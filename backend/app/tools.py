@@ -115,10 +115,15 @@ class Workspace:
         if not path.startswith("/") or "://" in path:
             raise ValueError("path must be a relative URL path like /orders/7")
 
-        spec = {"app": self.sandbox.app, "method": method, "path": path, "headers": headers or {}, "body": body}
-        result = self.sandbox.python(["-c", REQUEST_RUNNER], stdin=json.dumps(spec), timeout=30)
+        results = self.send_batch([{"method": method, "path": path, "headers": headers or {}, "body": body}], timeout=30)
+        return results if isinstance(results, dict) else results[0]
+
+    def send_batch(self, requests: list[dict], timeout: int = 120) -> list[dict] | dict:
+        """Send several requests to one app instance in one sandbox process (also used to seed traffic)."""
+        spec = {"app": self.sandbox.app, "requests": requests}
+        result = self.sandbox.python(["-c", REQUEST_RUNNER], stdin=json.dumps(spec), timeout=timeout)
         if result.timed_out:
-            return {"error": "request timed out after 30s"}
+            return {"error": f"request timed out after {timeout}s"}
         if result.exit_code != 0:
             return {"error": "the app failed to handle the request", "stderr": _truncate(self.scrub(result.stderr), 3000)}
         return self.scrub(json.loads(result.stdout.strip().splitlines()[-1]))

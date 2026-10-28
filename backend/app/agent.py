@@ -11,8 +11,11 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+import openai
+
 from .llm import get_client
 from .sandbox import Sandbox
+from .scenarios import Scenario
 from .tools import FIX_TOOLS, INVESTIGATION_TOOLS, Workspace, execute_tool
 
 EventSink = Callable[[dict], None]
@@ -143,12 +146,16 @@ class Investigation:
         client: Any = None,
         model: str | None = None,
         isolation: str = "auto",
+        app: str = "orders_api.app:app",
+        seed_requests: list[dict] | None = None,
     ):
         self.incident = incident
         self.source = source
         self.provider = provider
         self.on_event = on_event or (lambda event: None)
         self.isolation = isolation
+        self.app = app
+        self.seed_requests = seed_requests or []
         if client is None:
             client, model = get_client(provider)
         self.client, self.model = client, model
@@ -156,8 +163,13 @@ class Investigation:
         self.events: list[dict] = []
         self.usage = {"input_tokens": 0, "output_tokens": 0, "model_calls": 0, "tool_calls": 0}
         self._previous_id: str | None = None
+        self._history: list = []
         self._call_counts: dict[str, int] = {}
         self._started = 0.0
+
+    @classmethod
+    def from_scenario(cls, scenario: Scenario, **kwargs) -> "Investigation":
+        return cls(scenario.incident, scenario.target, app=scenario.app, seed_requests=scenario.seed_requests(), **kwargs)
 
     # --- plumbing -----------------------------------------------------------
 
@@ -172,8 +184,19 @@ class Investigation:
             params["tools"] = tools
         if self._previous_id:
             params["previous_response_id"] = self._previous_id
-        response = self.client.responses.create(**params)
+        # Keep our own transcript so a run survives the server losing the response chain.
+        self._history.extend(input_items)
+        try:
+            response = self.client.responses.create(**params)
+        except openai.BadRequestError as exc:
+            if not self._previous_id or "referenced response" not in str(exc):
+                raise
+            self._emit("recovered", reason="the server lost the conversation; replaying it from the local transcript")
+            params.pop("previous_response_id")
+            params["input"] = list(self._history)
+            response = self.client.responses.create(**params)
         self._previous_id = response.id
+        self._history.extend(item for item in map(_as_input_item, response.output) if item)
         self.usage["model_calls"] += 1
         if getattr(response, "usage", None):
             self.usage["input_tokens"] += response.usage.input_tokens or 0
@@ -268,9 +291,15 @@ class Investigation:
 
     def run(self) -> dict:
         self._started = time.monotonic()
-        with Sandbox(self.source, isolation=self.isolation) as sandbox:
+        with Sandbox(self.source, isolation=self.isolation, app=self.app) as sandbox:
             workspace = Workspace(sandbox)
             self._emit("start", incident=self.incident, provider=self.provider, model=self.model, isolation=sandbox.isolation)
+
+            if self.seed_requests:
+                seeded = workspace.send_batch(self.seed_requests)
+                if isinstance(seeded, dict):  # the target failed to start: nothing to investigate against
+                    raise RuntimeError(f"seeding traffic failed: {seeded}")
+                self._emit("seeded", requests=len(seeded), statuses=[r["status"] for r in seeded])
 
             baseline = workspace.test_outcomes()
             self._emit("baseline", tests=baseline, tally=_tally(baseline))
@@ -356,3 +385,16 @@ class Investigation:
 
 def _names(tools: list[dict]) -> set[str]:
     return {tool["name"] for tool in tools}
+
+
+def _as_input_item(item: Any) -> dict | None:
+    """Turn a response output item into an input item for replaying the transcript."""
+    data = item.model_dump(exclude_none=True) if hasattr(item, "model_dump") else dict(vars(item))
+    kind = data.get("type")
+    if kind == "function_call":
+        return {k: data[k] for k in ("type", "call_id", "name", "arguments") if k in data}
+    if kind == "message":
+        return {"type": "message", "role": "assistant", "content": data.get("content", [])}
+    if kind == "reasoning" and data.get("encrypted_content"):
+        return {k: data[k] for k in ("type", "id", "summary", "encrypted_content") if k in data}
+    return None  # reasoning without replayable content, or unknown items

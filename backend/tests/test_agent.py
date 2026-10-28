@@ -4,7 +4,7 @@ import json
 from types import SimpleNamespace
 
 from app.agent import Investigation, compare_outcomes
-from conftest import SAMPLE_APP
+from conftest import ORDERS_TARGET as SAMPLE_APP
 from test_sandbox import COUPON_BUG, COUPON_FIX, IDOR_BUG, IDOR_FIX
 
 COUPON_TEST = "tests/test_orders.py::test_total_without_coupon"
@@ -29,6 +29,8 @@ class FakeClient:
     def create(self, **params):
         self.requests.append(params)
         step = self.script.pop(0)
+        if isinstance(step, Exception):
+            raise step
         if isinstance(step, str):
             output, text = [], step
         else:
@@ -120,6 +122,28 @@ def test_full_run_verifies_fix():
     # The investigation phase must not offer edit tools.
     first_tools = {t["name"] for t in client.requests[0]["tools"]}
     assert "edit_file" not in first_tools and "propose_hypothesis" in first_tools
+
+
+def test_recovers_when_server_loses_conversation():
+    import httpx
+    import openai
+
+    expired = openai.BadRequestError(
+        "referenced response not found or expired",
+        response=httpx.Response(400, request=httpx.Request("POST", "https://api.example/v1/responses")),
+        body=None,
+    )
+    script = investigation_script()
+    # Lose the chain right when the fix phase starts; the retry gets the edit response.
+    fix = [call("edit_file", path="orders_api/app.py", old=COUPON_BUG, new=COUPON_FIX), call("edit_file", path="orders_api/app.py", old=IDOR_BUG, new=IDOR_FIX)]
+    report, client = run(script + [expired, fix, "Fixed both.", REPORT])
+    assert report["verification"]["verified"]
+    assert any(e["type"] == "recovered" for e in report["events"])
+    retry = client.requests[5]
+    assert "previous_response_id" not in retry
+    replayed = retry["input"]
+    assert replayed[0]["role"] == "system" and any(i.get("type") == "function_call" for i in replayed)
+    assert any(i.get("type") == "function_call_output" for i in replayed)
 
 
 def test_tests_cannot_be_edited():

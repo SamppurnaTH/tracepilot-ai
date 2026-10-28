@@ -1,17 +1,20 @@
-# Demo scenario (answer key)
+# Demo scenarios (answer key)
 
-The target app is `sample_app/`, a synthetic Orders API. It contains two deliberately planted bugs:
+TracePilot investigates the apps in `targets/`. Each one is a small synthetic FastAPI service with planted defects. This file is the answer key, and it never enters the sandbox: the agent only sees the target's code, its logs (seeded fresh inside each sandbox), and a symptom-only incident report (`backend/app/scenarios.py`).
 
-| Bug | Type | Symptom |
-|---|---|---|
-| Missing ownership check on `GET /orders/{id}` | Security (IDOR) | Any signed-in user can read any order |
-| `compute_total` assumes every order has a coupon | Reliability | `GET /orders/9/total` returns 500 |
+| Scenario | Defect | Class | Symptom the agent is given |
+|---|---|---|---|
+| `orders` | `compute_total` assumes every order has a coupon | Reliability | `GET /orders/9/total` sometimes returns 500 |
+| `orders` | `read_order` has no ownership check (IDOR) | Security | A reviewer suspects users can see others' orders |
+| `notes` | Search builds SQL with an f-string (SQL injection) | Security | Searching for a title with an apostrophe fails |
+| `notes` | *Red herring:* slow export logs WARNINGs | (none) | On-call asks whether the WARNINGs are related |
+| `billing` | Float math and `round()` lose a cent on tax | Correctness | Customer disputes 54.12 vs 54.13 |
+| `billing` | Pagination offset is `page * size` (off by one page) | Correctness | First page never shows the earliest invoices |
 
-`sample_app/tests/test_orders.py` has one failing test per bug. TracePilot must find the root causes from logs, code and requests, then prove its fix by turning those tests green.
+Note that the `notes` incident never mentions security. The agent has to discover that a quoting error is really an injection that leaks other users' notes. The test suite checks this, so escaping only the apostrophe isn't enough.
 
-This file and `simulate_traffic.py` live outside `sample_app/`, so neither is copied into the sandbox. The agent investigates without an answer key.
+`backend/tests/test_scenarios.py` proves each scenario is fair. The seed traffic reproduces the symptoms, exactly the expected tests fail, a reference fix verifies, and no target contains hint words.
 
 ```bash
-.venv/Scripts/python demo/simulate_traffic.py      # writes sample_app/logs/orders_api.log
-cd sample_app && ../.venv/Scripts/python -m pytest  # 2 tests fail until the bugs are fixed
+.venv/Scripts/python backend/scripts/investigate.py --scenario notes   # run one investigation from the CLI
 ```

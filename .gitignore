@@ -15,8 +15,8 @@ node_modules/
 
 # Runtime output
 runs/
-sample_app/logs/*.log
-!sample_app/logs/.gitkeep
+targets/*/logs/*.log
+!targets/*/logs/.gitkeep
 
 # OS / editor
 .DS_Store

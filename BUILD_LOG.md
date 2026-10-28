@@ -63,3 +63,29 @@ It patched `compute_total` and `read_order`, and the harness verified the fix: *
 - **Muse Spark Open (Meta open weights) on Baseten works:** basic call, tool calling (`read_log`) and structured output all pass with the reissued key.
 - Finding: Baseten's constrained decoding (`response_format` with a JSON schema) made Muse Spark Open pad its JSON with thousands of whitespace tokens. One run used 17K completion tokens for a ~700-character answer, and another was cut off as invalid JSON.
   Switched to prompt-based JSON plus validation (`json_instruction` and `extract_json` in `backend/app/llm.py`): 3/3 valid, about 3 seconds and ~600 tokens each.
+
+**Multiple scenarios**, to show TracePilot isn't tuned to one app:
+
+- `sample_app/` moved to `targets/orders/`. Two new targets were added:
+  - `targets/notes`: an f-string SQL search, so an apostrophe gives a 500 and the same flaw is SQL injection leaking other users' notes. Slow-export WARNINGs act as a red herring.
+  - `targets/billing`: float math with `round()` loses a cent on tax (54.12 vs 54.13), plus a pagination offset off by one page.
+- `backend/app/scenarios.py`: each scenario is a target, a symptom-only incident report, and seed traffic. The harness replays the traffic **inside each sandbox** with one batched in-process runner, so every run gets fresh logs and no log files ship with the targets.
+- `backend/tests/test_scenarios.py` proves each scenario is fair: the seed traffic reproduces the symptoms, exactly the expected tests fail, a reference fix verifies, and no target contains hint words. The answer key moved to `demo/README.md`.
+
+**API** (`backend/app/main.py`):
+
+- Start investigations, stream every event live over server-sent events, fetch reports, and list or replay saved runs.
+- Runs execute in background threads with a concurrency limit and missing-key and bad-input checks. Failures surface as `error` events.
+- On boot it pre-warms Docker. Sandbox startup is now under a second; the earlier 24 seconds was a cold Docker start.
+- 10 API tests with a fake investigation. 77 backend tests in total, all passing (Docker tests included).
+
+**Real run through the API: notes scenario** (`muse-spark-1.3`, Docker, about 3.7 minutes, 19 model calls, 21 tool calls):
+the incident only said "apostrophe search fails". The agent proposed H1 (f-string SQL) and H2 (the warnings are unrelated slow exports).
+It **exploited the flaw itself to prove impact**: `' OR 1=1 --` as Alice returned Bob's notes. It rated the issue critical/security and classified the warnings as unrelated, low priority.
+It replaced the query with a parameterized one, and the harness verified **3/5 → 5/5, no regressions**.
+
+**Robustness fix from a real failure:** the first billing run found both root causes and applied correct edits, then crashed with `400 referenced response not found or expired`. The Meta API had lost the `previous_response_id` chain mid-run.
+The agent now keeps its own transcript. If the chain is lost, it replays the full history once without `previous_response_id` and emits a `recovered` event. This is covered by a test that drops the chain at the start of the fix phase.
+
+**Real run through the API: billing scenario** (about 3 minutes, 15 model calls, 18 tool calls): the agent confirmed both root causes, switched to `Decimal` with half-up tax rounding, and fixed the page offset. Verified **2/5 → 5/5, no regressions**.
+**All three scenarios have now been solved end to end by `muse-spark-1.3`.**

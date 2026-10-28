@@ -1,25 +1,26 @@
-import subprocess
-import sys
-
 import pytest
 
-from app.config import REPO_ROOT
 from app.sandbox import Sandbox, docker_available
+from app.scenarios import SCENARIOS
 from app.tools import Workspace
 
-SAMPLE_APP = REPO_ROOT / "sample_app"
+ORDERS = SCENARIOS["orders"]
+ORDERS_TARGET = ORDERS.target
 
 
-@pytest.fixture(scope="session", autouse=True)
-def fresh_logs():
-    # Known synthetic logs in the source, copied into every sandbox.
-    subprocess.run([sys.executable, str(REPO_ROOT / "demo" / "simulate_traffic.py")], check=True, capture_output=True)
+def open_seeded(scenario, isolation: str) -> Sandbox:
+    """Open a sandbox for a scenario and replay its seed traffic, as an investigation does."""
+    sb = Sandbox(scenario.target, isolation=isolation, app=scenario.app).__enter__()
+    seeded = Workspace(sb).send_batch(scenario.seed_requests())
+    assert isinstance(seeded, list), seeded
+    return sb
 
 
 @pytest.fixture
 def sandbox():
-    with Sandbox(SAMPLE_APP, isolation="process") as sb:
-        yield sb
+    sb = open_seeded(ORDERS, "process")
+    yield sb
+    sb.__exit__(None, None, None)
 
 
 @pytest.fixture
@@ -31,5 +32,6 @@ def ws(sandbox) -> Workspace:
 def docker_sandbox():
     if not docker_available():
         pytest.skip("Docker is not available")
-    with Sandbox(SAMPLE_APP, isolation="docker") as sb:
-        yield sb
+    sb = open_seeded(ORDERS, "docker")
+    yield sb
+    sb.__exit__(None, None, None)
