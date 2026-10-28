@@ -535,6 +535,86 @@
   font-weight: 600;
 }
 
+/* ---- landing: evaluation ---- */
+.evalStats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.evalStats .metric + .metric {
+  border-left: 1px solid var(--border);
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table thead th {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--text-3);
+  background: var(--surface-2);
+}
+
+.table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.table tbody th {
+  font-weight: 500;
+}
+
+.caught {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+
+.caught li {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+.caught .tag {
+  justify-content: center;
+}
+
+.inlineCode {
+  font-size: 0.85em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+}
+
 /* ---- run view ---- */
 .run {
   display: grid;
@@ -1292,11 +1372,20 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .metric:nth-child(3) {
+  .metrics .metric:nth-child(3) {
     border-left: 0;
   }
 
-  .metric:nth-child(n + 3) {
+  .evalStats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .evalStats .metric + .metric {
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+
+  .metrics .metric:nth-child(n + 3) {
     border-top: 1px solid var(--border);
   }
 

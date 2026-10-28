@@ -125,6 +125,7 @@ function Outcome({ scenario, state }: { scenario: ScenarioSummary; state: RunSta
       <dl className={s.kpis}>
         <Kpi label="Tests" value={v ? `${passing(v.before)} → ${passing(v.after)}` : "—"} tone={ok ? s.goodText : s.badText} />
         <Kpi label="Root causes" value={`${confirmed} confirmed`} />
+        {state.regressionTests.length > 0 && <Kpi label="Tests written" value={`${state.regressionTests.length} new`} />}
         <Kpi label="Second opinion" value={review ? REVIEW[review.verdict][0] : "—"} tone={review ? REVIEW[review.verdict][1] : undefined} />
         <Kpi label="Time" value={formatClock(r.duration_s)} />
         <Kpi label="Tokens" value={tokens ? kTokens(tokens) : "—"} />
@@ -281,16 +282,16 @@ function Cells({ tests }: { tests?: Record<string, Outcome> }) {
   );
 }
 
-function VerificationPanel({ baseline, v }: { baseline?: Record<string, Outcome>; v?: Verification }) {
+function VerificationPanel({ baseline, v, added }: { baseline?: Record<string, Outcome>; v?: Verification; added: string[] }) {
   const rows: [string, string, string][] = v
     ? [
-        ...v.fixed.map((t): [string, string, string] => [t, "Fixed", s.sevPass]),
+        ...v.fixed.map((t): [string, string, string] => [t, added.includes(t) ? "New · fixed" : "Fixed", s.sevPass]),
         ...v.regressions.map((t): [string, string, string] => [t, "Broke", s.sevCritical]),
         ...v.still_failing.map((t): [string, string, string] => [t, "Failing", s.sevMedium]),
       ]
     : [];
   return (
-    <Panel title="Verification" meta="Decided by the test suite, not the model">
+    <Panel title="Verification" meta={added.length ? `Includes ${added.length} test${added.length === 1 ? "" : "s"} the agent wrote to reproduce the bug` : "Decided by the test suite, not the model"}>
       {!baseline ? (
         <p className={s.muted}>The harness runs the service&apos;s tests before any change.</p>
       ) : (
@@ -476,7 +477,7 @@ export function RunView({
         <div className={s.runMain}>
           {done && <Findings state={state} />}
           <Hypotheses list={state.hypotheses} />
-          <VerificationPanel baseline={state.baseline} v={state.verification} />
+          <VerificationPanel baseline={state.baseline} v={state.verification} added={state.regressionTests} />
           <SecondOpinionPanel opinion={state.secondOpinion} />
           <DiffView diff={state.diff} />
         </div>

@@ -127,7 +127,7 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - Found that each logged 500 carried a ~5,000-character traceback, almost all starlette and anyio frames, re-billed on every later call. `compact_traceback` keeps only the app's own frames and the exception.
 - The harness now builds a free evidence brief: the workspace files, grouped log warnings and errors with example request ids (taken before any test run pollutes the log), and each failing test with its full assertion message. pytest is run with a wide virtual terminal so the messages aren't truncated.
 - Green test runs return only the summary. The report is written in a fresh context from the recorded facts and the patch. The system prompt asks for batched tool calls. Usage is now tracked by phase, along with cached tokens.
-- Real runs, all verified 5/5 and approved by Muse Spark Open: orders 95K → 48K, notes 117K → 55K, billing 117K → 67K tokens. That's **48% fewer**, and each run is 40–50 s faster.
+- First real runs, all verified 5/5 and approved by Muse Spark Open: orders 95K → 48K, notes 117K → 55K, billing 117K → 67K tokens. Later repeated eval runs averaged 49K, 75K and 95K, so the honest saving is **about 34%** (see below).
 
 **UI redesign:** the "flight recorder" look is replaced with a calm developer-tool design (Geist type, neutral palette, one blue accent) built outcome-first.
 
@@ -135,3 +135,20 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - **Run page:** a progress stepper (sandbox → investigate → patch → verify → second opinion → report). An outcome card shows tests before and after, the reviewer verdict, time and tokens. Then root causes with collapsible evidence, hypotheses, verification, the second opinion and the patch. A sticky activity log and a token-spend-by-phase chart sit in the sidebar.
 - **Hand-off, zero tokens:** copy the patch, copy a PR description, or download a Markdown incident report, all generated in the browser.
 - Test credentials are hidden from the displayed tickets (only the agent needs them). Checked at desktop and 375 px, in dark and light, with no horizontal overflow. 89 backend tests pass.
+
+**The agent proves fixes even when no test catches the bug:**
+
+- New `write_regression_test` tool (investigation phase only). It adds `tests/test_regression_<name>.py`. The harness runs it at once and keeps it only if every test in it **fails on the current code**; a test that passes, or crashes, reproduces nothing and is deleted. Kept tests join the baseline as failures the fix must turn green. They ship in the patch, and existing tests stay read-only.
+- Verification now also requires that something which failed now passes. A green suite with nothing reproduced proves nothing.
+- New `inventory` scenario with green CI: negative reservations create phantom stock, and a double cancel returns stock twice (oversell). All 5 existing tests pass. In a real run, Muse Spark wrote 2 reproducing tests, the harness confirmed both failed, and the patch went 5/7 → 7/7, approved by Muse Spark Open.
+- `send_request` now accepts a JSON body sent as a string. The model did this in a real run, and each resulting 422 was a wasted round trip.
+
+**The two models now work together:** if Muse Spark Open *rejects* a patch, its summary and risks go back to Muse Spark for one more fix round (`review_retry` event), then the patch is reviewed again. Covered by a test with a scripted reject-then-approve reviewer.
+
+**Evaluation** (`backend/scripts/eval.py`, results in `eval/`):
+
+- **8/8 end-to-end runs verified** (2 per incident). In both inventory runs the agent wrote its own reproducing tests (3 in total). The reviewer approved 7/8 runs.
+- **Reviewer benchmark:** for each incident, the reference fix and a test-gaming fix that passes the full suite, run twice. **8/8 gamed patches caught; 7/8 reference fixes approved** (one "concerns" on inventory). About 4K tokens per review.
+- In one billing run the reviewer flagged a real latent crash the tests missed: `sum()` over an empty invoice returns the int `0`, which has no `.quantize()`.
+- The landing page shows an Evaluation section generated from the same data, and the token saving is computed per incident from the eval averages.
+- 98 backend tests pass.

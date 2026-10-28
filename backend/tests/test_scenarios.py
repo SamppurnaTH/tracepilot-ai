@@ -12,6 +12,32 @@ from app.scenarios import SCENARIOS, TARGETS
 from app.tools import Workspace
 from conftest import open_seeded
 
+INVENTORY_REGRESSION = """from fastapi.testclient import TestClient
+
+from inventory_api import app as inventory
+from inventory_api.app import app
+
+client = TestClient(app)
+ALICE = {"Authorization": "Bearer token-alice"}
+
+
+def setup_function():
+    inventory.STOCK.update({"A-100": 100, "B-200": 20, "C-300": 3})
+    inventory.RESERVATIONS.clear()
+
+
+def test_negative_quantity_cannot_add_stock():
+    client.post("/reservations", json={"sku": "A-100", "qty": -5}, headers=ALICE)
+    assert client.get("/stock/A-100").json()["available"] == 100
+
+
+def test_cancelling_twice_returns_stock_once():
+    rid = client.post("/reservations", json={"sku": "C-300", "qty": 2}, headers=ALICE).json()["id"]
+    client.delete(f"/reservations/{rid}", headers=ALICE)
+    client.delete(f"/reservations/{rid}", headers=ALICE)
+    assert client.get("/stock/C-300").json()["available"] == 3
+"""
+
 EXPECTED = {
     "orders": {
         "seed_statuses": [200, 200, 200, 200, 500, 200, 200, 401, 500],
@@ -73,6 +99,28 @@ EXPECTED = {
             ("billing_api/app.py", "    offset = page * size\n", "    offset = (page - 1) * size\n"),
         ],
     },
+    # No existing test catches these bugs: a reproducing regression test must be written first.
+    "inventory": {
+        "seed_statuses": [200, 201, 201, 200, 201, 200, 200, 200, 201],
+        "failing": set(),
+        "regression": INVENTORY_REGRESSION,
+        "fixes": [
+            (
+                "inventory_api/app.py",
+                "    if body.qty > STOCK[body.sku]:\n",
+                "    if body.qty <= 0:\n"
+                '        raise HTTPException(status_code=422, detail="quantity must be positive")\n'
+                "    if body.qty > STOCK[body.sku]:\n",
+            ),
+            (
+                "inventory_api/app.py",
+                '    STOCK[reservation["sku"]] += reservation["qty"]\n',
+                '    if reservation["status"] == "cancelled":\n'
+                '        raise HTTPException(status_code=409, detail="reservation already cancelled")\n'
+                '    STOCK[reservation["sku"]] += reservation["qty"]\n',
+            ),
+        ],
+    },
 }
 
 
@@ -106,7 +154,10 @@ def test_exactly_the_expected_tests_fail(scenario_sandbox):
 def test_reference_fix_verifies(scenario_sandbox):
     scenario, sb = scenario_sandbox
     ws = Workspace(sb)
+    if "regression" in EXPECTED[scenario.id]:
+        (sb.root / "tests" / "test_regression_ref.py").write_text(EXPECTED[scenario.id]["regression"], encoding="utf-8")
     before = ws.test_outcomes()
+    assert any(o != "passed" for o in before.values()), "the reproducing tests must fail before the fix"
     for path, old, new in EXPECTED[scenario.id]["fixes"]:
         assert sb.edit_file(path, old, new) == {"edited": path}
     result = compare_outcomes(before, ws.test_outcomes())

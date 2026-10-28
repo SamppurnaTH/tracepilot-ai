@@ -151,3 +151,11 @@ def test_brief_digests_logs_and_failures(ws):
     assert "ERROR x2: GET /orders/9/total -> 500 TypeError" in brief
     assert "FAILING tests/test_orders.py::test_total_without_coupon: assert 500 == 200" in brief
     assert "orders_api/app.py" in brief and "logs/" not in brief
+
+
+def test_send_request_accepts_a_json_string_body(ws, monkeypatch):
+    # Models often pass the body as a JSON string; it should still reach the app as JSON.
+    sent = []
+    monkeypatch.setattr(ws, "send_batch", lambda requests, timeout: sent.extend(requests) or [{"status": 201}])
+    call(ws, "send_request", method="POST", path="/reservations", body='{"sku": "A-100", "qty": 2}')
+    assert sent[0]["body"] == {"sku": "A-100", "qty": 2}

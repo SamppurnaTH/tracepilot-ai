@@ -6,6 +6,7 @@ and decides whether a fix is verified by comparing per-test outcomes before and 
 """
 
 import json
+import re
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -24,8 +25,10 @@ EventSink = Callable[[dict], None]
 MAX_INVESTIGATION_STEPS = 16
 MAX_FIX_STEPS = 10
 MAX_FIX_ATTEMPTS = 2
+REVIEW_RETRIES = 1  # extra fix rounds when the independent reviewer rejects the patch
 REPEAT_LIMIT = 2
 PROTECTED_PREFIXES = ("tests/", "tests\\")
+REGRESSION_NAME = re.compile(r"[a-z0-9_]{1,40}")
 
 SYSTEM_PROMPT = """You are TracePilot, an evidence-driven software investigation agent.
 You investigate failures in an application running in an isolated sandbox, then fix and verify them.
@@ -37,6 +40,8 @@ Rules:
 - Never confirm a hypothesis from intuition alone. If evidence contradicts it, reject it and form a better one.
 - Look for the cause of every reported symptom, and note any closely related defect you discover.
 - Tests are the ground truth: never weaken or edit them.
+- If a confirmed root cause has no failing test that demonstrates it, write one with write_regression_test
+  before you finish investigating. It must fail on the current code; it then proves the fix.
 - Be economical: every round trip re-sends the whole conversation. Batch independent tool calls into one turn
   (several reads, requests or hypotheses at once), use the evidence brief instead of re-discovering it,
   and read only the code you need."""
@@ -74,6 +79,23 @@ HYPOTHESIS_TOOLS: list[dict] = [
         },
     },
 ]
+
+REGRESSION_TOOL: dict = {
+    "type": "function",
+    "name": "write_regression_test",
+    "description": "Add a new pytest file, tests/test_regression_<name>.py, that reproduces a confirmed root cause. "
+    "The harness runs it at once and keeps it only if every test in it fails on the current code; "
+    "after the fix, it must pass. Existing tests can't be changed. Import the app the way the existing tests do.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "Short snake_case name, e.g. negative_quantity"},
+            "code": {"type": "string", "description": "The complete pytest file"},
+        },
+        "required": ["name", "code"],
+        "additionalProperties": False,
+    },
+}
 
 REPORT_SCHEMA = {
     "type": "object",
@@ -119,7 +141,8 @@ def compare_outcomes(before: dict[str, str], after: dict[str, str]) -> dict:
     still_failing = sorted(t for t, o in after.items() if o != "passed" and before.get(t, "failed") != "passed")
     regressions = sorted(t for t, o in before.items() if o == "passed" and after.get(t) != "passed")
     missing = sorted(t for t in before if t not in after)
-    verified = bool(before) and not still_failing and not regressions and not missing
+    # Something that failed must now pass: a run that fixed nothing proved nothing.
+    verified = bool(fixed) and not still_failing and not regressions and not missing
     return {
         "verified": verified,
         "fixed": fixed,
@@ -166,6 +189,8 @@ class Investigation:
             client, model = get_client(provider)
         self.client, self.model = client, model
         self.hypotheses: dict[str, Hypothesis] = {}
+        self.regression_tests: dict[str, str] = {}  # node id -> "failed", for tests the agent added that reproduce a bug
+        self._attempts = 0
         self.events: list[dict] = []
         self.usage = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0, "model_calls": 0, "tool_calls": 0, "by_phase": {}}
         self._phase = "investigate"
@@ -241,6 +266,8 @@ class Investigation:
             return json.dumps(self._propose(args))
         if name == "resolve_hypothesis" and name in _names(allowed):
             return json.dumps(self._resolve(args))
+        if name == "write_regression_test" and name in _names(allowed):
+            return json.dumps(self._regression_test(workspace, args))
         if name == "edit_file" and str(args.get("path", "")).startswith(PROTECTED_PREFIXES):
             result = json.dumps({"error": "tests are the ground truth and cannot be modified; fix the application code"})
             self._emit("blocked", tool=name, args=args, reason="protected path")
@@ -283,6 +310,53 @@ class Investigation:
         hyp.status, hyp.evidence, hyp.reason = status, evidence, str(args.get("reason", ""))
         self._emit("hypothesis_update", **asdict(hyp))
         return {"id": hyp.id, "status": hyp.status}
+
+    def _regression_test(self, workspace: Workspace, args: dict) -> dict:
+        """Add a test that reproduces a bug. It is kept only if it fails now, so it can prove the fix later."""
+        name, code = str(args.get("name", "")), str(args.get("code", ""))
+        if not REGRESSION_NAME.fullmatch(name):
+            return {"error": "name must be 1-40 lowercase letters, digits or underscores"}
+        if "def test_" not in code:
+            return {"error": "code must define at least one test function (def test_...)"}
+        path = f"tests/test_regression_{name}.py"
+        target = workspace.sandbox.resolve(path)
+        if target.exists() and not any(node.startswith(path) for node in self.regression_tests):
+            return {"error": f"{path} already exists and is not one of your regression tests"}
+        self._emit("tool_call", tool="write_regression_test", args={"path": path})
+        self.regression_tests = {k: v for k, v in self.regression_tests.items() if not k.startswith(path)}
+        target.write_text(code, encoding="utf-8")
+        outcomes, reasons = workspace.test_report(path)
+        if not outcomes or any(o != "failed" for o in outcomes.values()):
+            target.unlink()
+            self._emit("regression_test", path=path, accepted=False, tests=outcomes)
+            return {
+                "accepted": False,
+                "outcomes": outcomes or {"(none)": "no tests collected"},
+                "reasons": reasons,
+                "note": "Not kept: every test must FAIL on the current code (an error or a pass doesn't reproduce the bug).",
+            }
+        self.regression_tests.update(outcomes)
+        self._emit("regression_test", path=path, accepted=True, tests=outcomes, reasons=reasons)
+        return {"accepted": True, "path": path, "failing_now": reasons or list(outcomes)}
+
+    def _fix(self, workspace: Workspace, baseline: dict, prompt: str, attempts: int) -> dict:
+        """Fix rounds until the harness verifies the patch or the attempts run out."""
+        fix_tools = INVESTIGATION_TOOLS + FIX_TOOLS
+        verification = compare_outcomes(baseline, baseline)
+        for _ in range(attempts):
+            self._attempts += 1
+            self._run_phase(workspace, "fix", [{"role": "user", "content": prompt}], fix_tools, MAX_FIX_STEPS)
+            after = workspace.test_outcomes()
+            verification = compare_outcomes(baseline, after)
+            self._emit("verification", attempt=self._attempts, tests=after, **verification)
+            if verification["verified"]:
+                break
+            prompt = (
+                "Verification failed. Still failing: "
+                f"{verification['still_failing'] or 'none'}; regressions: {verification['regressions'] or 'none'}. "
+                "Investigate why and correct the fix. Do not modify tests."
+            )
+        return verification
 
     def _run_phase(self, workspace: Workspace, phase: str, prompt_items: list, tools: list[dict], max_steps: int) -> str:
         self._phase = phase
@@ -330,7 +404,7 @@ class Investigation:
             brief = workspace.brief(log_digest, baseline, reasons)
             self._emit("brief", text=brief)
 
-            investigate_tools = INVESTIGATION_TOOLS + HYPOTHESIS_TOOLS
+            investigate_tools = INVESTIGATION_TOOLS + HYPOTHESIS_TOOLS + [REGRESSION_TOOL]
             self._run_phase(
                 workspace,
                 "investigate",
@@ -339,7 +413,7 @@ class Investigation:
                     {
                         "role": "user",
                         "content": f"Incident:\n{self.incident}\n\nEvidence brief (computed by the harness):\n{brief}\n\n"
-                        "Investigate now. Do not change any code in this phase. "
+                        "Investigate now. Do not change application code in this phase. "
                         "When every reported symptom has a confirmed root cause, or you have exhausted your options, "
                         "reply with a short summary and no tool calls.",
                     },
@@ -349,29 +423,37 @@ class Investigation:
             )
 
             confirmed = [h for h in self.hypotheses.values() if h.status == "confirmed"]
+            # The agent's reproducing tests join the baseline as failures the fix must turn green.
+            baseline = {**baseline, **self.regression_tests}
             verification = compare_outcomes(baseline, baseline)
+            second_opinion = None
             if confirmed:
-                fix_tools = INVESTIGATION_TOOLS + FIX_TOOLS
-                prompt = (
+                verification = self._fix(
+                    workspace,
+                    baseline,
                     "Fix phase. For each confirmed root cause, make the smallest correct change to the application code with edit_file. "
-                    "Do not modify tests. Run the relevant tests after editing, then reply with a short summary."
+                    "Do not modify tests. Run the relevant tests after editing, then reply with a short summary.",
+                    MAX_FIX_ATTEMPTS,
                 )
-                for attempt in range(1, MAX_FIX_ATTEMPTS + 1):
-                    self._run_phase(workspace, "fix", [{"role": "user", "content": prompt}], fix_tools, MAX_FIX_STEPS)
-                    after = workspace.test_outcomes()
-                    verification = compare_outcomes(baseline, after)
-                    self._emit("verification", attempt=attempt, tests=after, **verification)
-                    if verification["verified"]:
+                second_opinion = self._second_opinion(sandbox, verification)
+                for _ in range(REVIEW_RETRIES):
+                    if not second_opinion or second_opinion.get("verdict") != "reject":
                         break
-                    prompt = (
-                        "Verification failed. Still failing: "
-                        f"{verification['still_failing'] or 'none'}; regressions: {verification['regressions'] or 'none'}. "
-                        "Investigate why and correct the fix. Do not modify tests."
+                    # The models disagree: the reviewer's objections go back to the investigator for one more round.
+                    self._emit("review_retry", summary=second_opinion.get("summary", ""), risks=second_opinion.get("risks", []))
+                    risks = "\n".join(f"- {r}" for r in second_opinion.get("risks", []))
+                    verification = self._fix(
+                        workspace,
+                        baseline,
+                        "An independent reviewer rejected your patch even though the tests pass:\n"
+                        f"{second_opinion.get('summary', '')}\n{risks}\n"
+                        "Check each objection against the code. Fix the ones that are real, then run the tests and reply with a short summary.",
+                        1,
                     )
+                    second_opinion = self._second_opinion(sandbox, verification)
             else:
                 self._emit("skip_fix", reason="no confirmed root cause")
 
-            second_opinion = self._second_opinion(sandbox, verification) if confirmed else None
             findings = self._final_report(verification, second_opinion, sandbox.diff())
             report = {
                 "incident": self.incident,

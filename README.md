@@ -32,10 +32,11 @@ Passing tests aren't proof on their own. `backend/scripts/check_reviewer.py` bui
 
 1. **Sandbox:** the target app is copied into a fresh, locked-down Docker container. Realistic traffic is replayed inside it to produce logs.
 2. **Investigate:** the model registers hypotheses (`propose_hypothesis`), gathers evidence with tools (`read_log`, `read_file`, `send_request`, `run_tests`), and confirms or rejects each one (`resolve_hypothesis`). A confirmation without evidence is refused.
-3. **Fix:** with confirmed root causes, the model edits the sandbox copy (`edit_file`). Tests can't be edited.
-4. **Verify:** the harness, not the model, compares every test's outcome before and after. A fix counts only if all failures are fixed and nothing regressed. Otherwise the model gets one more attempt.
-5. **Second opinion:** Muse Spark Open reviews the causes and the patch cold, looking for weak evidence, symptom-only fixes and the same flaw surviving elsewhere. Its verdict is advisory and is shown next to the test result. The run continues if the reviewer is unavailable.
-6. **Report:** a structured report (issues, severity, root cause, evidence, fix), the diff, and the verification result. Every step streams live as an event.
+3. **Reproduce:** real incidents often have no failing test. If a confirmed cause isn't caught by any test, the model writes one (`write_regression_test`). The harness runs it at once and keeps it only if it **fails on the current code**; a test that already passes reproduces nothing and is discarded.
+4. **Fix:** with confirmed root causes, the model edits the sandbox copy (`edit_file`). Existing tests can't be edited.
+5. **Verify:** the harness, not the model, compares every test's outcome before and after, including the agent's new tests. A fix counts only if something that failed now passes, every failure is fixed and nothing regressed. Otherwise the model gets one more attempt.
+6. **Second opinion:** Muse Spark Open reviews the causes and the patch cold, looking for weak evidence, symptom-only fixes and the same flaw surviving elsewhere. **If it rejects the patch, its objections go back to Muse Spark for one more fix round**, then it reviews again. The run continues if the reviewer is unavailable.
+7. **Report:** a structured report (issues, severity, root cause, evidence, fix), the diff, and the verification result. Every step streams live as an event.
 
 ## Token economy
 
@@ -47,15 +48,26 @@ Every model call re-sends the whole conversation, so input tokens are about 95% 
 - **Fresh-context report:** the final report is written from the recorded facts and the patch, not the full transcript.
 - **Batched calls:** the model is told to batch independent tool calls into one turn.
 
-Measured on the same three scenarios, all still verified and approved by the reviewer:
+Measured with the eval harness (2 runs per incident), against one run of each incident before the changes. Every run still verified:
 
-| Scenario | Before | After | Time |
-|---|---|---|---|
-| orders | 95K tokens | 48K | 143 s → 103 s |
-| notes | 117K | 55K | 182 s → 134 s |
-| billing | 117K | 67K | 205 s → 156 s |
+| Scenario | Before | After (average) |
+|---|---|---|
+| orders | 95K tokens | 49K (−48%) |
+| notes | 117K | 75K (−36%) |
+| billing | 117K | 95K (−19%) |
 
-That's **48% fewer tokens** on average. Each run reports its tokens by phase.
+That's **about 34% fewer tokens** on the same incidents. Runs vary, and the single best runs were 48K, 55K and 67K. Each run reports its tokens by phase, and the open-weight reviewer adds about 4–8K per run.
+
+## Evaluation
+
+`backend/scripts/eval.py` runs repeated real investigations and a reviewer benchmark. It writes the raw results to `eval/results.json` and regenerates [`eval/RESULTS.md`](eval/RESULTS.md) and the website's evaluation section from them.
+
+- **End to end: 8/8 runs verified** (2 per incident, 4 incidents). In both inventory runs, where CI was green, the agent wrote the reproducing tests itself.
+- **Reviewer benchmark:** every case passes the full test suite.
+  - **8/8 test-gaming patches caught.** Examples: an ownership check for only the order id the test uses, a keyword blocklist that's still injectable with `UNION`, and hard-coded invoice totals.
+  - **7/8 correct patches approved.** One reference fix got "concerns" instead.
+  - About 4K tokens per review.
+- **A real catch:** in one billing run, the patch passed all 5 tests, but Muse Spark Open flagged a latent crash: `sum()` over an invoice with no lines returns the integer `0`, which has no `.quantize()`. No test covered it.
 
 ## API
 
@@ -121,11 +133,12 @@ The detailed, timestamped history is in `BUILD_LOG.md`.
 
 ## Demo scenarios
 
-Three synthetic services in `targets/`, covering five planted defects plus a red herring:
+Four synthetic services in `targets/`, covering seven planted defects plus a red herring:
 
 - **orders:** a 500 from a missing null check (reliability), and a missing ownership check (IDOR, security)
 - **notes:** search breaks on apostrophes, which is really SQL injection (security); slow-export warnings are a red herring
 - **billing:** a disputed cent from float rounding, and a pagination off-by-one (correctness)
+- **inventory:** negative reservations create phantom stock, and cancelling twice returns stock twice, so an item is oversold. **CI is green**: no existing test catches either bug, so the agent has to write the failing tests itself.
 
 The answer key is in `demo/README.md`, outside the sandbox. The agent only sees code, logs and a symptom-only incident report.
 

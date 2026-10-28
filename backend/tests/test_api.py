@@ -55,7 +55,7 @@ def stream(client, run_id: str) -> list[tuple[str, dict]]:
 
 def test_lists_scenarios(client):
     ids = {s["id"] for s in client.get("/api/scenarios").json()}
-    assert ids == {"orders", "notes", "billing"}
+    assert ids == {"orders", "notes", "billing", "inventory"}
 
 
 def test_scenario_summaries_hide_traffic(client):

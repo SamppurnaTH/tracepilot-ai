@@ -14,7 +14,7 @@ IDOR_TEST = "tests/test_orders.py::test_user_cannot_read_someone_elses_order"
 # --- fake Responses API -----------------------------------------------------
 
 
-def call(name: str, **args) -> SimpleNamespace:
+def call(name: str, /, **args) -> SimpleNamespace:
     return SimpleNamespace(type="function_call", name=name, arguments=json.dumps(args), call_id=f"c-{name}-{id(args)}")
 
 
@@ -218,3 +218,74 @@ def test_report_runs_in_a_fresh_context_and_usage_is_split_by_phase():
     # The first prompt carries the harness's evidence brief.
     assert "Evidence brief" in client.requests[0]["input"][1]["content"]
     assert "brief" in [e["type"] for e in report["events"]]
+
+
+# --- regression tests written by the agent -----------------------------------
+
+INVENTORY = SAMPLE_APP.parent / "inventory"
+NEGATIVE_QTY_TEST = """from fastapi.testclient import TestClient
+from inventory_api.app import app
+
+client = TestClient(app)
+
+
+def test_negative_quantity_is_rejected():
+    resp = client.post("/reservations", json={"sku": "A-100", "qty": -5}, headers={"Authorization": "Bearer token-alice"})
+    assert resp.status_code == 422
+"""
+PASSING_TEST = "def test_nothing():\n    assert True\n"
+QTY_GUARD = ("    if body.qty > STOCK[body.sku]:\n", "    if body.qty <= 0:\n        raise HTTPException(status_code=422, detail=\"bad qty\")\n    if body.qty > STOCK[body.sku]:\n")
+
+
+def inventory_run(script: list) -> tuple[dict, FakeClient]:
+    client = FakeClient(script)
+    inv = Investigation("stock is wrong", INVENTORY, client=client, model="fake", isolation="process", app="inventory_api.app:app")
+    return inv.run(), client
+
+
+def test_regression_test_must_fail_first_and_then_proves_the_fix():
+    report, client = inventory_run(
+        [
+            [call("propose_hypothesis", claim="negative qty accepted", symptom="stock above 100", next_check="read reserve")],
+            [
+                call("resolve_hypothesis", id="H1", status="confirmed", evidence=["app.py reserve has no qty > 0 check"], reason="code"),
+                call("write_regression_test", name="always_green", code=PASSING_TEST),
+                call("write_regression_test", name="negative_qty", code=NEGATIVE_QTY_TEST),
+            ],
+            "Confirmed, with a reproducing test.",
+            [call("edit_file", path="inventory_api/app.py", old=QTY_GUARD[0], new=QTY_GUARD[1])],
+            "Fixed.",
+            REPORT,
+        ]
+    )
+    added = [e for e in report["events"] if e["type"] == "regression_test"]
+    assert [e["accepted"] for e in added] == [False, True]  # a test that already passes reproduces nothing
+    node = "tests/test_regression_negative_qty.py::test_negative_quantity_is_rejected"
+    assert report["verification"]["verified"] and report["verification"]["fixed"] == [node]
+    assert "+++ b/tests/test_regression_negative_qty.py" in report["diff"]  # the test ships with the patch
+    assert "tests/test_regression_always_green.py" not in report["diff"]
+
+
+def test_green_suite_with_no_reproducing_test_is_not_verified():
+    report, _ = inventory_run(
+        [
+            [call("propose_hypothesis", claim="negative qty accepted", symptom="stock above 100", next_check="read reserve")],
+            [call("resolve_hypothesis", id="H1", status="confirmed", evidence=["app.py reserve"], reason="code")],
+            "Confirmed.",
+            [call("edit_file", path="inventory_api/app.py", old=QTY_GUARD[0], new=QTY_GUARD[1])],
+            "Fixed.",
+            "Still nothing failing.",
+            "Done.",
+            REPORT,
+        ]
+    )
+    assert not report["verification"]["verified"]  # nothing was failing, so nothing was proven
+
+
+def test_regression_tool_is_not_available_while_fixing():
+    _, client = run(
+        investigation_script()
+        + [[call("edit_file", path="orders_api/app.py", old=COUPON_BUG, new=COUPON_FIX), call("edit_file", path="orders_api/app.py", old=IDOR_BUG, new=IDOR_FIX)], "Fixed.", REPORT]
+    )
+    fix_request = next(r for r in client.requests if r.get("tools") and "edit_file" in {t["name"] for t in r["tools"]})
+    assert "write_regression_test" not in {t["name"] for t in fix_request["tools"]}

@@ -21,7 +21,7 @@ class Scenario:
     service: str
     app: str  # "module:attribute" of the ASGI app inside the target
     incident: str
-    traffic: tuple  # (method, path, headers) tuples, replayed in order
+    traffic: tuple  # (method, path, headers) or (method, path, headers, json_body) tuples, replayed in order
 
     @property
     def target(self):
@@ -29,8 +29,8 @@ class Scenario:
 
     def seed_requests(self) -> list[dict]:
         return [
-            {"method": method, "path": path, "headers": {**headers, "x-request-id": f"r-{101 + i}"}}
-            for i, (method, path, headers) in enumerate(self.traffic)
+            {"method": method, "path": path, "headers": {**headers, "x-request-id": f"r-{101 + i}"}, "body": body[0] if body else None}
+            for i, (method, path, headers, *body) in enumerate(self.traffic)
         ]
 
     def summary(self) -> dict:
@@ -99,6 +99,29 @@ Test credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2
                 ("GET", "/invoices?page=2&size=2", {}),
                 ("GET", "/invoices?page=3&size=2", {}),  # empty
                 ("GET", "/invoices/1003", {}),
+            ),
+        ),
+        Scenario(
+            id="inventory",
+            title="Inventory API: phantom stock and an oversold item, with green CI",
+            service="inventory_api",
+            app="inventory_api.app:app",
+            incident="""Two tickets came in for the inventory_api service:
+1. The warehouse counted 100 units of SKU A-100, but the API reports more than 100 available.
+2. SKU C-300 was oversold: customers reserved 5 units, but only 3 exist.
+CI is green on the latest deploy, so no existing test catches either problem.
+
+Test credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'.""",
+            traffic=(
+                ("GET", "/stock/A-100", ALICE),
+                ("POST", "/reservations", ALICE, {"sku": "A-100", "qty": 10}),
+                ("POST", "/reservations", BOB, {"sku": "A-100", "qty": -15}),  # accepted: stock goes up
+                ("GET", "/stock/A-100", ALICE),  # 105, more than the warehouse holds
+                ("POST", "/reservations", BOB, {"sku": "C-300", "qty": 2}),
+                ("DELETE", "/reservations/3", BOB),
+                ("DELETE", "/reservations/3", BOB),  # cancelled twice: stock returned twice
+                ("GET", "/stock/C-300", ALICE),  # 5, only 3 exist
+                ("POST", "/reservations", ALICE, {"sku": "C-300", "qty": 5}),  # oversold
             ),
         ),
     ]

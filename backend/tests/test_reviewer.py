@@ -102,3 +102,17 @@ def test_no_reviewer_means_no_second_opinion():
     report, _ = run_with(None)
     assert report["second_opinion"] is None
     assert "second_opinion" not in [e["type"] for e in report["events"]]
+
+
+def test_rejection_sends_the_patch_back_for_another_round():
+    reject = {**APPROVE, "verdict": "reject", "summary": "Only order 7 is protected.", "risks": ["IDOR remains for order 8"]}
+    chat = FakeChat([json.dumps(reject), json.dumps(APPROVE)])
+    script = fix_script()
+    script[-1:-1] = ["Checked the objection; the check is already generic."]  # the review-driven fix round
+    report, client = run_with(Reviewer(chat, "open-model"), script)
+    types = [e["type"] for e in report["events"]]
+    assert types.count("second_opinion") == 2 and "review_retry" in types
+    assert report["second_opinion"]["verdict"] == "approve"
+    retry_prompt = next(r for r in client.requests if "independent reviewer rejected" in str(r.get("input")))
+    assert "IDOR remains for order 8" in str(retry_prompt["input"])
+    assert [e["attempt"] for e in report["events"] if e["type"] == "verification"] == [1, 2]

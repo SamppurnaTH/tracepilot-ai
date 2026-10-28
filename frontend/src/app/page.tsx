@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import s from "@/components/ui.module.css";
 import { RunView } from "@/components/RunView";
 import { Logo, Severity } from "@/components/bits";
-import { API_URL, backendAvailable, loadRecording, loadRecordingIndex, startLiveRun, streamRun, type RecordingIndexEntry } from "@/lib/api";
+import { API_URL, backendAvailable, loadEval, loadRecording, loadRecordingIndex, startLiveRun, streamRun, type EvalSummary, type RecordingIndexEntry } from "@/lib/api";
 import { publicTicket } from "@/lib/report";
 import { formatTally, initialState, reduce, type RunEvent, type RunState, type ScenarioSummary } from "@/lib/run";
 
@@ -19,8 +19,8 @@ function runReducer(state: RunState, action: Action): RunState {
 const REPO_URL = "https://github.com/SamppurnaTH/tracepilot-ai";
 const SPEEDS = [4, 10, 25];
 const MAX_GAP_MS = 1400;
-// Average tokens per investigation before the token-economy work (three real runs, Oct 28).
-const FIRST_VERSION_TOKENS = 109_600;
+// Tokens per investigation before the token-economy work (one real run of each incident, Oct 28).
+const FIRST_VERSION_TOKENS: Record<string, number> = { orders: 95_106, notes: 116_774, billing: 117_016 };
 
 interface Active {
   scenario: ScenarioSummary;
@@ -30,17 +30,109 @@ interface Active {
 const STEPS = [
   ["Isolate", "The service is copied into a locked-down Docker sandbox (no network, read-only, non-root) and real traffic is replayed to produce logs."],
   ["Investigate", "Muse Spark registers each suspected cause as a hypothesis and confirms it only with cited evidence: log lines, code, reproduced requests, tests."],
-  ["Patch", "With confirmed causes, it edits the sandbox copy. The tests are read-only ground truth and can't be weakened."],
+  ["Reproduce", "If no test catches a confirmed bug, the agent writes one. The harness keeps it only if it fails on the current code."],
+  ["Patch", "With confirmed causes, it edits the sandbox copy. Existing tests are read-only ground truth and can't be weakened."],
   ["Verify", "The harness, not the model, compares every test before and after. A fix counts only if all failures pass and nothing regresses."],
-  ["Second opinion", "Muse Spark Open, an open-weight Meta model, reviews the patch cold and rejects fixes that only game the tests."],
-  ["Hand off", "You get the root causes, the patch, a PR description and a full report, ready to apply."],
+  ["Second opinion", "Muse Spark Open, an open-weight Meta model, reviews the patch cold. If it rejects the patch, its objections go back for one more fix round."],
+  ["Hand off", "You get the root causes, the patch with its new tests, a PR description and a full report, ready to apply."],
 ];
 
 const kTokens = (n: number) => `${Math.round(n / 1000)}K`;
+const pct = (a: number, b: number) => (b ? `${Math.round((a / b) * 100)}%` : "—");
+
+function Evaluation({ data }: { data: EvalSummary }) {
+  const t = data.agent_total;
+  const gamed = data.reviewer.gamed;
+  const reference = data.reviewer.reference;
+  const caught = data.reviewer_cases.filter((c) => c.kind === "gamed");
+  return (
+    <section className={s.section} id="eval" aria-labelledby="eval-title">
+      <div className={s.sectionHead}>
+        <h2 id="eval-title" className={s.sectionTitle}>
+          Evaluation
+        </h2>
+        <p className={s.sectionText}>
+          Repeated real runs, not a hand-picked demo. The numbers are regenerated from the raw results by <code className={s.inlineCode}>backend/scripts/eval.py</code>.
+        </p>
+      </div>
+      <div className={s.evalStats}>
+        <div className={s.metric}>
+          <span className={s.metricValue}>
+            {t.verified}/{t.runs}
+          </span>
+          <span className={s.metricLabel}>end-to-end runs verified by the test suite ({pct(t.verified, t.runs)})</span>
+        </div>
+        {gamed && (
+          <div className={s.metric}>
+            <span className={s.metricValue}>
+              {gamed.correct}/{gamed.cases}
+            </span>
+            <span className={s.metricLabel}>test-gaming patches caught by the reviewer, though every one passes all tests</span>
+          </div>
+        )}
+        {reference && (
+          <div className={s.metric}>
+            <span className={s.metricValue}>
+              {reference.correct}/{reference.cases}
+            </span>
+            <span className={s.metricLabel}>correct patches approved, at about {kTokens(reference.avg_tokens)} tokens per review</span>
+          </div>
+        )}
+      </div>
+      <div className={s.tableWrap}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th scope="col">Incident</th>
+              <th scope="col">Runs</th>
+              <th scope="col">Verified</th>
+              <th scope="col">Reviewer approved</th>
+              <th scope="col">Tests written</th>
+              <th scope="col">Avg tokens</th>
+              <th scope="col">Avg time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(data.agent).map(([id, a]) => (
+              <tr key={id}>
+                <th scope="row" className="mono">
+                  {id}
+                </th>
+                <td>{a.runs}</td>
+                <td className={a.verified === a.runs ? s.goodText : s.warnText}>
+                  {a.verified}/{a.runs}
+                </td>
+                <td>
+                  {a.approved}/{a.runs}
+                </td>
+                <td>{a.regression_tests || "—"}</td>
+                <td>{kTokens(a.avg_tokens)}</td>
+                <td>{minutes(a.avg_duration_s)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {caught.length > 0 && (
+        <ul className={s.caught}>
+          {caught.map((c) => (
+            <li key={c.scenario}>
+              <span className={`${s.tag} ${c.correct ? s.sevPass : s.sevCritical}`}>{c.correct ? "caught" : "missed"}</span>
+              <span>
+                <span className={s.service}>{c.scenario}</span> {c.label}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
 const minutes = (sec: number) => (sec < 60 ? `${Math.round(sec)} s` : `${(sec / 60).toFixed(1)} min`);
 
 function Landing({
   index,
+  evalData,
   scenarios,
   live,
   startError,
@@ -48,6 +140,7 @@ function Landing({
   onLive,
 }: {
   index: RecordingIndexEntry[];
+  evalData: EvalSummary | null;
   scenarios: ScenarioSummary[];
   live: boolean | null;
   startError: string | null;
@@ -56,10 +149,18 @@ function Landing({
 }) {
   const issues = index.flatMap((e) => e.issues ?? []);
   const security = issues.filter((i) => i.category === "security").length;
-  const withTokens = index.filter((e) => e.tokens);
-  const avgTokens = withTokens.length ? withTokens.reduce((a, e) => a + (e.tokens ?? 0), 0) / withTokens.length : 0;
+  // Token figures come from the repeated eval runs when available, not from the single recordings.
+  const evalRows = Object.entries(evalData?.agent ?? {});
+  const evalRuns = evalRows.reduce((a, [, r]) => a + r.runs, 0);
+  const avgTokens = evalRuns
+    ? evalRows.reduce((a, [, r]) => a + r.avg_tokens * r.runs, 0) / evalRuns
+    : index.reduce((a, e) => a + (e.tokens ?? 0), 0) / Math.max(1, index.length);
+  // Compare like with like: only incidents that existed in the first version.
+  const comparable = evalRows.filter(([id]) => id in FIRST_VERSION_TOKENS);
+  const before = comparable.reduce((a, [id]) => a + FIRST_VERSION_TOKENS[id], 0);
+  const after = comparable.reduce((a, [, r]) => a + r.avg_tokens, 0);
   const avgTime = index.length ? index.reduce((a, e) => a + e.duration_s, 0) / index.length : 0;
-  const saving = avgTokens ? Math.round((1 - avgTokens / FIRST_VERSION_TOKENS) * 100) : 0;
+  const saving = before ? Math.round((1 - after / before) * 100) : 0;
   const first = index[0];
 
   return (
@@ -106,7 +207,9 @@ function Landing({
           </div>
           <div className={s.metric}>
             <span className={s.metricValue}>{avgTokens ? kTokens(avgTokens) : "…"}</span>
-            <span className={s.metricLabel}>tokens per investigation{saving > 0 ? `, ${saving}% fewer than our first version` : ""}</span>
+            <span className={s.metricLabel}>
+              average tokens per investigation{saving > 0 ? `; ${saving}% fewer than our first version on the same incidents` : ""}
+            </span>
           </div>
         </section>
       )}
@@ -117,7 +220,8 @@ function Landing({
             Incidents
           </h2>
           <p className={s.sectionText}>
-            Three synthetic services with planted defects. Each recording is a real, unedited run: investigated by muse-spark-1.3, reviewed by Muse Spark Open.
+            Synthetic services with planted defects, including one where CI is green and the agent must write the failing test itself. Each recording is a
+            real, unedited run: investigated by muse-spark-1.3, reviewed by Muse Spark Open.
           </p>
         </div>
         {startError && <p className={s.errorText}>{startError}</p>}
@@ -188,6 +292,8 @@ function Landing({
         </div>
       </section>
 
+      {evalData && evalData.agent_total.runs > 0 && <Evaluation data={evalData} />}
+
       <section className={s.section} id="how" aria-labelledby="how-title">
         <div className={s.sectionHead}>
           <h2 id="how-title" className={s.sectionTitle}>
@@ -238,6 +344,7 @@ function Landing({
 
 export default function Home() {
   const [index, setIndex] = useState<RecordingIndexEntry[]>([]);
+  const [evalData, setEvalData] = useState<EvalSummary | null>(null);
   const [scenarios, setScenarios] = useState<ScenarioSummary[]>([]);
   const [live, setLive] = useState<boolean | null>(null);
   const [active, setActive] = useState<Active | null>(null);
@@ -257,6 +364,7 @@ export default function Home() {
         setScenarios((current) => (current.length ? current : entries.map((e) => e.scenario)));
       })
       .catch(() => setIndex([]));
+    loadEval().then(setEvalData);
     backendAvailable().then(async (up) => {
       setLive(up);
       if (up) {
@@ -355,6 +463,7 @@ export default function Home() {
             <span>TracePilot</span>
           </button>
           <nav className={s.navLinks} aria-label="Primary">
+            {!active && <a href="#eval">Evaluation</a>}
             {!active && <a href="#how">How it works</a>}
             <a href={REPO_URL} target="_blank" rel="noreferrer">
               GitHub
@@ -371,7 +480,7 @@ export default function Home() {
         {active ? (
           <RunView scenario={active.scenario} state={state} mode={active.mode} onBack={back} controls={controls} />
         ) : (
-          <Landing index={index} scenarios={scenarios} live={live} startError={startError} onReplay={replay} onLive={runLive} />
+          <Landing index={index} evalData={evalData} scenarios={scenarios} live={live} startError={startError} onReplay={replay} onLive={runLive} />
         )}
       </main>
 

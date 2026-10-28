@@ -125,6 +125,8 @@ export interface RunState {
   timeline: TimelineItem[];
   reached: Stage[];
   brief?: string;
+  regressionTests: string[]; // tests the agent wrote that reproduce a bug
+  reviewRetries: number;
 }
 
 export const initialState: RunState = {
@@ -135,6 +137,8 @@ export const initialState: RunState = {
   toolCalls: 0,
   timeline: [],
   reached: [],
+  regressionTests: [],
+  reviewRetries: 0,
 };
 
 const TOOL_LABELS: Record<string, string> = {
@@ -144,6 +148,7 @@ const TOOL_LABELS: Record<string, string> = {
   run_tests: "Ran tests",
   edit_file: "Edited code",
   show_diff: "Reviewed diff",
+  write_regression_test: "Wrote a reproducing test",
 };
 
 function describeTool(tool: string, args: Record<string, unknown>): string {
@@ -165,6 +170,7 @@ function describeTool(tool: string, args: Record<string, unknown>): string {
     case "run_tests":
       return (args.selector as string) || "full suite";
     case "edit_file":
+    case "write_regression_test":
       return String(args.path ?? "");
     default:
       return "";
@@ -266,6 +272,21 @@ export function reduce(state: RunState, e: RunEvent): RunState {
       });
       break;
     }
+    case "regression_test": {
+      const tests = Object.keys((e.tests ?? {}) as Record<string, Outcome>);
+      if (e.accepted) {
+        s.regressionTests = [...s.regressionTests.filter((t) => !t.startsWith(e.path as string)), ...tests];
+        s.baseline = { ...(s.baseline ?? {}), ...Object.fromEntries(tests.map((t) => [t, "failed" as Outcome])) };
+        add({ kind: "resolve", title: "Reproducing test kept", detail: `${tests.length} new test${tests.length === 1 ? "" : "s"} fail on the current code`, tone: "signal" });
+      } else {
+        add({ kind: "alert", title: "Test not kept", detail: "it didn't fail on the current code, so it reproduces nothing", tone: "neutral" });
+      }
+      break;
+    }
+    case "review_retry":
+      s.reviewRetries += 1;
+      add({ kind: "alert", title: "Reviewer objections sent back", detail: "one more fix round with the reviewer's risks", tone: "bad" });
+      break;
     case "recovered":
       add({ kind: "alert", title: "Recovered the conversation", detail: e.reason as string, tone: "neutral" });
       break;

@@ -63,3 +63,18 @@ export function streamRun(runId: string, onEvent: (e: RunEvent) => void, onEnd: 
   };
   return () => source.close();
 }
+
+export interface EvalSummary {
+  agent: Record<
+    string,
+    { runs: number; verified: number; approved: number; avg_tokens: number; avg_reviewer_tokens: number; avg_duration_s: number; regression_tests: number; review_retries: number }
+  >;
+  agent_total: { runs: number; verified: number; approved: number };
+  reviewer: Partial<Record<"reference" | "gamed", { cases: number; correct: number; avg_tokens: number }>>;
+  reviewer_cases: { scenario: string; kind: "reference" | "gamed"; label: string; verdict: string; correct: boolean; summary: string; tokens: number }[];
+}
+
+export async function loadEval(): Promise<EvalSummary | null> {
+  const resp = await fetch("/eval.json").catch(() => null);
+  return resp?.ok ? resp.json() : null;
+}

@@ -8,7 +8,7 @@
     },
     "file": "orders.json",
     "verified": true,
-    "duration_s": 103.4,
+    "duration_s": 143.7,
     "tests": {
       "before": {
         "passed": 3,
@@ -20,17 +20,17 @@
     },
     "issues": [
       {
-        "title": "GET /orders/9/total 500 due to missing None coupon handling",
+        "title": "GET /orders/9/total 500 due to missing coupon handling (None subscript)",
         "severity": "high",
         "category": "reliability"
       },
       {
-        "title": "Order detail endpoint lacks ownership check allowing cross-user reads",
+        "title": "Order read endpoints lack ownership check allowing cross-user access",
         "severity": "critical",
         "category": "security"
       }
     ],
-    "tokens": 47528,
+    "tokens": 44520,
     "model_calls": 9,
     "review": "approve"
   },
@@ -43,7 +43,7 @@
     },
     "file": "notes.json",
     "verified": true,
-    "duration_s": 134.0,
+    "duration_s": 157.8,
     "tests": {
       "before": {
         "passed": 3,
@@ -55,18 +55,13 @@
     },
     "issues": [
       {
-        "title": "Search for title with apostrophe fails with 500 due to SQL string interpolation",
-        "severity": "high",
-        "category": "reliability"
-      },
-      {
-        "title": "SQL injection in search bypasses owner filter and leaks other users' notes",
+        "title": "Search endpoint builds SQL by string interpolation, causing apostrophe syntax error and SQL injection ownership bypass",
         "severity": "critical",
         "category": "security"
       }
     ],
-    "tokens": 55126,
-    "model_calls": 9,
+    "tokens": 72238,
+    "model_calls": 10,
     "review": "approve"
   },
   {
@@ -78,7 +73,7 @@
     },
     "file": "billing.json",
     "verified": true,
-    "duration_s": 155.9,
+    "duration_s": 205.9,
     "tests": {
       "before": {
         "passed": 2,
@@ -90,18 +85,53 @@
     },
     "issues": [
       {
-        "title": "Invoice total uses banker's rounding instead of ROUND_HALF_UP",
+        "title": "Invoice totals use banker's/float rounding instead of half-up decimal rounding, causing 1-cent undercharge",
         "severity": "medium",
         "category": "correctness"
       },
       {
-        "title": "Invoice list pagination off-by-one skips earliest invoices",
+        "title": "Invoice list pagination has off-by-one offset, skipping first page of results",
         "severity": "high",
         "category": "correctness"
       }
     ],
-    "tokens": 66884,
-    "model_calls": 11,
+    "tokens": 114797,
+    "model_calls": 14,
+    "review": "concerns"
+  },
+  {
+    "scenario": {
+      "id": "inventory",
+      "title": "Inventory API: phantom stock and an oversold item, with green CI",
+      "service": "inventory_api",
+      "incident": "Two tickets came in for the inventory_api service:\n1. The warehouse counted 100 units of SKU A-100, but the API reports more than 100 available.\n2. SKU C-300 was oversold: customers reserved 5 units, but only 3 exist.\nCI is green on the latest deploy, so no existing test catches either problem.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'."
+    },
+    "file": "inventory.json",
+    "verified": true,
+    "duration_s": 208.4,
+    "tests": {
+      "before": {
+        "passed": 5,
+        "failed": 3
+      },
+      "after": {
+        "passed": 8
+      }
+    },
+    "issues": [
+      {
+        "title": "Negative qty reservation inflates available stock above warehouse count (SKU A-100)",
+        "severity": "high",
+        "category": "correctness"
+      },
+      {
+        "title": "Double-cancel re-adds stock enabling oversell (SKU C-300)",
+        "severity": "critical",
+        "category": "correctness"
+      }
+    ],
+    "tokens": 123659,
+    "model_calls": 16,
     "review": "approve"
   }
 ]

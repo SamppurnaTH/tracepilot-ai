@@ -140,7 +140,11 @@ class Workspace:
             raise ValueError(f"method must be one of {sorted(HTTP_METHODS)}")
         if not path.startswith("/") or "://" in path:
             raise ValueError("path must be a relative URL path like /orders/7")
-
+        if isinstance(body, str):  # models often send the JSON body as a string; a wasted 422 costs a round trip
+            try:
+                body = json.loads(body)
+            except json.JSONDecodeError:
+                pass
         results = self.send_batch([{"method": method, "path": path, "headers": headers or {}, "body": body}], timeout=30)
         return results if isinstance(results, dict) else results[0]
 
@@ -215,13 +219,15 @@ class Workspace:
         """Per-test outcomes ({node_id: "passed" | "failed" | "error"}), for harness-side verification."""
         return self.test_report()[0]
 
-    def test_report(self) -> tuple[dict[str, str], dict[str, str]]:
+    def test_report(self, selector: str | None = None) -> tuple[dict[str, str], dict[str, str]]:
         """Per-test outcomes, plus pytest's one-line failure message for each failing test."""
+        args = ["-q", "-rA", "--tb=no", "-p", "no:cacheprovider"]
+        if selector:
+            if ".." in selector or not re.fullmatch(r"[\w/.:\-\[\]]+", selector):
+                raise ValueError("selector must be a test path or node id")
+            args.append(selector)
         # A wide virtual terminal stops pytest from truncating the failure messages.
-        code = (
-            "import os, sys; os.environ['COLUMNS'] = '400'; import pytest; "
-            "sys.exit(pytest.main(['-q', '-rA', '--tb=no', '-p', 'no:cacheprovider']))"
-        )
+        code = f"import os, sys; os.environ['COLUMNS'] = '400'; import pytest; sys.exit(pytest.main({args!r}))"
         result = self.sandbox.python(["-c", code], timeout=180)
         outcomes, reasons = {}, {}
         for line in (result.stdout + result.stderr).splitlines():
@@ -286,7 +292,7 @@ INVESTIGATION_TOOLS: list[dict] = [
                 "method": {"type": "string", "enum": sorted(HTTP_METHODS)},
                 "path": {"type": "string", "description": "URL path, e.g. /orders/9/total"},
                 "headers": {"type": "object", "additionalProperties": {"type": "string"}},
-                "body": {"description": "Optional JSON body"},
+                "body": {"description": "Optional JSON body, as an object (not a string)"},
             },
             "required": ["method", "path"],
             "additionalProperties": False,
