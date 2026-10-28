@@ -29,6 +29,16 @@ export async function backendAvailable(): Promise<boolean> {
   }
 }
 
+/** Whether the backend wants an access key before it investigates uploaded or cloned code. */
+export async function uploadsNeedKey(): Promise<boolean> {
+  try {
+    const resp = await fetch(`${API_URL}/health`, { signal: AbortSignal.timeout(2500) });
+    return Boolean((await resp.json()).uploads_need_key);
+  } catch {
+    return false;
+  }
+}
+
 export async function loadRecordingIndex(): Promise<RecordingIndexEntry[]> {
   const resp = await fetch("/recordings/index.json");
   return resp.ok ? resp.json() : [];
@@ -134,8 +144,9 @@ async function json<T>(resp: Response): Promise<T> {
 }
 
 /** Start an investigation of your own project: a ZIP upload or a public repository URL, with optional attachments. */
-export async function startCustomRun(form: FormData): Promise<RunSummary> {
-  return json(await fetch(`${API_URL}/api/investigations/custom`, { method: "POST", body: form }));
+export async function startCustomRun(form: FormData, accessKey?: string): Promise<RunSummary> {
+  const headers: Record<string, string> = accessKey ? { "X-TracePilot-Key": accessKey } : {};
+  return json(await fetch(`${API_URL}/api/investigations/custom`, { method: "POST", body: form, headers }));
 }
 
 export async function cancelRun(id: string): Promise<RunSummary> {

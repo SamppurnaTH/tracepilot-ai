@@ -1,6 +1,7 @@
 """TracePilot API: start investigations, stream their events live (SSE), and replay saved runs."""
 
 import asyncio
+import hmac
 import json
 import os
 import threading
@@ -12,7 +13,7 @@ from dataclasses import dataclass, field
 import shutil
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -27,6 +28,9 @@ from .scenarios import SCENARIOS
 
 RUNS_DIR = REPO_ROOT / "runs"
 MAX_CONCURRENT = int(os.environ.get("TRACEPILOT_MAX_CONCURRENT", "2"))
+# Public-server guards, all off by default: a daily run cap (0 = none), a key for investigating
+# uploaded or cloned code, and refusing to run at all without Docker isolation.
+DAILY_LIMIT = int(os.environ.get("TRACEPILOT_DAILY_LIMIT", "0"))
 SUPPORTED_PROVIDERS = {"meta"}
 STREAM_POLL_S = 0.25
 
@@ -68,6 +72,7 @@ class RunManager:
         self.custom_factory = custom_factory  # builds investigations of uploaded or cloned projects
         self.runs: dict[str, Run] = {}
         self.lock = threading.Lock()
+        self.day, self.started_today = "", 0
 
     def active(self) -> int:
         return sum(1 for r in self.runs.values() if r.status == "running")
@@ -76,6 +81,12 @@ class RunManager:
         with self.lock:
             if self.active() >= MAX_CONCURRENT:
                 raise HTTPException(429, f"{MAX_CONCURRENT} investigations already running; try again shortly")
+            today = time.strftime("%Y-%m-%d", time.gmtime())
+            if today != self.day:
+                self.day, self.started_today = today, 0
+            if DAILY_LIMIT and self.started_today >= DAILY_LIMIT:
+                raise HTTPException(429, "today's live runs are used up; replay a recorded run or try again tomorrow (UTC)")
+            self.started_today += 1
             run = Run(id=uuid.uuid4().hex[:12], scenario=scenario, provider=provider, title=title)
             self.runs[run.id] = run
         return run
@@ -151,9 +162,18 @@ class StartRequest(BaseModel):
     provider: str = "meta"
 
 
+def _upload_key() -> str:
+    return os.environ.get("TRACEPILOT_UPLOAD_KEY", "")
+
+
+def _require_docker() -> None:
+    if os.environ.get("TRACEPILOT_REQUIRE_DOCKER") == "1" and not docker_available():
+        raise HTTPException(503, "the sandbox is unavailable; try again shortly")
+
+
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "active_investigations": manager.active()}
+    return {"status": "ok", "active_investigations": manager.active(), "uploads_need_key": bool(_upload_key())}
 
 
 @app.get("/api/scenarios")
@@ -171,6 +191,7 @@ def start_investigation(body: StartRequest) -> dict:
         get_settings(body.provider)
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc
+    _require_docker()
     return manager.start(body.scenario, body.provider).summary()
 
 
@@ -190,9 +211,14 @@ async def start_custom_investigation(
     screenshots: list[UploadFile] = File([]),
     tests: str | None = Form(None),
     test_args: str | None = Form(None),
+    x_tracepilot_key: str = Header(""),
 ) -> dict:
     """Investigate your own project: upload a ZIP or give a public repository URL, plus optional logs and screenshots."""
+    key = _upload_key()
+    if key and not hmac.compare_digest(x_tracepilot_key.encode(), key.encode()):
+        raise HTTPException(401, "investigating your own code needs an access key")
     _check_key()
+    _require_docker()
     if bool(project) == bool(repo_url):
         raise HTTPException(400, "provide either a project ZIP or a repository URL")
     base = workdir()

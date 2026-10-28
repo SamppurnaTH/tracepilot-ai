@@ -809,3 +809,19 @@
   color: var(--console-muted);
   font-family: var(--font-mono);
 }
+
+/* Light investigation chrome frames the dark execution workspace. */
+.console { border-color: #dfe6f2; background: #fff; box-shadow: 0 5px 25px #19366308; }
+.head,.stepper,.controls,.tabs { --console-border: #e5eaf4; --console-text: #132038; --console-muted: #687893; --console-raised: #f4f6fc; --console-accent: #4b3dff; --console-accent-wash: #eeedff; --console-good: #00af7a; --console-good-wash: #ddfaee; background: #fcfdff; color: #132038; border-color: #e5eaf4; color-scheme: light; }
+.head { background: linear-gradient(100deg,#fff,#f8faff); }
+.headIcon { color: #f39512; background: #fff5e2; border-radius: 50%; }
+.lang { color: #2866e9; background: #e8efff; border: 0; }
+.pillAccent { color: #008e63; background: #dcfaee; }
+.stepNum { width: 26px; height: 26px; }
+.step_done .stepNum { color: #fff; }
+.step_current .stepNum { color: #fff; background: #00af7a; border-color: #00af7a; box-shadow: 0 0 0 4px #00af7a15; }
+.main { border-color: #e5eaf4; }
+.tabs { padding-top: 10px; }
+.tab { border: 1px solid #e5eaf4; border-radius: 6px 6px 0 0; padding: 9px; font-size: 12px; }
+.tabOn { background: #f3f3ff; color: #493dff; border-bottom: 2px solid #493dff; }
+.tabBody { background: #070e17; }

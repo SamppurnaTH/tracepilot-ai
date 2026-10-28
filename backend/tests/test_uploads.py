@@ -144,3 +144,24 @@ def test_real_target_zip_detects_python_and_app(client):
     )
     wait(client, resp.json()["id"])
     assert FakeCustom.built[0]["app"] == "orders_api.app:app"
+
+
+def test_upload_key_is_required_when_configured(client, monkeypatch):
+    monkeypatch.setenv("TRACEPILOT_UPLOAD_KEY", "judges-only")
+    assert client.get("/health").json()["uploads_need_key"] is True
+    form = {"data": {"incident": "Checkout returns 500 for empty carts"}, "files": [("project", ("svc.zip", project_zip({"svc/app.py": ""}), "application/zip"))]}
+    assert client.post("/api/investigations/custom", **form).status_code == 401
+    assert client.post("/api/investigations/custom", headers={"X-TracePilot-Key": "wrong"}, **form).status_code == 401
+    resp = client.post("/api/investigations/custom", headers={"X-TracePilot-Key": "judges-only"}, **form)
+    assert resp.status_code == 202, resp.text
+    wait(client, resp.json()["id"])
+
+
+def test_public_server_refuses_to_run_without_docker(client, monkeypatch):
+    monkeypatch.setenv("TRACEPILOT_REQUIRE_DOCKER", "1")
+    resp = client.post(
+        "/api/investigations/custom",
+        data={"incident": "Checkout returns 500 for empty carts"},
+        files=[("project", ("svc.zip", project_zip({"svc/app.py": ""}), "application/zip"))],
+    )
+    assert resp.status_code == 503

@@ -121,3 +121,13 @@ def test_missing_api_key_is_503(client, monkeypatch):
 def test_saved_run_path_traversal_blocked(client):
     assert client.get("/api/runs/..%2F.env").status_code == 404
     assert client.get("/api/investigations/nope").status_code == 404
+
+
+def test_daily_limit(client, monkeypatch):
+    monkeypatch.setattr(main, "DAILY_LIMIT", 1)
+    first = client.post("/api/investigations", json={"scenario": "orders"})
+    assert first.status_code == 202
+    wait_done(client, first.json()["id"])
+    second = client.post("/api/investigations", json={"scenario": "orders"})
+    assert second.status_code == 429 and "used up" in second.json()["detail"]
+    assert client.get("/health").json()["uploads_need_key"] is False

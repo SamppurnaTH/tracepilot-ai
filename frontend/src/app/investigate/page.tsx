@@ -2,15 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import s from "@/components/app.module.css";
 import { AppShell } from "@/components/AppShell";
 import { cx } from "@/components/bits";
 import { Icon } from "@/components/icons";
-import { startCustomRun, startLiveRun } from "@/lib/api";
+import { startCustomRun, startLiveRun, uploadsNeedKey } from "@/lib/api";
 import { useData } from "@/lib/useData";
 
 type Source = "upload" | "repo" | "example";
+
+// The access key is kept for this browser tab only, so judges type it once.
+const KEY_STORE = "tracepilot-access-key";
+const readKey = () => {
+  try {
+    return sessionStorage.getItem(KEY_STORE) ?? "";
+  } catch {
+    return "";
+  }
+};
 
 function FilePick({ label, hint, accept, multiple, files, onChange }: { label: string; hint: string; accept: string; multiple?: boolean; files: File[]; onChange: (f: File[]) => void }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -67,9 +77,18 @@ export default function Investigate() {
   const [testArgs, setTestArgs] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needKey, setNeedKey] = useState(false);
+  const [accessKey, setAccessKey] = useState("");
+  useEffect(() => setAccessKey(readKey()), []);
+  useEffect(() => {
+    if (live) uploadsNeedKey().then(setNeedKey);
+  }, [live]);
   const examples = (index ?? []).filter((e) => e.scenario.live);
 
-  const ready = source === "example" ? Boolean(example) : incident.trim().length >= 10 && (source === "upload" ? project.length === 1 : /^https:\/\//.test(repo.trim()));
+  const ready =
+    source === "example"
+      ? Boolean(example)
+      : incident.trim().length >= 10 && (source === "upload" ? project.length === 1 : /^https:\/\//.test(repo.trim())) && (!needKey || Boolean(accessKey.trim()));
 
   const start = async () => {
     setError(null);
@@ -91,7 +110,10 @@ export default function Investigate() {
       shots.forEach((f) => form.append("screenshots", f));
       if (tests.trim()) form.append("tests", tests.trim());
       if (testArgs.trim()) form.append("test_args", testArgs.trim());
-      const run = await startCustomRun(form);
+      try {
+        sessionStorage.setItem(KEY_STORE, accessKey.trim());
+      } catch {}
+      const run = await startCustomRun(form, accessKey.trim() || undefined);
       router.push(`/run?live=${run.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -180,6 +202,16 @@ export default function Investigate() {
               </label>
               <FilePick label="Logs (optional)" hint="JSON lines or plain text: .log, .txt, .json" accept=".log,.txt,.json,.jsonl" multiple files={logs} onChange={setLogs} />
               <FilePick label="Screenshots (optional)" hint="PNG, JPEG, WebP or GIF; the model reads them as evidence" accept="image/png,image/jpeg,image/webp,image/gif" multiple files={shots} onChange={setShots} />
+              {needKey && (
+                <label className={s.field}>
+                  <span className={s.label}>Access key</span>
+                  <input className={s.input} type="password" autoComplete="off" value={accessKey} onChange={(e) => setAccessKey(e.target.value)} />
+                  <span className={s.hint}>
+                    Investigating your own code on this hosted backend needs a key, shared with the hackathon judges. The example scenarios run without one, or run TracePilot
+                    on your machine (<Link href="/docs#getting-started">getting started</Link>).
+                  </span>
+                </label>
+              )}
               <details className={s.details}>
                 <summary>Advanced options (Java)</summary>
                 <div className={s.field} style={{ gap: 12 }}>

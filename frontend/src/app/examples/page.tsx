@@ -103,6 +103,9 @@ export default function Examples() {
                   >
                     <Icon name="bolt" size={13} /> Run live
                   </button>
+                  <Link href={`/run?id=${e.scenario.id}&replay=1`} className={cx(s.btn, s.btnSm, !live && s.btnPrimary)}>
+                    <Icon name="play" size={13} /> Watch run
+                  </Link>
                   <Link href={`/run?id=${e.scenario.id}`} className={cx(s.btn, s.btnSm)}>
                     View details
                   </Link>
