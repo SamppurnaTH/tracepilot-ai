@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from app.llm import get_client  # noqa: E402
+from app.llm import extract_json, get_client, json_instruction  # noqa: E402
 from smoke_test import HYPOTHESIS_SCHEMA, READ_LOG_TOOL, SYNTHETIC_LOG  # noqa: E402
 
 # Chat Completions nests function metadata under "function".
@@ -66,18 +66,21 @@ def check_tool_calling(client, model) -> None:
 
 
 def check_structured_output(client, model) -> None:
+    # Prompt-based JSON: constrained decoding (response_format) on Baseten pads the output with whitespace.
     resp = client.chat.completions.create(
         model=model,
+        max_tokens=4000,
         messages=[
-            {"role": "system", "content": "You are a debugging agent. Form one testable root-cause hypothesis."},
+            {
+                "role": "system",
+                "content": "You are a debugging agent. Form one testable root-cause hypothesis. "
+                + json_instruction(HYPOTHESIS_SCHEMA),
+            },
             {"role": "user", "content": f"Logs from orders_api:\n{SYNTHETIC_LOG}"},
         ],
-        response_format={"type": "json_schema", "json_schema": {"name": "Hypothesis", "schema": HYPOTHESIS_SCHEMA, "strict": True}},
     )
-    hypothesis = json.loads(resp.choices[0].message.content)
-    missing = set(HYPOTHESIS_SCHEMA["required"]) - hypothesis.keys()
-    if missing:
-        raise AssertionError(f"missing fields: {missing}")
+    hypothesis = extract_json(resp.choices[0].message.content or "", HYPOTHESIS_SCHEMA)
+    print(f"  (completion tokens: {resp.usage.completion_tokens})")
     print("  " + json.dumps(hypothesis, indent=2).replace("\n", "\n  "))
 
 
