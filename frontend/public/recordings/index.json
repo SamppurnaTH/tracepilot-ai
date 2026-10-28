@@ -4,7 +4,8 @@
       "id": "orders",
       "title": "Orders API: intermittent 500s and a data-exposure report",
       "service": "orders_api",
-      "incident": "Two reports came in for the orders_api service:\n1. Users say GET /orders/9/total sometimes returns 500.\n2. A security reviewer suspects users can see other users' orders.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'."
+      "incident": "Two reports came in for the orders_api service:\n1. Users say GET /orders/9/total sometimes returns 500.\n2. A security reviewer suspects users can see other users' orders.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'.",
+      "screenshots": []
     },
     "file": "orders.json",
     "verified": true,
@@ -40,7 +41,8 @@
       "id": "notes",
       "title": "Notes API: search errors and noisy warnings",
       "service": "notes_api",
-      "incident": "Support tickets for the notes_api service:\n1. Searching for a note whose title contains an apostrophe (for example \"Bob's\") fails with a server error.\n2. On-call noticed WARNING entries in the logs this morning and wants to know whether they are related.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'."
+      "incident": "Support tickets for the notes_api service:\n1. Searching for a note whose title contains an apostrophe (for example \"Bob's\") fails with a server error.\n2. On-call noticed WARNING entries in the logs this morning and wants to know whether they are related.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'.",
+      "screenshots": []
     },
     "file": "notes.json",
     "verified": true,
@@ -71,7 +73,8 @@
       "id": "billing",
       "title": "Billing API: a disputed invoice and missing invoices",
       "service": "billing_api",
-      "incident": "Two tickets came in for the billing_api service:\n1. Customer initech disputes invoice 1003: by their own calculation the total should be 54.13, but the invoice shows 54.12.\n2. A customer says the first page of their invoice list never shows their earliest invoices."
+      "incident": "Two tickets came in for the billing_api service:\n1. Customer initech disputes invoice 1003: by their own calculation the total should be 54.13, but the invoice shows 54.12.\n2. A customer says the first page of their invoice list never shows their earliest invoices.",
+      "screenshots": []
     },
     "file": "billing.json",
     "verified": true,
@@ -107,7 +110,8 @@
       "id": "inventory",
       "title": "Inventory API: phantom stock and an oversold item, with green CI",
       "service": "inventory_api",
-      "incident": "Two tickets came in for the inventory_api service:\n1. The warehouse counted 100 units of SKU A-100, but the API reports more than 100 available.\n2. SKU C-300 was oversold: customers reserved 5 units, but only 3 exist.\nCI is green on the latest deploy, so no existing test catches either problem.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'."
+      "incident": "Two tickets came in for the inventory_api service:\n1. The warehouse counted 100 units of SKU A-100, but the API reports more than 100 available.\n2. SKU C-300 was oversold: customers reserved 5 units, but only 3 exist.\nCI is green on the latest deploy, so no existing test catches either problem.\n\nTest credentials for the sandbox: 'token-alice' (user 1) and 'token-bob' (user 2), sent as 'Authorization: Bearer <token>'.",
+      "screenshots": []
     },
     "file": "inventory.json",
     "verified": true,
@@ -143,7 +147,8 @@
       "id": "refunds",
       "title": "Refunds API: refunds failing right after a deploy",
       "service": "refunds_api",
-      "incident": "Refunds have been failing since this morning: customers get an error and support is escalating.\nIt started right after this morning's deploy of v2.14.0, so on-call suspects the release.\nFind what broke and fix it."
+      "incident": "Refunds have been failing since this morning: customers get an error and support is escalating.\nIt started right after this morning's deploy of v2.14.0, so on-call suspects the release.\nFind what broke and fix it.",
+      "screenshots": []
     },
     "file": "refunds.json",
     "verified": false,
@@ -167,5 +172,39 @@
     "tokens": 42982,
     "model_calls": 7,
     "review": null
+  },
+  {
+    "scenario": {
+      "id": "checkout",
+      "title": "Checkout API: a customer's screenshot shows the wrong discount",
+      "service": "checkout_api",
+      "incident": "A customer sent a screenshot of their checkout and says the coupon discount is wrong.\nSupport tried the same coupon on a single item and the total looked fine, so they couldn't reproduce it.\nFind out what is going on and fix it.",
+      "screenshots": [
+        "checkout-customer.png"
+      ]
+    },
+    "file": "checkout.json",
+    "verified": true,
+    "outcome": "fixed",
+    "duration_s": 146.8,
+    "tests": {
+      "before": {
+        "passed": 5,
+        "failed": 1
+      },
+      "after": {
+        "passed": 6
+      }
+    },
+    "issues": [
+      {
+        "title": "Percent coupon discount ignores line quantity, applying 10% of unit price once per line",
+        "severity": "high",
+        "category": "correctness"
+      }
+    ],
+    "tokens": 62260,
+    "model_calls": 11,
+    "review": "approve"
   }
 ]

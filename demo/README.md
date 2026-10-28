@@ -13,8 +13,11 @@ TracePilot investigates the apps in `targets/`. Each one is a small synthetic Fa
 | `inventory` | `POST /reservations` never checks `qty > 0`, so a negative quantity adds phantom stock | Correctness | A-100 shows more than the 100 units the warehouse counted |
 | `inventory` | Cancelling doesn't check the reservation is still active, so a double cancel returns stock twice | Correctness | C-300 was oversold: 5 reserved, 3 exist |
 | `refunds` | *No code bug:* the payment provider's API key expired at 08:00, eight minutes after a deploy | External | Refunds fail since this morning's deploy; on-call suspects the release |
+| `checkout` | Percent coupons sum 10% of each line's unit price, ignoring quantity | Correctness | A customer's screenshot shows the wrong discount; the ticket text has no numbers |
 
 Note that the `notes` incident never mentions security. The agent has to discover that a quoting error is really an injection that leaks other users' notes. The test suite checks this, so escaping only the apostrophe isn't enough.
+
+In `checkout`, the specifics are only in the customer's screenshot (`demo/screenshots/checkout-customer.png`, drawn by `demo/make_checkout_screenshot.py`): 2× LAMP-20 and 1× MUG-08 with SAVE10, a $2.80 discount where $4.80 is right. The request logs don't record bodies, and all 5 tests pass because none uses a quantity above 1.
 
 In `refunds`, the right answer is **no code change**. The recorded production logs (`demo/logs/refunds_api.log`) show three key-expiry warnings before the deploy, a successful refund after it, then `401 api_key_expired` from 08:03. The fix is to issue a new key at the provider.
 

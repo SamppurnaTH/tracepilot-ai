@@ -7,6 +7,7 @@ Run from the repo root:  .venv/Scripts/python backend/scripts/export_recordings.
 """
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -36,6 +37,8 @@ def main() -> None:
         data["events"] = [e for e in data["events"] if e.get("type") not in DROP_EVENTS]
         name = f"{scenario_id}.json"
         (OUT / name).write_text(json.dumps(data, separators=(",", ":")), encoding="utf-8")
+        for shot in SCENARIOS[scenario_id].screenshot_paths():  # the UI shows the evidence the model saw
+            shutil.copyfile(shot, OUT / shot.name)
         report = data["report"]
         usage, verification = report["usage"], report["verification"]
         index.append(

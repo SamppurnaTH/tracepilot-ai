@@ -48,9 +48,12 @@ SHIPSPACE_CI_TESTS = (
 
 def cases(shipspace: str | None) -> dict[str, dict]:
     out = {}
-    for sid in ("orders", "notes", "billing", "inventory", "refunds"):
+    for sid in ("orders", "notes", "billing", "inventory", "refunds", "checkout"):
         sc = SCENARIOS[sid]
-        out[sid] = {"source": sc.target, "incident": sc.incident, "app": sc.app, "seed": sc.seed_requests(), "logs": sc.logs(), "kind": "python"}
+        out[sid] = {
+            "source": sc.target, "incident": sc.incident, "app": sc.app, "seed": sc.seed_requests(), "logs": sc.logs(),
+            "images": sc.screenshot_paths(), "kind": "python",
+        }  # fmt: skip
     out["shipping"] = {
         "source": ROOT / "bench" / "shipping",
         "incident": "Customers who order express on Fridays are promised delivery on Saturday, but our carrier does not deliver "
@@ -94,7 +97,7 @@ def tracepilot_row(case_id: str, report: dict, run_id: str) -> dict:
 def run_one(system: str, case_id: str, case: dict) -> dict:
     common = dict(
         app=case["app"], seed_requests=case["seed"], logs=case["logs"], kind=case["kind"], isolation="auto",
-        test_scope=case.get("test_scope"), test_args=case.get("test_args"),
+        test_scope=case.get("test_scope"), test_args=case.get("test_args"), images=case.get("images"),
     )  # fmt: skip
     common["image"] = project_image(case["source"], case["kind"])  # the project's own dependencies
     run_id = uuid.uuid4().hex[:12]

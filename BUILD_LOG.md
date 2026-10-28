@@ -228,3 +228,13 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - Comparison bar charts with key takeaways; the reviewer benchmark; a "Run it on your own code" section.
 - The mockup's illustrative numbers were replaced with real data. For example, the refunds run wrote no test and analysed no "24 files", and ShipSpace's bug is the edit window, not delivery dates.
 - Checked at 1536 px and at 375 px (no overflow), and in light and dark themes.
+
+**Screenshot evidence (multimodal Muse Spark):**
+
+- Incidents can carry screenshots (`Investigation(images=...)`, scenario `screenshots`, CLI `--screenshot`). They're sent to `muse-spark-1.3` as `input_image` parts of the first message, with a note asking the agent to cite what it reads. Only PNG, JPEG, WebP and GIF up to 5 MB are accepted. Each one is emitted as an `evidence_image` event.
+- A quick check confirmed the Meta Model API reads text from images: a 420×160 test image cost 114 input tokens.
+- New `checkout` incident. The ticket says only that a customer's screenshot shows the wrong discount. The screenshot (`demo/make_checkout_screenshot.py`) is the only place the cart, coupon and amounts appear. The logs have no request bodies, and all 5 tests pass.
+- **Real run:** Muse Spark rebuilt the exact cart from the image (2× LAMP-20 and 1× MUG-08 with SAVE10) and sent it to the app. It cited quote Q-20417 and "$2.80 vs $4.80" in its findings, wrote a reproducing test, and fixed the missing `line.qty`: 5/6 → 6/6, approved by Muse Spark Open, 62K tokens (about $0.08).
+- **The site:** the Evidence tab shows the screenshot, captioned as given to the model as an image. Scenario cards get a "Screenshot" badge, and the exporter publishes screenshots next to the recordings.
+- **Also fixed:** the reviewer benchmark now only covers scenarios that have a test-gaming fix. It would have crashed on refunds, which has no code fix. A checkout gaming fix was added, and a checkout hidden test is in `eval/hidden/`.
+- 125 backend tests pass (1 skipped by design: refunds has no reference code fix).

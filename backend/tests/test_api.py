@@ -55,13 +55,13 @@ def stream(client, run_id: str) -> list[tuple[str, dict]]:
 
 def test_lists_scenarios(client):
     ids = {s["id"] for s in client.get("/api/scenarios").json()}
-    assert ids == {"orders", "notes", "billing", "inventory", "refunds"}
+    assert ids == {"orders", "notes", "billing", "inventory", "refunds", "checkout"}
 
 
 def test_scenario_summaries_hide_traffic(client):
     # Seed traffic comments describe the defects; only the incident text is public.
     for scenario in client.get("/api/scenarios").json():
-        assert set(scenario) == {"id", "title", "service", "incident"}
+        assert set(scenario) == {"id", "title", "service", "incident", "screenshots"}  # attachment names, never their contents
 
 
 def test_run_streams_events_and_ends(client):

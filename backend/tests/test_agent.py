@@ -331,3 +331,25 @@ def test_cause_outside_the_code_means_no_patch():
     assert "fix" not in [e["phase"] for e in report["events"] if e["type"] == "phase"]
     assert "outside the code (external)" in next(e["reason"] for e in report["events"] if e["type"] == "skip_fix")
     assert "fix_in is not code" in client.requests[-1]["input"][0]["content"]  # the report must say what to do instead
+
+
+def test_screenshots_reach_the_model_as_images():
+    from app.scenarios import SCENARIOS
+
+    checkout = SCENARIOS["checkout"]
+    client = FakeClient([[call("propose_hypothesis", claim="c", symptom="s", next_check="n")], "Nothing confirmed.", REPORT])
+    inv = Investigation.from_scenario(checkout, client=client, model="fake", isolation="process", reviewer=None)
+    report = inv.run()
+    first = client.requests[0]["input"][1]["content"]
+    assert isinstance(first, list) and first[0]["type"] == "input_text" and "checkout-customer.png" in first[0]["text"]
+    assert first[1]["type"] == "input_image" and first[1]["image_url"].startswith("data:image/png;base64,")
+    assert [e["name"] for e in report["events"] if e["type"] == "evidence_image"] == ["checkout-customer.png"]
+
+
+def test_unsupported_screenshot_is_refused(tmp_path):
+    import pytest
+
+    bad = tmp_path / "trace.pdf"
+    bad.write_bytes(b"%PDF")
+    with pytest.raises(ValueError, match="unsupported screenshot type"):
+        Investigation("x", SAMPLE_APP, client=object(), model="fake", images=[bad])

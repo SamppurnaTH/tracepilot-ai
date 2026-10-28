@@ -787,3 +787,25 @@
     grid-template-columns: 96px minmax(0, 1fr);
   }
 }
+
+.shot {
+  margin: 0;
+  border: 1px solid var(--console-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0a0c1c;
+  max-width: 640px;
+}
+
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.shot figcaption {
+  padding: 6px 10px;
+  font-size: var(--text-xs);
+  color: var(--console-muted);
+  font-family: var(--font-mono);
+}

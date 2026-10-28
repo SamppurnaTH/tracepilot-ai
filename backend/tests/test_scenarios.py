@@ -38,6 +38,19 @@ def test_cancelling_twice_returns_stock_once():
     assert client.get("/stock/C-300").json()["available"] == 3
 """
 
+CHECKOUT_REGRESSION = """from fastapi.testclient import TestClient
+
+from checkout_api.app import app
+
+client = TestClient(app)
+
+
+def test_percent_coupon_counts_every_unit():
+    lines = [{"sku": "LAMP-20", "qty": 2}, {"sku": "MUG-08", "qty": 1}]
+    resp = client.post("/checkout/quote", json={"lines": lines, "coupon": "SAVE10"})
+    assert resp.json() == {"subtotal": 48.0, "discount": 4.8, "total": 43.2}
+"""
+
 EXPECTED = {
     "orders": {
         "seed_statuses": [200, 200, 200, 200, 500, 200, 200, 401, 500],
@@ -101,6 +114,19 @@ EXPECTED = {
     },
     # The cause is outside the code (an expired provider API key): the right answer is no patch.
     "refunds": {"seed_statuses": [201] * 5 + [502] * 4, "failing": set(), "no_code_fix": True, "fixes": []},
+    # The specifics (cart, coupon, wrong discount) are only in the customer's screenshot; CI is green.
+    "checkout": {
+        "seed_statuses": [200, 200, 200, 200],
+        "failing": set(),
+        "regression": CHECKOUT_REGRESSION,
+        "fixes": [
+            (
+                "checkout_api/app.py",
+                '    return sum(CATALOG[line.sku]["price"] * coupon["value"] / 100 for line in lines)\n',
+                '    return subtotal * coupon["value"] / 100\n',
+            )
+        ],
+    },
     # No existing test catches these bugs: a reproducing regression test must be written first.
     "inventory": {
         "seed_statuses": [200, 201, 201, 200, 201, 200, 200, 200, 201],

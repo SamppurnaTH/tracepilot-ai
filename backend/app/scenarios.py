@@ -7,6 +7,8 @@ incident text: this module is never copied into the sandbox.
 
 from dataclasses import dataclass
 
+from pathlib import Path
+
 from .config import REPO_ROOT
 
 TARGETS = REPO_ROOT / "targets"
@@ -23,6 +25,7 @@ class Scenario:
     incident: str
     traffic: tuple  # (method, path, headers) or (method, path, headers, json_body) tuples, replayed in order
     log_files: tuple = ()  # recorded production logs (paths relative to the repo root, outside the target)
+    screenshots: tuple = ()  # images attached to the incident (paths relative to the repo root)
 
     @property
     def target(self):
@@ -37,8 +40,14 @@ class Scenario:
     def logs(self) -> list:
         return [REPO_ROOT / p for p in self.log_files]
 
+    def screenshot_paths(self) -> list:
+        return [REPO_ROOT / p for p in self.screenshots]
+
     def summary(self) -> dict:
-        return {"id": self.id, "title": self.title, "service": self.service, "incident": self.incident}
+        return {
+            "id": self.id, "title": self.title, "service": self.service, "incident": self.incident,
+            "screenshots": [Path(p).name for p in self.screenshots],
+        }  # fmt: skip
 
 
 SCENARIOS: dict[str, Scenario] = {
@@ -138,6 +147,22 @@ It started right after this morning's deploy of v2.14.0, so on-call suspects the
 Find what broke and fix it.""",
             traffic=(),
             log_files=("demo/logs/refunds_api.log",),  # recorded in production; the provider can't be reached from a sandbox
+        ),
+        Scenario(
+            id="checkout",
+            title="Checkout API: a customer's screenshot shows the wrong discount",
+            service="checkout_api",
+            app="checkout_api.app:app",
+            incident="""A customer sent a screenshot of their checkout and says the coupon discount is wrong.
+Support tried the same coupon on a single item and the total looked fine, so they couldn't reproduce it.
+Find out what is going on and fix it.""",
+            traffic=(
+                ("POST", "/checkout/quote", {}, {"lines": [{"sku": "MUG-08", "qty": 2}]}),
+                ("POST", "/checkout/quote", {}, {"lines": [{"sku": "LAMP-20", "qty": 1}], "coupon": "SAVE10"}),
+                ("POST", "/checkout/quote", {}, {"lines": [{"sku": "NOTE-12", "qty": 1}], "coupon": "FLAT5"}),
+                ("POST", "/checkout/quote", {}, {"lines": [{"sku": "LAMP-20", "qty": 2}, {"sku": "MUG-08", "qty": 1}], "coupon": "SAVE10"}),
+            ),
+            screenshots=("demo/screenshots/checkout-customer.png",),  # the only place the cart and the wrong discount appear
         ),
     ]
 }

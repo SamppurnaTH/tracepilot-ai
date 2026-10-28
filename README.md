@@ -18,6 +18,8 @@ cp .env.example .env                                                            
 .venv/Scripts/python tracepilot.py investigate --repo path/to/your/service --logs path/to/app.log --incident "Orders placed on Friday are promised for Saturday"
 ```
 
+Attach screenshots with `--screenshot path/to/image.png` (PNG, JPEG, WebP or GIF); the model reads them as evidence.
+
 It works on **Python projects with pytest** and **Java projects with Maven and JUnit 5**; the type is detected from `pom.xml`. Logs can be JSON lines or plain text. A FastAPI app is detected automatically, so the agent can also send requests to it.
 
 For Java, two options match what your CI does:
@@ -104,6 +106,7 @@ Developers spend hours investigating failures: reading logs, replaying API calls
 TracePilot uses two Meta models with different jobs:
 
 - **`muse-spark-1.3`** (Meta Model API, Responses API) runs the investigation: multi-step tool calling, hypothesis tracking, sandboxed fixes, and a structured final report.
+  It is also **multimodal**: screenshots attached to an incident are sent as images, and the agent cites what it reads in them. In the checkout incident, the cart, the coupon and the wrong discount appear only in a customer's screenshot.
 - **Muse Spark Open** (`meta-models/muse-spark-open-1026`, Meta open weights served by Baseten) is the **independent reviewer**. After the fix, it gets the incident, the confirmed hypotheses and their evidence, the patch and the patched files, but none of the investigation transcript. It rates each hypothesis as supported, weak or unsupported, and approves the patch, raises concerns or rejects it.
 
 Passing tests aren't proof on their own. `backend/scripts/check_reviewer.py` builds a patch that passes all 5 orders tests but only blocks the one order id the test requests, and Muse Spark Open rejects it: "IDOR remains for all other orders".

@@ -86,6 +86,7 @@ export interface ScenarioSummary {
   title: string;
   service: string;
   incident: string;
+  screenshots?: string[];
 }
 
 export interface Recording {
@@ -130,6 +131,7 @@ export interface RunState {
   reached: Stage[];
   brief?: string;
   regressionTests: string[]; // tests the agent wrote that reproduce a bug
+  images: string[]; // screenshots given to the model as evidence
   reviewRetries: number;
 }
 
@@ -142,6 +144,7 @@ export const initialState: RunState = {
   timeline: [],
   reached: [],
   regressionTests: [],
+  images: [],
   reviewRetries: 0,
 };
 
@@ -214,6 +217,10 @@ export function reduce(state: RunState, e: RunEvent): RunState {
     }
     case "baseline":
       s.baseline = e.tests as Record<string, Outcome>;
+      break;
+    case "evidence_image":
+      s.images = [...s.images, e.name as string];
+      add({ kind: "note", title: "Screenshot given to the model", detail: e.name as string, tone: "signal" });
       break;
     case "brief":
       s.brief = e.text as string;

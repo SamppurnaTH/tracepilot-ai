@@ -44,6 +44,7 @@ const SCENARIO_ICON: Record<string, [IconName, string]> = {
   billing: ["receipt", s.iconGreen],
   inventory: ["box", s.iconPink],
   refunds: ["card", s.iconAmber],
+  checkout: ["image", s.iconBlue],
 };
 
 const STEPS: [string, string, IconName, string][] = [
@@ -167,7 +168,10 @@ function ScenarioCards({ index, activeId, onPick }: { index: RecordingIndexEntry
                 <span className={cx(s.cardIcon, tone)}>
                   <Icon name={icon} size={20} />
                 </span>
-                <span className={s.langTag}>Python</span>
+                <span className={s.cardTags}>
+                  {e.scenario.screenshots?.length ? <span className={s.shotTag}>Screenshot</span> : null}
+                  <span className={s.langTag}>Python</span>
+                </span>
               </span>
               <span className={s.cardTitle}>{service}</span>
               <span className={s.cardText}>{rest.join(":").trim() || first}</span>

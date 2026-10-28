@@ -540,7 +540,7 @@
 /* scenario cards */
 .cards {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -582,6 +582,21 @@
   display: inline-grid;
   place-items: center;
   flex: none;
+}
+
+.cardTags {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.shotTag {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--blue);
+  background: var(--blue-wash);
 }
 
 .langTag {

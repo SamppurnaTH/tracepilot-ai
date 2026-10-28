@@ -5,6 +5,7 @@ it records hypotheses, enforces which tools each phase may use, protects the tes
 and decides whether a fix is verified by comparing per-test outcomes before and after.
 """
 
+import base64
 import json
 import re
 import time
@@ -27,6 +28,8 @@ MAX_FIX_STEPS = 10
 MAX_FIX_ATTEMPTS = 2
 REVIEW_RETRIES = 1  # extra fix rounds when the independent reviewer rejects the patch
 MAX_REPRODUCE_STEPS = 6
+IMAGE_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif"}
+MAX_IMAGE_BYTES = 5_000_000
 TOKEN_BUDGET = 400_000  # per investigation; past it, the model must stop calling tools and wrap up
 REPEAT_LIMIT = 2
 # Existing tests are ground truth. Python: tests/; Java (Maven layout): src/test/.
@@ -214,6 +217,7 @@ class Investigation:
         test_scope: list[str] | None = None,
         test_args: list[str] | None = None,
         reviewer: Reviewer | None = None,
+        images: list[Path] | None = None,
     ):
         self.incident = incident
         self.source = source
@@ -227,6 +231,12 @@ class Investigation:
         self.image = image
         self.test_scope = test_scope
         self.test_args = test_args
+        self.images = [Path(i) for i in images or []]  # screenshots attached to the incident
+        for image in self.images:
+            if image.suffix.lower() not in IMAGE_TYPES:
+                raise ValueError(f"unsupported screenshot type: {image.name} (use PNG, JPEG, WebP or GIF)")
+            if image.stat().st_size > MAX_IMAGE_BYTES:
+                raise ValueError(f"screenshot too large: {image.name} (max 5 MB)")
         self.reviewer = reviewer
         if client is None:
             client, model = get_client(provider)
@@ -251,6 +261,7 @@ class Investigation:
         """A scenario run, with the Muse Spark Open reviewer whenever a Baseten key is configured."""
         kwargs.setdefault("reviewer", Reviewer.from_env())
         kwargs.setdefault("logs", scenario.logs())
+        kwargs.setdefault("images", scenario.screenshot_paths())
         return cls(scenario.incident, scenario.target, app=scenario.app, seed_requests=scenario.seed_requests(), **kwargs)
 
     # --- plumbing -----------------------------------------------------------
@@ -291,6 +302,20 @@ class Investigation:
                 if summary.strip():
                     self._emit("thinking", text=summary.strip())
         return response
+
+    def _with_images(self, text: str) -> str | list[dict]:
+        """The first message: text, plus the reporter's screenshots as images the model reads as evidence."""
+        if not self.images:
+            return text
+        note = (
+            f"\n\nThe reporter attached {len(self.images)} screenshot(s): {', '.join(i.name for i in self.images)}. "
+            "Read them as evidence, and cite what you see in them (values, identifiers) when you resolve hypotheses."
+        )
+        parts: list[dict] = [{"type": "input_text", "text": text + note}]
+        for image in self.images:
+            data = base64.b64encode(image.read_bytes()).decode()
+            parts.append({"type": "input_image", "image_url": f"data:{IMAGE_TYPES[image.suffix.lower()]};base64,{data}"})
+        return parts
 
     def _count(self, response) -> None:
         self.usage["model_calls"] += 1
@@ -483,6 +508,8 @@ class Investigation:
             self._emit("baseline", tests=baseline, tally=_tally(baseline))
             brief = workspace.brief(log_digest, baseline, reasons)
             self._emit("brief", text=brief)
+            for image in self.images:
+                self._emit("evidence_image", name=image.name)
 
             if workspace.excluded:
                 self._emit("excluded_tests", classes=workspace.excluded, reason="they need a database, network or Docker, which the sandbox blocks")
@@ -495,10 +522,12 @@ class Investigation:
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {
                         "role": "user",
-                        "content": f"Incident:\n{self.incident}\n\nEvidence brief (computed by the harness):\n{brief}\n\n"
-                        "Investigate now. Do not change application code in this phase. "
-                        "When every reported symptom has a confirmed root cause, or you have exhausted your options, "
-                        "reply with a short summary and no tool calls.",
+                        "content": self._with_images(
+                            f"Incident:\n{self.incident}\n\nEvidence brief (computed by the harness):\n{brief}\n\n"
+                            "Investigate now. Do not change application code in this phase. "
+                            "When every reported symptom has a confirmed root cause, or you have exhausted your options, "
+                            "reply with a short summary and no tool calls."
+                        ),
                     },
                 ],
                 investigate_tools,

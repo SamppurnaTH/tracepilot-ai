@@ -254,6 +254,18 @@ function Evidence({ scenario, state }: { scenario: ScenarioSummary; state: RunSt
     <div className={s.stack}>
       <p className={s.sectionLabel}>Incident ticket</p>
       <pre className={s.pre}>{publicTicket(scenario.incident)}</pre>
+      {state.images.length > 0 && (
+        <>
+          <p className={s.sectionLabel}>Attached screenshots: given to Muse Spark as images</p>
+          {state.images.map((name) => (
+            <figure key={name} className={s.shot}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- a static recording asset, shown at its own size */}
+              <img src={`/recordings/${name}`} alt={`Screenshot attached to the incident: ${name}`} loading="lazy" />
+              <figcaption>{name}</figcaption>
+            </figure>
+          ))}
+        </>
+      )}
       <p className={s.sectionLabel}>Evidence brief: computed by the harness before the first model call, at no token cost</p>
       <pre className={s.pre}>{state.brief ?? "The brief appears once the sandbox has replayed traffic and run the tests."}</pre>
     </div>

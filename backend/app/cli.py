@@ -57,6 +57,8 @@ def print_event(event: dict) -> None:
         print(f"{t}  {'+' if mark == 'CONFIRMED' else 'x'} {event['id']} {mark}: {event['reason'][:160]}")
     elif kind == "tool_call":
         print(f"{t}    -> {event['tool']}({json.dumps(event['args'])[:140]})")
+    elif kind == "evidence_image":
+        print(f"{t}  SCREENSHOT given to the model as evidence: {event['name']}")
     elif kind == "reproduced":
         print(f"{t}  REPRODUCED by existing tests (re-run after the fix): {', '.join(event['tests'][:5])}")
     elif kind == "excluded_tests":
@@ -98,6 +100,11 @@ def investigate(args: argparse.Namespace) -> int:
         print("error: describe the incident with --incident or --incident-file", file=sys.stderr)
         return 2
     logs = [Path(p).resolve() for p in args.logs]
+    images = [Path(p).resolve() for p in args.screenshot]
+    for image in images:
+        if not image.is_file():
+            print(f"error: screenshot not found: {image}", file=sys.stderr)
+            return 2
     for log in logs:
         if not log.is_file():
             print(f"error: log file not found: {log}", file=sys.stderr)
@@ -117,7 +124,7 @@ def investigate(args: argparse.Namespace) -> int:
 
     reviewer = None if args.no_review else Reviewer.from_env()
     investigation = Investigation(
-        incident.strip(), repo, on_event=print_event, isolation=args.isolation, app=app, logs=logs, image=image, reviewer=reviewer, kind=kind,
+        incident.strip(), repo, on_event=print_event, isolation=args.isolation, app=app, logs=logs, image=image, reviewer=reviewer, kind=kind, images=images,
         test_scope=[t.strip() for t in args.tests.split(",") if t.strip()] if args.tests else None,
         test_args=args.test_args.split() if args.test_args else None,
     )
@@ -170,6 +177,7 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--incident", help="what users are seeing, in plain words")
     group.add_argument("--incident-file", help="a file with the incident text")
     inv.add_argument("--logs", nargs="*", default=[], help="log files to use as evidence (JSON lines or plain text)")
+    inv.add_argument("--screenshot", nargs="*", default=[], help="screenshots attached to the incident (PNG, JPEG, WebP or GIF)")
     inv.add_argument("--app", help="ASGI app as module:attribute; detected automatically for FastAPI; 'none' to disable")
     inv.add_argument("--out", help="where to write the hand-off (default: <repo>/tracepilot-out/<time>)")
     inv.add_argument("--tests", help="Java: comma-separated test classes that define green, e.g. the list your CI runs (default: all)")
