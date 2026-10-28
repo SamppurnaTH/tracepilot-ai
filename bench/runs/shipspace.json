@@ -1,0 +1,1196 @@
+{
+ "id": "shipspace",
+ "scenario": "shipspace",
+ "status": "completed",
+ "started_at": 1793179403.3,
+ "verified": true,
+ "error": null,
+ "report": {
+  "incident": "Users can still edit their ships hours after posting. Ship s-9001 was rewritten about 3 hours after it was created, after it had collected 40 likes. Product rule (Requirement 4.4): a ship can only be edited for 10 minutes after creation. CI is green.",
+  "provider": "meta",
+  "model": "muse-spark-1.3",
+  "isolation": "docker",
+  "hypotheses": [
+   {
+    "id": "H1",
+    "claim": "ShipService.createShip uses ChronoUnit.HOURS instead of MINUTES, making edit window 10 hours not 10 minutes",
+    "symptom": "Ship s-9001 edited ~3h after creation despite 10-min rule",
+    "next_check": "Read logs and ShipService tests to confirm window calculation and why tests miss it",
+    "status": "confirmed",
+    "evidence": [
+     "src/main/java/com/shipspace/service/ShipService.java:76 now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS)",
+     "log shipspace-app: s-9001 created 2026-10-27T14:02:11.455Z updated 2026-10-27T17:05:40.140Z (~3h03m later, Successfully updated)",
+     "log shipspace-app: s-9017 created 2026-10-27T18:20:03.560Z updated 2026-10-27T21:58:44.902Z (~3h38m later, Successfully updated)",
+     "Ship.isEditWindowOpen src/main/java/com/shipspace/model/Ship.java:111 Instant.now().isBefore(editWindowExpires) \u2014 check exists but compares against wrong expiry"
+    ],
+    "reason": "HOURS unit makes window 10 hours (600 min) not 10 min, so 3h-late edits succeed; enforcement code itself is correct, only expiry calculation wrong."
+   },
+   {
+    "id": "H2",
+    "claim": "In-scope (CI) tests do not assert the created editWindowExpires duration, so the 10-hour bug goes undetected",
+    "symptom": "CI is green despite 10-minute rule violation",
+    "next_check": "Inspect ShipControllerTest and other in-scope tests for edit-window assertions",
+    "status": "confirmed",
+    "evidence": [
+     ".github/workflows/ci-cd.yml:23 MVP_TESTS list excludes ShipServiceTest (only ShipControllerTest in scope)",
+     "src/test/java/com/shipspace/controller/ShipControllerTest.java:67-68 @MockBean ShipService \u2014 never exercises real expiry calc, stubs 10 MINUTES responses",
+     "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation fails on current code: expected 10L but was 600L"
+    ],
+    "reason": "The test that asserts 10-min window (ShipServiceTest) is excluded from CI MVP_TESTS; in-scope ShipControllerTest mocks ShipService so the HOURS bug is invisible to CI."
+   }
+  ],
+  "findings": {
+   "issues": [
+    {
+     "category": "correctness",
+     "evidence": [
+      "src/main/java/com/shipspace/service/ShipService.java:76 now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS)",
+      "log shipspace-app: s-9001 created 2026-10-27T14:02:11.455Z updated 2026-10-27T17:05:40.140Z (~3h03m later, Successfully updated)",
+      "log shipspace-app: s-9017 created 2026-10-27T18:20:03.560Z updated 2026-10-27T21:58:44.902Z (~3h38m later, Successfully updated)",
+      "Ship.isEditWindowOpen src/main/java/com/shipspace/model/Ship.java:111 Instant.now().isBefore(editWindowExpires) \u2014 check exists but compares against wrong expiry"
+     ],
+     "fix": "Change ShipService.java:76 from now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS) to now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.MINUTES) to restore 10-minute window per Requirement 4.4. Verified by com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation passing with no regressions.",
+     "hypothesis_ids": [
+      "H1"
+     ],
+     "root_cause": "HOURS unit makes window 10 hours (600 min) not 10 min, so 3h-late edits succeed; enforcement code itself is correct, only expiry calculation wrong.",
+     "severity": "high",
+     "title": "Edit window calculated as 10 hours instead of 10 minutes allows late ship edits"
+    },
+    {
+     "category": "reliability",
+     "evidence": [
+      ".github/workflows/ci-cd.yml:23 MVP_TESTS list excludes ShipServiceTest (only ShipControllerTest in scope)",
+      "src/test/java/com/shipspace/controller/ShipControllerTest.java:67-68 @MockBean ShipService \u2014 never exercises real expiry calc, stubs 10 MINUTES responses",
+      "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation fails on current code: expected 10L but was 600L"
+     ],
+     "fix": "Include ShipServiceTest in CI MVP_TESTS in .github/workflows/ci-cd.yml so the 10-minute expiry assertion runs in CI; in-scope ShipControllerTest alone mocks ShipService and cannot catch the expiry bug.",
+     "hypothesis_ids": [
+      "H2"
+     ],
+     "root_cause": "The test that asserts 10-min window (ShipServiceTest) is excluded from CI MVP_TESTS; in-scope ShipControllerTest mocks ShipService so the HOURS bug is invisible to CI.",
+     "severity": "medium",
+     "title": "CI is green because covering expiry test is excluded and in-scope test mocks service"
+    }
+   ],
+   "summary": "Ship s-9001 was rewritten ~3h after creation in violation of Requirement 4.4 10-minute edit rule. Root cause was ChronoUnit.HOURS instead of MINUTES creating a 10-hour window. CI stayed green because the asserting ShipServiceTest is excluded from MVP_TESTS and ShipControllerTest mocks the service. Patch to MINUTES fixes expiry and makes the covering test pass."
+  },
+  "diff": "--- a/src/main/java/com/shipspace/service/ShipService.java\n+++ b/src/main/java/com/shipspace/service/ShipService.java\n@@ -73,7 +73,7 @@\n         \n         // Calculate edit window expiration (Requirement 4.4)\n         Instant now = Instant.now();\n-        Instant editWindowExpires = now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS);\n+        Instant editWindowExpires = now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.MINUTES);\n         \n         // Create ship entity (Requirement 4.2)\n         Ship ship = Ship.builder()\n",
+  "verification": {
+   "verified": true,
+   "fixed": [
+    "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation"
+   ],
+   "still_failing": [],
+   "regressions": [],
+   "missing": [],
+   "before": {
+    "passed": 232,
+    "failed": 1
+   },
+   "after": {
+    "passed": 251
+   }
+  },
+  "second_opinion": {
+   "verdict": "approve",
+   "confidence": "high",
+   "summary": "Patch changes ChronoUnit.HOURS to MINUTES on the editWindowExpires calculation, directly fixing the 10-hour window that allowed 3h-late edits in s-9001/s-9017. Enforcement logic in Ship.isEditWindowOpen was already correct; only expiry was wrong, now fixed and previously failing ShipServiceTest passes with no regressions.",
+   "hypotheses": [
+    {
+     "id": "H1",
+     "assessment": "supported",
+     "note": "Line 76 with HOURS plus 3h successful updates directly imply 600-min window; isEditWindowOpen exists but uses wrong expiry, so claim follows."
+    },
+    {
+     "id": "H2",
+     "assessment": "supported",
+     "note": "CI MVP_TESTS excludes ShipServiceTest and ShipControllerTest mocks ShipService; excluded test demonstrates it would have caught bug (expected 10 vs 600)."
+    }
+   ],
+   "risks": [
+    "CI still excludes ShipServiceTest in MVP_TESTS, so future regression would stay green despite correct fix",
+    "Existing persisted ships created before fix keep 10-hour editWindowExpires in DB \u2014 no migration/backfill considered",
+    "No search/fix for similar ChronoUnit misuse outside ShipService.java; Instant.now without Clock injection leaves tests flaky"
+   ],
+   "provider": "baseten",
+   "model": "meta-models/muse-spark-open-1026",
+   "tokens": 6788,
+   "duration_s": 14.1
+  },
+  "usage": {
+   "input_tokens": 323455,
+   "output_tokens": 11212,
+   "cached_tokens": 75822,
+   "model_calls": 15,
+   "tool_calls": 18,
+   "by_phase": {
+    "investigate": 176022,
+    "fix": 154254,
+    "report": 4391
+   }
+  },
+  "duration_s": 727.7
+ },
+ "events": [
+  {
+   "seq": 1,
+   "t": 1.66,
+   "type": "start",
+   "incident": "Users can still edit their ships hours after posting. Ship s-9001 was rewritten about 3 hours after it was created, after it had collected 40 likes. Product rule (Requirement 4.4): a ship can only be edited for 10 minutes after creation. CI is green.",
+   "provider": "meta",
+   "model": "muse-spark-1.3",
+   "isolation": "docker"
+  },
+  {
+   "seq": 2,
+   "t": 185.05,
+   "type": "baseline",
+   "tests": {
+    "com.shipspace.config.BannedUserWriteFilterTest#bannedUser_cannotWrite": "passed",
+    "com.shipspace.config.BannedUserWriteFilterTest#bannedUser_canLogoutWhenApiContextPathIsPresent": "passed",
+    "com.shipspace.config.BannedUserWriteFilterTest#bannedUser_canRead": "passed",
+    "com.shipspace.config.MongoIndexInitializerTest#auditIndexes_supportAdminAuditLogBrowsing": "passed",
+    "com.shipspace.config.MongoIndexInitializerTest#indexedCollections_includeReportsForModerationQueries": "passed",
+    "com.shipspace.config.MongoIndexInitializerTest#indexedCollections_useActualDocumentCollectionNames": "passed",
+    "com.shipspace.controller.AdminControllerTest#listUsers_ordersNewestFirstForRecentDashboardPanel": "passed",
+    "com.shipspace.controller.AdminControllerTest#banUser_updatesTargetUser": "passed",
+    "com.shipspace.controller.AdminControllerTest#getStats_returnsRepositoryCountsWithoutDerivedPlaceholders": "passed",
+    "com.shipspace.controller.AdminControllerTest#listReports_ordersNewestFirstForPendingDashboardPanel": "passed",
+    "com.shipspace.controller.AdminControllerTest#banUser_blocksSelfBan": "passed",
+    "com.shipspace.controller.AdminControllerTest#getUser_returnsAdminVisibleFields": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminReportResolve_persistsSupportedResolutionStatuses": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminReportResolve_rejectsPendingAsResolutionTarget": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#representativeAdminRoutesAllowAdminJwtThroughSecurity": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminRead_allowsAdminJwtThroughSecurity": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminUnbanRouteRestoresWriteAccess": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#authMeReturnsCurrentUserRolesWithoutSensitiveTokens": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#auditLogsRoute_deniesUserJwtAndAllowsAdminJwtWithDtoResponse": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminCannotRemoveOwnAdminRoleThroughRoute": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#allCurrentAdminRoutesDenyUserJwt": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminReportResolve_handlesTerminalDuplicatesPredictably": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminRead_deniesMissingMalformedExpiredAndUserJwt": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminCannotSelfBanOrSelfUnbanThroughRoute": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminBanRoute_persistsAndBannedUserCanReadAndLogoutButCannotWrite": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminMutation_deniesUserJwtAndAllowsAdminJwtThroughSecurity": "passed",
+    "com.shipspace.controller.AuthControllerTest#getCurrentUser_UserNotFound_ThrowsException": "passed",
+    "com.shipspace.controller.AuthControllerTest#authenticateWithGitHub_InvalidState_RejectsBeforeGitHubExchange": "passed",
+    "com.shipspace.controller.AuthControllerTest#refreshToken_ValidRefreshToken_ReturnsNewAuthResponse": "passed",
+    "com.shipspace.controller.AuthControllerTest#getCurrentUser_ValidAuthentication_ReturnsUserInfo": "passed",
+    "com.shipspace.controller.AuthControllerTest#refreshToken_InvalidRefreshToken_ThrowsException": "passed",
+    "com.shipspace.controller.AuthControllerTest#getOAuthState_GeneratesServerStateToken": "passed",
+    "com.shipspace.controller.AuthControllerTest#authenticateWithGitHub_ValidCode_ReturnsAuthResponse": "passed",
+    "com.shipspace.controller.AuthControllerTest#authenticateWithGitHub_BlankState_RejectsBeforeGitHubExchange": "passed",
+    "com.shipspace.controller.AuthControllerTest#authenticateWithGitHub_InvalidCode_ThrowsException": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getShipLikes_WithCustomPagination_UsesCorrectParameters": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getShipComments_WithCustomPagination_UsesCorrectParameters": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getLikeStatus_UserHasLiked_ReturnsTrue": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getLikeStatus_UserHasNotLiked_ReturnsFalse": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getShipComments_WithAuthenticatedViewer_PassesViewerIdForUpvoteState": "passed",
+    "com.shipspace.controller.EngagementControllerTest#addComment_EmptyContent_ShouldBeValidatedByFramework": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getShipComments_ValidRequest_ReturnsPagedComments": "passed",
+    "com.shipspace.controller.EngagementControllerTest#unlikeShip_ValidRequest_ReturnsUnlikedResponse": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getShipLikes_ValidRequest_ReturnsPagedLikes": "passed",
+    "com.shipspace.controller.EngagementControllerTest#addComment_ValidRequest_ReturnsCreatedComment": "passed",
+    "com.shipspace.controller.EngagementControllerTest#likeShip_ValidRequest_ReturnsLikeToggleResponse": "passed",
+    "com.shipspace.controller.FeedControllerTest#getTrendingFeed_EmptyFeed": "passed",
+    "com.shipspace.controller.FeedControllerTest#getFollowingFeed_Success": "passed",
+    "com.shipspace.controller.FeedControllerTest#getPersonalizedFeed_Success": "passed",
+    "com.shipspace.controller.FeedControllerTest#getTrendingFeedWithTimeWindow_Success": "passed",
+    "com.shipspace.controller.FeedControllerTest#getPersonalizedFeed_Degradation_ServesTrending": "passed",
+    "com.shipspace.controller.FeedControllerTest#getTrendingFeed_Success_Unauthenticated": "passed",
+    "com.shipspace.controller.FeedControllerTest#getLatestFeed_Success_Unauthenticated": "passed",
+    "com.shipspace.controller.FeedControllerTest#getFollowingFeed_EmptyFeed": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsAllRequiredFields": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_TimestampUpdatesOnEachCall": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsVersion": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ConsistentResponseStructure": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsSuccessResponse": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_TimestampIsValidISOFormat": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ResponseBodyNotEmpty": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_StatusValueIsString": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsServiceName": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsTimestamp": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsStatusUp": "passed",
+    "com.shipspace.controller.ProjectControllerTest#updateProject_Unauthorized": "passed",
+    "com.shipspace.controller.ProjectControllerTest#updateProject_PartialUpdate": "passed",
+    "com.shipspace.controller.ProjectControllerTest#updateProject_Success": "passed",
+    "com.shipspace.controller.ProjectControllerTest#deleteProject_Forbidden": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProjectShips_WithPagination": "passed",
+    "com.shipspace.controller.ProjectControllerTest#createProject_NameTooLong": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProject_NotFound": "passed",
+    "com.shipspace.controller.ProjectControllerTest#deleteProject_Unauthorized": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProjectShips_Success": "passed",
+    "com.shipspace.controller.ProjectControllerTest#createProject_MinimalData": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProjectShips_EmptyPage": "passed",
+    "com.shipspace.controller.ProjectControllerTest#updateProject_NotFound": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProject_Success": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProjectShips_ProjectNotFound": "passed",
+    "com.shipspace.controller.ProjectControllerTest#deleteProject_Success": "passed",
+    "com.shipspace.controller.ProjectControllerTest#updateProject_Forbidden": "passed",
+    "com.shipspace.controller.ProjectControllerTest#createProject_Success": "passed",
+    "com.shipspace.controller.ProjectControllerTest#createProject_Unauthorized": "passed",
+    "com.shipspace.controller.ProjectControllerTest#createProject_ValidationError": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_Success": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_NotFound": "passed",
+    "com.shipspace.controller.ShipControllerTest#deleteShip_Unauthorized": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_EditWindowExpired": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_PartialUpdate": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_Forbidden": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_MinimalData": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_Unauthorized": "passed",
+    "com.shipspace.controller.ShipControllerTest#getShip_Success": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_ContentTooLong": "passed",
+    "com.shipspace.controller.ShipControllerTest#deleteShip_Forbidden": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_ContentTooLong": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_Success": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_ShipNotFound": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_ValidationError": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_SingleImage": "passed",
+    "com.shipspace.controller.ShipControllerTest#deleteShip_Success": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_Unauthorized": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_Success": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_Unauthorized": "passed",
+    "com.shipspace.controller.ShipControllerTest#getShip_NotFound": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_ProjectNotFound": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_ProjectNotOwned": "passed",
+    "com.shipspace.controller.ShipControllerTest#getShip_WithImages": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_Forbidden": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_EditWindowExpired": "passed",
+    "com.shipspace.controller.SocialControllerTest#followUser_Success": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowers_CustomPagination": "passed",
+    "com.shipspace.controller.SocialControllerTest#unfollowUser_Idempotent": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_Success": "passed",
+    "com.shipspace.controller.SocialControllerTest#unfollowUser_Success": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_CustomPagination": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_WithSorting": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowers_Unauthorized": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowers_EmptyList": "passed",
+    "com.shipspace.controller.SocialControllerTest#followUser_Idempotent": "passed",
+    "com.shipspace.controller.SocialControllerTest#unfollowUser_Unauthorized": "passed",
+    "com.shipspace.controller.SocialControllerTest#unfollowUser_TargetNotFound": "passed",
+    "com.shipspace.controller.SocialControllerTest#followUser_TargetNotFound": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowers_Success": "passed",
+    "com.shipspace.controller.SocialControllerTest#followUser_SelfFollow": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowers_WithSorting": "passed",
+    "com.shipspace.controller.SocialControllerTest#followUser_Unauthorized": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_MultiplePagesNavigation": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_Unauthorized": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_EmptyList": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserActivity_Unauthorized": "passed",
+    "com.shipspace.controller.UserControllerTest#getUserProfile_NotFound": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserActivity_EmptyActivity": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserProjects_Unauthorized": "passed",
+    "com.shipspace.controller.UserControllerTest#updateCurrentUserProfile_Success": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserProjects_Success": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserProjects_EmptyList": "passed",
+    "com.shipspace.controller.UserControllerTest#updateCurrentUserProfile_InvalidEmail": "passed",
+    "com.shipspace.controller.UserControllerTest#updateCurrentUserProfile_Unauthorized": "passed",
+    "com.shipspace.controller.UserControllerTest#getUserProjects_Success": "passed",
+    "com.shipspace.controller.UserControllerTest#getUserProfile_Success": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserActivity_Success": "passed",
+    "com.shipspace.service.AuthServiceRbacTest#getCurrentUserResponse_exposesRolesAndBannedState": "passed",
+    "com.shipspace.service.AuthServiceRbacTest#refreshToken_usesPersistedRolesInNewAccessToken": "passed",
+    "com.shipspace.service.EngagementServiceTest#addComment_ValidRequest_CreatesComment": "passed",
+    "com.shipspace.service.EngagementServiceTest#removeCommentUpvote_WhenConcurrentDeleteAlreadyRemoved_DoesNotDecrement": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenCommentQualifies_TriggersScoring": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenAlreadyUpvoted_RemovesUpvote": "passed",
+    "com.shipspace.service.EngagementServiceTest#addComment_WhenShipNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenCommentAlreadyQualified_DoesNotTriggerScoring": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipLikes_WhenUserDeleted_HandlesGracefully": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipComments_ValidShip_ReturnsPagedComments": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenScoringFails_ContinuesWithUpvote": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipLikes_ValidShip_ReturnsPagedLikes": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenScoringReturnsFlase_DoesNotSetQualifiedFlag": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenNotUpvoted_AddsUpvote": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenShipNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenUpvoteCountIsZero_DoesNotGoNegative": "passed",
+    "com.shipspace.service.EngagementServiceTest#addComment_WhenUserNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenLikeCountIsZero_DoesNotGoNegative": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenRaceConditionOccurs_HandlesGracefully": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipComments_WhenShipNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipComments_WhenUserDeleted_HandlesGracefully": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenUserNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenCommentNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#hasUserLikedShip_WhenNotLiked_ReturnsFalse": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipLikes_WhenShipNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenNotLiked_AddsLike": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenAlreadyLiked_RemovesLike": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenUserNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipComments_WithCurrentUser_EnrichesUpvotedState": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenRaceConditionOccurs_HandlesGracefully": "passed",
+    "com.shipspace.service.EngagementServiceTest#hasUserLikedShip_WhenLiked_ReturnsTrue": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_ExistingAdminRemovedFromConfig_RetainsPersistedAdminRole": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_ConfiguredAdminGithubId_AddsAdminRole": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_GitHubUserApiFailure_ThrowsException": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#getUserByGithubId_UserDoesNotExist_ReturnsEmpty": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_ExistingUserAddedToAdminConfig_GainsAdminOnNextLogin": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_NewUser_CreatesUserSuccessfully": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_ExistingUser_UpdatesUserSuccessfully": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_NullAccessToken_ThrowsException": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_PartialGitHubData_CreatesUserWithAvailableData": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_ConfiguredAdminGithubId_TrimsWhitespaceAndKeepsUserRole": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_InvalidOAuthCode_ThrowsException": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_AdminLikeUsernameWithoutConfiguredNumericId_DoesNotAddAdminRole": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#getUserByGithubId_UserExists_ReturnsUser": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testGetImageReferenceFromUpload_Success": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_EmptyFile": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_Success": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_NullFile": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testCleanupUploadProgress": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_FileTooLarge": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_ValidatesPngImage": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_RenamedExecutableRejectedByMagicBytes": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testGetImageReferenceFromUpload_NotComplete": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImageAsync_Success": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testGetUploadProgress_NotFound": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_ValidatesJpegImage": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_ApiError": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_InvalidContentType": "passed",
+    "com.shipspace.service.NotificationServiceTest#markAllAsRead_OnlyCurrentUserUnread": "passed",
+    "com.shipspace.service.NotificationServiceTest#createNotification_PersistsStructuredTarget": "passed",
+    "com.shipspace.service.NotificationServiceTest#markAsRead_MissingNotification_NotFound": "passed",
+    "com.shipspace.service.NotificationServiceTest#markAsRead_OtherUserNotification_NotFound": "passed",
+    "com.shipspace.service.NotificationServiceTest#markAsRead_AlreadyRead_IsIdempotent": "passed",
+    "com.shipspace.service.NotificationServiceTest#markAsRead_UnreadNotification_PersistsRead": "passed",
+    "com.shipspace.service.NotificationServiceTest#getUnreadCount_UsesCurrentUser": "passed",
+    "com.shipspace.service.NotificationServiceTest#getNotifications_UsesCurrentUserAndStablePagination": "passed",
+    "com.shipspace.service.UserServiceTest#getUserActivity_CustomLimit": "passed",
+    "com.shipspace.service.UserServiceTest#updateUserProfile_EditableFieldsOnly": "passed",
+    "com.shipspace.service.UserServiceTest#getPublicProfile_Success": "passed",
+    "com.shipspace.service.UserServiceTest#getUserActivity_EmptyActivity": "passed",
+    "com.shipspace.service.UserServiceTest#updateUserProfile_PartialFields": "passed",
+    "com.shipspace.service.UserServiceTest#getUserById_Success": "passed",
+    "com.shipspace.service.UserServiceTest#getUserById_NotFound": "passed",
+    "com.shipspace.service.UserServiceTest#getUserProjects_Success": "passed",
+    "com.shipspace.service.UserServiceTest#updateProjectCount_Success": "passed",
+    "com.shipspace.service.UserServiceTest#getUserProjects_EmptyList": "passed",
+    "com.shipspace.service.UserServiceTest#getUserActivity_Success": "passed",
+    "com.shipspace.util.JwtUtilTest#validateRefreshToken_AccessToken_ReturnsFalse": "passed",
+    "com.shipspace.util.JwtUtilTest#extractTokenType_AccessToken_ReturnsAccess": "passed",
+    "com.shipspace.util.JwtUtilTest#extractUsername_ValidToken_ReturnsUsername": "passed",
+    "com.shipspace.util.JwtUtilTest#extractTokenType_RefreshToken_ReturnsRefresh": "passed",
+    "com.shipspace.util.JwtUtilTest#generateToken_ValidUserIdAndUsername_ReturnsToken": "passed",
+    "com.shipspace.util.JwtUtilTest#validateRefreshToken_ValidRefreshToken_ReturnsTrue": "passed",
+    "com.shipspace.util.JwtUtilTest#extractUserId_ValidToken_ReturnsUserId": "passed",
+    "com.shipspace.util.JwtUtilTest#isTokenExpired_ValidToken_ReturnsFalse": "passed",
+    "com.shipspace.util.JwtUtilTest#validateToken_ExpiredToken_ReturnsFalse": "passed",
+    "com.shipspace.util.JwtUtilTest#validateToken_InvalidToken_ReturnsFalse": "passed",
+    "com.shipspace.util.JwtUtilTest#generateRefreshToken_ValidUserId_ReturnsToken": "passed",
+    "com.shipspace.util.JwtUtilTest#validateToken_ValidToken_ReturnsTrue": "passed",
+    "com.shipspace.util.JwtUtilTest#init_ShortSecret_ThrowsStartupFailure": "passed"
+   },
+   "tally": {
+    "passed": 232
+   }
+  },
+  {
+   "seq": 3,
+   "t": 185.28,
+   "type": "brief",
+   "text": "Workspace: 290 text files. Directories (file count): . (6), .github/workflows (1), .kiro/settings (1), .mvn/wrapper (1), docs (8), docs/integration (2), observability (2), ops (3), src/main/java/com/shipspace (1), src/main/java/com/shipspace/config (21), src/main/java/com/shipspace/controller (15), src/main/java/com/shipspace/demo (2), src/main/java/com/shipspace/dto (32), src/main/java/com/shipspace/exception (10), src/main/java/com/shipspace/model (20), src/main/java/com/shipspace/repository (18), src/main/java/com/shipspace/security (4), src/main/java/com/shipspace/service (28), src/main/java/com/shipspace/util (4), src/main/resources (2), src/test/java/com/shipspace (1), src/test/java/com/shipspace/config (3), src/test/java/com/shipspace/controller (18), src/test/java/com/shipspace/dto (2), src/test/java/com/shipspace/exception (2), src/test/java/com/shipspace/integration (14), src/test/java/com/shipspace/model (12), src/test/java/com/shipspace/monitoring (2), src/test/java/com/shipspace/repository (5), src/test/java/com/shipspace/service (41), src/test/java/com/shipspace/util (2), src/test/resources (1), web (6)\nProject: Java/Maven; tests are JUnit, run offline in the sandbox.\nTest scope (what counts as green, as in CI): AdminControllerTest, AdminSecurityRouteTest, AuthControllerTest, AuthServiceRbacTest, BannedUserWriteFilterTest, EngagementControllerTest, EngagementServiceTest, FeedControllerTest, GitHubOAuthServiceTest, HealthControllerTest, JwtUtilTest, MongoIndexInitializerTest, MultibaseServiceTest, NotificationServiceTest, ProjectControllerTest, ShipControllerTest, SocialControllerTest, UserControllerTest, UserServiceTest\nExcluded 13 test classes that need a database, network or Docker: AuthControllerIntegrationTest, AbstractIntegrationTest, DistributedLikeConcurrencyTest, FeedOrderingIntegrationTest, LikeConcurrencyIntegrationTest, ShipCreationIntegrationTest, BehavioralSignalRepositoryTest, ContentScoreRepositoryTest, ScoreEventLogRepositoryTest, UserInterestProfileRepositoryTest, UserRepositoryTest, FeedServiceCacheTest, ShipSpaceApplicationTests\nLog shipspace-app: 10 INFO, 1 WARNING\n  WARNING x1: WARN # --- [nio-#-exec-#] com.shipspace.service.ShipService        : User u-# attempted to update ship s-# after edit window expired at #\nTests: 232 passed, 0 failing"
+  },
+  {
+   "seq": 4,
+   "t": 185.28,
+   "type": "excluded_tests",
+   "classes": [
+    "AuthControllerIntegrationTest",
+    "AbstractIntegrationTest",
+    "DistributedLikeConcurrencyTest",
+    "FeedOrderingIntegrationTest",
+    "LikeConcurrencyIntegrationTest",
+    "ShipCreationIntegrationTest",
+    "BehavioralSignalRepositoryTest",
+    "ContentScoreRepositoryTest",
+    "ScoreEventLogRepositoryTest",
+    "UserInterestProfileRepositoryTest",
+    "UserRepositoryTest",
+    "FeedServiceCacheTest",
+    "ShipSpaceApplicationTests"
+   ],
+   "reason": "they need a database, network or Docker, which the sandbox blocks"
+  },
+  {
+   "seq": 5,
+   "t": 185.28,
+   "type": "phase",
+   "phase": "investigate"
+  },
+  {
+   "seq": 6,
+   "t": 188.16,
+   "type": "tool_call",
+   "tool": "read_file",
+   "args": {
+    "path": "."
+   }
+  },
+  {
+   "seq": 7,
+   "t": 188.38,
+   "type": "tool_result",
+   "tool": "read_file",
+   "preview": "{\"directory\": \".\", \"files\": [\".github/workflows/ci-cd.yml\", \".kiro/settings/mcp.json\", \".mvn/wrapper/maven-wrapper.properties\", \"README.md\", \"docker-compose.observability.yml\", \"docker-compose.yml\", \"docs/MVP_Admin_Persona_Design_Report.md\", \"docs/MVP_Backend_Readiness_Checklist.md\", \"docs/MVP_Backend_Test_Triage_Report.md\", \"docs/MVP_Frontend_Backend_Wiring_Report.md\", \"docs/MVP_Manual_QA_Runbook.md\", \"docs/MVP_Tracking_Document.md\", \"docs/RENDER_DEPLOYMENT.md\", \"docs/ShipSpace_Master_Documentation.md\", \"docs/integration/README.md\", \"docs/integration/collaboration-shipscore-integration.md\", \"observability/alerts.yml\", \"observability/prometheus.yml\", \"ops/backup-strategy.md\", \"ops/go-live-checklist.md\", \"ops/production-architecture.md\", \"pom.xml\", \"render.yaml\", \"replit.md\", \"src/main/java/com/shipspace/ShipSpaceApplication.java\", \"src/main/java/com/shipspace/config/AsyncConfig.java\", \"src/main/java/com/shipspace/config/BannedUserWriteFilter.java\", \"src/main/java/com/shipspace/config/CacheConfig.java\", \"src/main/java/com/shipspace/config/CorsConfig.java\", \"src/main/java/com/shipspace/config/LoadSheddingFilter.java\", \"src/main/java/com/shipspace/config/MetricsConfig.java\", \"src/main/java/com/shipspace/config/MongoAuditingConfig.java\", \"src/main/java/com/shipspace/config/MongoConfig.java\", \"src/main/java/com/shipspace/config/MongoIndexInitializer.java\", \"src/main/java/com/shipspace/config/MultibaseHealthIndicator.java\", \"src/main/java/com/shipspace/config/OpenApiConfig.java\", \"src/main/java/com/shipspace/config/RedisConfig.java\", \"src/main/java/com/shipspace/config/RequestLoggingConfig.java\", \"src/main/java/com/shipspace/config/ScheduledJobMetrics.java\", \"src/main/java/com/shipspace/config/SearchIndexVerifier.java\", \"src/main/java/com/shipspace/config/SecurityConfig.java\", \"src/main/java/com/shipspace/config/SecurityHeadersConfig.java\", \"src/main/java/com/shipspace/config/SloConfig.java\", \"src/main/java/com/shipspace/config/SloEnforcementService.java\", \"src/main/java/"
+  },
+  {
+   "seq": 8,
+   "t": 199.91,
+   "type": "tool_call",
+   "tool": "read_file",
+   "args": {
+    "path": "src/main/java/com/shipspace/service/ShipService.java"
+   }
+  },
+  {
+   "seq": 9,
+   "t": 199.91,
+   "type": "tool_result",
+   "tool": "read_file",
+   "preview": "{\"path\": \"src/main/java/com/shipspace/service/ShipService.java\", \"lines\": \"1-314 of 314\", \"content\": \"   1  package com.shipspace.service;\\n   2  \\n   3  import com.shipspace.dto.ShipCreateRequest;\\n   4  import com.shipspace.dto.ShipResponse;\\n   5  import com.shipspace.dto.ShipUpdateRequest;\\n   6  import com.shipspace.exception.ForbiddenException;\\n   7  import com.shipspace.exception.ResourceNotFoundException;\\n   8  import com.shipspace.model.ImageReference;\\n   9  import com.shipspace.model.Ship;\\n  10  import com.shipspace.repository.ShipRepository;\\n  11  import com.shipspace.util.InputSanitizer;\\n  12  import io.micrometer.core.instrument.Counter;\\n  13  import lombok.RequiredArgsConstructor;\\n  14  import lombok.extern.slf4j.Slf4j;\\n  15  import org.springframework.beans.factory.annotation.Qualifier;\\n  16  import org.springframework.stereotype.Service;\\n  17  import org.springframework.transaction.annotation.Transactional;\\n  18  import org.springframework.web.multipart.MultipartFile;\\n  19  \\n  20  import java.time.Instant;\\n  21  import java.time.temporal.ChronoUnit;\\n  22  import java.util.ArrayList;\\n  23  import java.util.List;\\n  24  \\n  25  /**\\n  26   * Service for ship content management operations.\\n  27   * Handles ship creation, retrieval, updates with edit window enforcement,\\n  28   * project association validation, and content processing.\\n  29   * \\n  30   * Implements Requirements 4.1, 4.2, 4.4, 4.5:\\n  31   * - 4.1: Ship creation with project association validation\\n  32   * - 4.2: Accept text content, image references, and external links\\n  33   * - 4.4: Edit window enforcement (10 minutes)\\n  34   * - 4.5: Reject edits after edit window expires\\n  35   */\\n  36  @Slf4j\\n  37  @Service\\n  38  @RequiredArgsConstructor\\n  39  public class ShipService {\\n  40  \\n  41      private final ShipRepository shipRepository;\\n  42      private final ProjectService projectService;\\n  43      private final MultibaseService multibaseService;\\n  44    "
+  },
+  {
+   "seq": 10,
+   "t": 199.91,
+   "type": "tool_call",
+   "tool": "read_file",
+   "args": {
+    "path": "src/main/java/com/shipspace/controller/ShipController.java"
+   }
+  },
+  {
+   "seq": 11,
+   "t": 199.91,
+   "type": "tool_result",
+   "tool": "read_file",
+   "preview": "{\"path\": \"src/main/java/com/shipspace/controller/ShipController.java\", \"lines\": \"1-191 of 191\", \"content\": \"   1  package com.shipspace.controller;\\n   2  \\n   3  import com.shipspace.dto.ShipCreateRequest;\\n   4  import com.shipspace.dto.ShipResponse;\\n   5  import com.shipspace.dto.ShipUpdateRequest;\\n   6  import com.shipspace.service.ShipService;\\n   7  import io.swagger.v3.oas.annotations.Operation;\\n   8  import io.swagger.v3.oas.annotations.Parameter;\\n   9  import io.swagger.v3.oas.annotations.security.SecurityRequirement;\\n  10  import io.swagger.v3.oas.annotations.tags.Tag;\\n  11  import jakarta.validation.Valid;\\n  12  import lombok.RequiredArgsConstructor;\\n  13  import lombok.extern.slf4j.Slf4j;\\n  14  import org.springframework.http.HttpStatus;\\n  15  import org.springframework.http.MediaType;\\n  16  import org.springframework.http.ResponseEntity;\\n  17  import org.springframework.security.core.Authentication;\\n  18  import org.springframework.security.core.userdetails.UserDetails;\\n  19  import org.springframework.web.bind.annotation.*;\\n  20  import org.springframework.web.multipart.MultipartFile;\\n  21  \\n  22  import java.util.List;\\n  23  \\n  24  /**\\n  25   * REST controller for ship content management endpoints.\\n  26   * Handles ship creation, retrieval, updates, and image uploads with proper authentication and authorization.\\n  27   * \\n  28   * Implements Requirements 4.1, 4.2, 4.3, 4.4, 4.5:\\n  29   * - POST /api/ships - Create new ship with project association\\n  30   * - GET /api/ships/{shipId} - Get ship details\\n  31   * - PUT /api/ships/{shipId} - Update ship within edit window\\n  32   * - POST /api/ships/{shipId}/images - Upload images to ship\\n  33   */\\n  34  @Slf4j\\n  35  @RestController\\n  36  @RequestMapping(\\\"/ships\\\")\\n  37  @RequiredArgsConstructor\\n  38  @Tag(name = \\\"Ship Content Management\\\", description = \\\"Ship creation, updates, and image upload endpoints\\\")\\n  39  public class ShipController {\\n  40  \\n  41      private "
+  },
+  {
+   "seq": 12,
+   "t": 199.91,
+   "type": "tool_call",
+   "tool": "read_file",
+   "args": {
+    "path": "src/main/java/com/shipspace/model/Ship.java"
+   }
+  },
+  {
+   "seq": 13,
+   "t": 199.91,
+   "type": "tool_result",
+   "tool": "read_file",
+   "preview": "{\"path\": \"src/main/java/com/shipspace/model/Ship.java\", \"lines\": \"1-113 of 113\", \"content\": \"   1  package com.shipspace.model;\\n   2  \\n   3  import org.springframework.data.annotation.Id;\\n   4  import org.springframework.data.mongodb.core.index.Indexed;\\n   5  import org.springframework.data.mongodb.core.mapping.Document;\\n   6  import jakarta.validation.constraints.NotBlank;\\n   7  import jakarta.validation.constraints.NotNull;\\n   8  import jakarta.validation.constraints.Size;\\n   9  import lombok.AllArgsConstructor;\\n  10  import lombok.Builder;\\n  11  import lombok.Data;\\n  12  import lombok.NoArgsConstructor;\\n  13  \\n  14  import java.time.Instant;\\n  15  import java.util.ArrayList;\\n  16  import java.util.List;\\n  17  \\n  18  /**\\n  19   * Ship document model representing a project update post.\\n  20   * Contains text content, images, links, and engagement metrics.\\n  21   */\\n  22  @Document(collection = \\\"ships\\\")\\n  23  @Data\\n  24  @Builder\\n  25  @NoArgsConstructor\\n  26  @AllArgsConstructor\\n  27  public class Ship {\\n  28  \\n  29      @Id\\n  30      private String id;\\n  31  \\n  32      /**\\n  33       * ID of the user who created this ship.\\n  34       */\\n  35      @NotBlank(message = \\\"User ID is required\\\")\\n  36      @Indexed\\n  37      private String userId;\\n  38  \\n  39      /**\\n  40       * ID of the project this ship is associated with.\\n  41       */\\n  42      @NotBlank(message = \\\"Project ID is required\\\")\\n  43      @Indexed\\n  44      private String projectId;\\n  45  \\n  46      /**\\n  47       * Text content of the ship update.\\n  48       */\\n  49      @NotBlank(message = \\\"Content is required\\\")\\n  50      @Size(min = 1, max = 5000, message = \\\"Content must be between 1 and 5000 characters\\\")\\n  51      private String content;\\n  52  \\n  53      /**\\n  54       * Images attached to this ship.\\n  55       */\\n  56      @Builder.Default\\n  57      private List<ImageReference> images = new ArrayList<>();\\n  58  \\n  59      /**\\n  60 "
+  },
+  {
+   "seq": 14,
+   "t": 210.66,
+   "type": "hypothesis",
+   "id": "H1",
+   "claim": "ShipService.createShip uses ChronoUnit.HOURS instead of MINUTES, making edit window 10 hours not 10 minutes",
+   "symptom": "Ship s-9001 edited ~3h after creation despite 10-min rule",
+   "next_check": "Read logs and ShipService tests to confirm window calculation and why tests miss it",
+   "status": "open",
+   "evidence": [],
+   "reason": ""
+  },
+  {
+   "seq": 15,
+   "t": 227.03,
+   "type": "tool_call",
+   "tool": "read_log",
+   "args": {
+    "limit": 50,
+    "service": "shipspace-app"
+   }
+  },
+  {
+   "seq": 16,
+   "t": 227.03,
+   "type": "tool_result",
+   "tool": "read_log",
+   "preview": "{\"matched\": 11, \"shown\": 11, \"entries\": [{\"level\": \"INFO\", \"line\": \"2026-10-27T14:02:11.402Z  INFO 1 --- [nio-8080-exec-3] com.shipspace.service.ShipService        : Creating ship for user ID: u-1042 on project ID: p-77\"}, {\"level\": \"INFO\", \"line\": \"2026-10-27T14:02:11.455Z  INFO 1 --- [nio-8080-exec-3] com.shipspace.service.ShipService        : Successfully created ship with ID: s-9001 for user: u-1042\"}, {\"level\": \"INFO\", \"line\": \"2026-10-27T14:31:08.990Z  INFO 1 --- [nio-8080-exec-7] com.shipspace.service.EngagementService  : Like recorded on ship s-9001 (likeCount=12)\"}, {\"level\": \"INFO\", \"line\": \"2026-10-27T15:47:52.300Z  INFO 1 --- [nio-8080-exec-2] com.shipspace.service.EngagementService  : Like recorded on ship s-9001 (likeCount=40)\"}, {\"level\": \"INFO\", \"line\": \"2026-10-27T17:05:40.118Z  INFO 1 --- [nio-8080-exec-5] com.shipspace.service.ShipService        : Updating ship ID: s-9001 by user ID: u-1042\"}, {\"level\": \"INFO\", \"line\": \"2026-10-27T17:05:40.140Z  INFO 1 --- [nio-8080-exec-5] com.shipspace.service.ShipService        : Successfully updated ship ID: s-9001\"}, {\"level\": \"INFO\", \"line\": \"2026-10-27T18:20:03.514Z  INFO 1 --- [nio-8080-exec-1] com.shipspace.service.ShipService        : Creating ship for user ID: u-2210 on project ID: p-91\"}, {\"level\": \"INFO\", \"line\": \"2026-10-27T18:20:03.560Z  INFO 1 --- [nio-8080-exec-1] com.shipspace.service.ShipService        : Successfully created ship with ID: s-9017 for user: u-2210\"}, {\"level\": \"INFO\", \"line\": \"2026-10-27T21:58:44.871Z  INFO 1 --- [nio-8080-exec-9] com.shipspace.service.ShipService        : Updating ship ID: s-9017 by user ID: u-2210\"}, {\"level\": \"INFO\", \"line\": \"2026-10-27T21:58:44.902Z  INFO 1 --- [nio-8080-exec-9] com.shipspace.service.ShipService        : Successfully updated ship ID: s-9017\"}, {\"level\": \"WARNING\", \"line\": \"2026-10-28T09:12:30.004Z  WARN 1 --- [nio-8080-exec-4] com.shipspace.service.ShipService        : User u-3301 attempted to update ship s-8800 after edit window expired at 20"
+  },
+  {
+   "seq": 17,
+   "t": 227.03,
+   "type": "tool_call",
+   "tool": "read_file",
+   "args": {
+    "path": "src/test/java/com/shipspace/service/ShipServiceTest.java"
+   }
+  },
+  {
+   "seq": 18,
+   "t": 227.03,
+   "type": "tool_result",
+   "tool": "read_file",
+   "preview": "{\"path\": \"src/test/java/com/shipspace/service/ShipServiceTest.java\", \"lines\": \"1-354 of 586\", \"content\": \"   1  package com.shipspace.service;\\n   2  \\n   3  import com.shipspace.dto.ShipCreateRequest;\\n   4  import com.shipspace.dto.ShipResponse;\\n   5  import com.shipspace.dto.ShipUpdateRequest;\\n   6  import com.shipspace.exception.ForbiddenException;\\n   7  import com.shipspace.exception.ResourceNotFoundException;\\n   8  import com.shipspace.model.ExternalLink;\\n   9  import com.shipspace.model.ImageReference;\\n  10  import com.shipspace.model.Ship;\\n  11  import com.shipspace.repository.ShipRepository;\\n  12  import com.shipspace.util.InputSanitizer;\\n  13  import io.micrometer.core.instrument.Counter;\\n  14  import org.junit.jupiter.api.BeforeEach;\\n  15  import org.junit.jupiter.api.DisplayName;\\n  16  import org.junit.jupiter.api.Test;\\n  17  import org.junit.jupiter.api.extension.ExtendWith;\\n  18  import org.mockito.ArgumentCaptor;\\n  19  import org.mockito.InjectMocks;\\n  20  import org.mockito.Mock;\\n  21  import org.mockito.junit.jupiter.MockitoExtension;\\n  22  import org.springframework.web.multipart.MultipartFile;\\n  23  \\n  24  import java.time.Instant;\\n  25  import java.time.temporal.ChronoUnit;\\n  26  import java.util.ArrayList;\\n  27  import java.util.Arrays;\\n  28  import java.util.List;\\n  29  import java.util.Optional;\\n  30  \\n  31  import static org.assertj.core.api.Assertions.assertThat;\\n  32  import static org.assertj.core.api.Assertions.assertThatThrownBy;\\n  33  import static org.mockito.ArgumentMatchers.any;\\n  34  import static org.mockito.ArgumentMatchers.anyString;\\n  35  import static org.mockito.Mockito.*;\\n  36  \\n  37  /**\\n  38   * Unit tests for ShipService.\\n  39   * Tests ship CRUD operations, edit window enforcement, project association validation,\\n  40   * and image upload functionality.\\n  41   * \\n  42   * Tests Requirements 4.1, 4.2, 4.4, 4.5:\\n  43   * - 4.1: Ship creation with project association validation\\n  44   "
+  },
+  {
+   "seq": 19,
+   "t": 233.34,
+   "type": "recovered",
+   "reason": "the server lost the conversation; replaying it from the local transcript"
+  },
+  {
+   "seq": 20,
+   "t": 238.91,
+   "type": "hypothesis",
+   "id": "H2",
+   "claim": "In-scope (CI) tests do not assert the created editWindowExpires duration, so the 10-hour bug goes undetected",
+   "symptom": "CI is green despite 10-minute rule violation",
+   "next_check": "Inspect ShipControllerTest and other in-scope tests for edit-window assertions",
+   "status": "open",
+   "evidence": [],
+   "reason": ""
+  },
+  {
+   "seq": 21,
+   "t": 255.56,
+   "type": "tool_call",
+   "tool": "read_file",
+   "args": {
+    "path": ".github/workflows/ci-cd.yml"
+   }
+  },
+  {
+   "seq": 22,
+   "t": 255.56,
+   "type": "tool_result",
+   "tool": "read_file",
+   "preview": "{\"path\": \".github/workflows/ci-cd.yml\", \"lines\": \"1-384 of 384\", \"content\": \"   1  name: ShipSpace CI/CD\\n   2  \\n   3  on:\\n   4    push:\\n   5      branches: [main, develop]\\n   6      paths-ignore:\\n   7        - \\\"**/*.md\\\"\\n   8        - \\\"docs/**\\\"\\n   9    pull_request:\\n  10      branches: [main]\\n  11      paths-ignore:\\n  12        - \\\"**/*.md\\\"\\n  13        - \\\"docs/**\\\"\\n  14  \\n  15  concurrency:\\n  16    group: shipspace-ci-${{ github.ref }}\\n  17    cancel-in-progress: true\\n  18  \\n  19  env:\\n  20    REGISTRY: ghcr.io\\n  21    IMAGE_NAME: ${{ github.repository }}\\n  22    JAVA_VERSION: \\\"17\\\"\\n  23    MVP_TESTS: \\\"AdminControllerTest,AdminSecurityRouteTest,AuthControllerTest,AuthServiceRbacTest,BannedUserWriteFilterTest,EngagementControllerTest,EngagementServiceTest,FeedControllerTest,GitHubOAuthServiceTest,HealthControllerTest,JwtUtilTest,MongoIndexInitializerTest,MultibaseServiceTest,NotificationServiceTest,ProjectControllerTest,ShipControllerTest,SocialControllerTest,UserControllerTest,UserServiceTest\\\"\\n  24    MONGO_SLICE_TESTS: \\\"BehavioralSignalRepositoryTest,ContentScoreRepositoryTest,ScoreEventLogRepositoryTest,UserInterestProfileRepositoryTest,UserRepositoryTest\\\"\\n  25    MVP_INTEGRATION_TESTS: \\\"ShipCreationIntegrationTest\\\"\\n  26  \\n  27  jobs:\\n  28    # \\u2500\\u2500 Stage 1: Build & Unit Tests \\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\u2500\\n  29    build:\\n  30      name: Build & Fast Tests\\n  31      runs-on: ubuntu-22.04\\n  32      timeout-minutes: 20\\n  33      outputs:\\n  34        version: ${{ steps.version.outputs.version }}\\n  35  \\n  36      steps:\\n  37        - uses: actions/checkout@v4\\n  38  \\n  39        - name: Set up JDK ${{ env.JAVA_VERSION }}\\n  40          uses: actions/setup-java@v4\\n  41        "
+  },
+  {
+   "seq": 23,
+   "t": 255.56,
+   "type": "tool_call",
+   "tool": "read_file",
+   "args": {
+    "path": "src/test/java/com/shipspace/controller/ShipControllerTest.java"
+   }
+  },
+  {
+   "seq": 24,
+   "t": 255.56,
+   "type": "tool_result",
+   "tool": "read_file",
+   "preview": "{\"path\": \"src/test/java/com/shipspace/controller/ShipControllerTest.java\", \"lines\": \"1-329 of 835\", \"content\": \"   1  package com.shipspace.controller;\\n   2  \\n   3  import com.fasterxml.jackson.databind.ObjectMapper;\\n   4  import com.shipspace.dto.ShipCreateRequest;\\n   5  import com.shipspace.dto.ShipResponse;\\n   6  import com.shipspace.dto.ShipUpdateRequest;\\n   7  import com.shipspace.exception.ForbiddenException;\\n   8  import com.shipspace.exception.ResourceNotFoundException;\\n   9  import com.shipspace.model.ExternalLink;\\n  10  import com.shipspace.model.ImageReference;\\n  11  import com.shipspace.service.ShipService;\\n  12  import org.junit.jupiter.api.BeforeEach;\\n  13  import org.junit.jupiter.api.DisplayName;\\n  14  import org.junit.jupiter.api.Test;\\n  15  import org.springframework.beans.factory.annotation.Autowired;\\n  16  import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;\\n  17  import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;\\n  18  import org.springframework.boot.test.mock.mockito.MockBean;\\n  19  import org.springframework.http.MediaType;\\n  20  import org.springframework.mock.web.MockMultipartFile;\\n  21  import org.springframework.security.test.context.support.WithMockUser;\\n  22  import org.springframework.test.web.servlet.MockMvc;\\n  23  \\n  24  import java.time.Instant;\\n  25  import java.time.temporal.ChronoUnit;\\n  26  import java.util.ArrayList;\\n  27  import java.util.Arrays;\\n  28  import java.util.List;\\n  29  \\n  30  import static org.hamcrest.Matchers.*;\\n  31  import static org.mockito.ArgumentMatchers.any;\\n  32  import static org.mockito.ArgumentMatchers.*;\\n  33  import static org.mockito.Mockito.*;\\n  34  import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;\\n  35  import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;\\n  36  import static org.springframework.test.web.servlet.result"
+  },
+  {
+   "seq": 25,
+   "t": 255.56,
+   "type": "tool_call",
+   "tool": "run_tests",
+   "args": {
+    "selector": "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation"
+   }
+  },
+  {
+   "seq": 26,
+   "t": 284.73,
+   "type": "tool_result",
+   "tool": "run_tests",
+   "preview": "{\"exit_code\": 1, \"summary\": \"1 failed\", \"failing\": {\"com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation\": \"org.opentest4j.AssertionFailedError: \\nexpected: 10L\\n but was: 600L\"}, \"failed_tests\": [\"com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation\"]}"
+  },
+  {
+   "seq": 27,
+   "t": 284.73,
+   "type": "reproduced",
+   "tests": [
+    "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation"
+   ]
+  },
+  {
+   "seq": 28,
+   "t": 302.0,
+   "type": "hypothesis_update",
+   "id": "H1",
+   "claim": "ShipService.createShip uses ChronoUnit.HOURS instead of MINUTES, making edit window 10 hours not 10 minutes",
+   "symptom": "Ship s-9001 edited ~3h after creation despite 10-min rule",
+   "next_check": "Read logs and ShipService tests to confirm window calculation and why tests miss it",
+   "status": "confirmed",
+   "evidence": [
+    "src/main/java/com/shipspace/service/ShipService.java:76 now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS)",
+    "log shipspace-app: s-9001 created 2026-10-27T14:02:11.455Z updated 2026-10-27T17:05:40.140Z (~3h03m later, Successfully updated)",
+    "log shipspace-app: s-9017 created 2026-10-27T18:20:03.560Z updated 2026-10-27T21:58:44.902Z (~3h38m later, Successfully updated)",
+    "Ship.isEditWindowOpen src/main/java/com/shipspace/model/Ship.java:111 Instant.now().isBefore(editWindowExpires) \u2014 check exists but compares against wrong expiry"
+   ],
+   "reason": "HOURS unit makes window 10 hours (600 min) not 10 min, so 3h-late edits succeed; enforcement code itself is correct, only expiry calculation wrong."
+  },
+  {
+   "seq": 29,
+   "t": 317.64,
+   "type": "hypothesis_update",
+   "id": "H2",
+   "claim": "In-scope (CI) tests do not assert the created editWindowExpires duration, so the 10-hour bug goes undetected",
+   "symptom": "CI is green despite 10-minute rule violation",
+   "next_check": "Inspect ShipControllerTest and other in-scope tests for edit-window assertions",
+   "status": "confirmed",
+   "evidence": [
+    ".github/workflows/ci-cd.yml:23 MVP_TESTS list excludes ShipServiceTest (only ShipControllerTest in scope)",
+    "src/test/java/com/shipspace/controller/ShipControllerTest.java:67-68 @MockBean ShipService \u2014 never exercises real expiry calc, stubs 10 MINUTES responses",
+    "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation fails on current code: expected 10L but was 600L"
+   ],
+   "reason": "The test that asserts 10-min window (ShipServiceTest) is excluded from CI MVP_TESTS; in-scope ShipControllerTest mocks ShipService so the HOURS bug is invisible to CI."
+  },
+  {
+   "seq": 30,
+   "t": 328.72,
+   "type": "message",
+   "phase": "investigate",
+   "text": "Root causes confirmed:\n\n- **Late edit allowed (H1 confirmed):** `src/main/java/com/shipspace/service/ShipService.java:76` computes `now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS)` \u2014 10 **hours** (600 min) instead of 10 minutes. Enforcement in `updateShip` (`Ship.java:111 isEditWindowOpen()`) is correct but compares against wrong expiry. Logs prove it: `s-9001` created `2026-10-27T14:02:11.455Z` \u2192 `Successfully updated` at `17:05:40.140Z` (~3h03m, 40 likes); `s-9017` created `18:20:03.560Z` \u2192 updated `21:58:44.902Z` (~3h38m).\n- **CI green (H2 confirmed):** `.github/workflows/ci-cd.yml:23` `MVP_TESTS` includes `ShipControllerTest` but not `ShipServiceTest`. `ShipControllerTest:67-68` mocks `ShipService` (stubs 10-min expiry), so bug invisible to CI. Out-of-scope `ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation:141-142` does assert `MINUTES.between(createdAt,editWindowExpires)==10` and fails on current code: `expected: 10L but was: 600L` (reproduced via `run_tests`)."
+  },
+  {
+   "seq": 31,
+   "t": 328.72,
+   "type": "phase",
+   "phase": "fix"
+  },
+  {
+   "seq": 32,
+   "t": 339.8,
+   "type": "tool_call",
+   "tool": "edit_file",
+   "args": {
+    "new": "        Instant editWindowExpires = now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.MINUTES);",
+    "old": "        Instant editWindowExpires = now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS);",
+    "path": "src/main/java/com/shipspace/service/ShipService.java"
+   }
+  },
+  {
+   "seq": 33,
+   "t": 339.8,
+   "type": "tool_result",
+   "tool": "edit_file",
+   "preview": "{\"edited\": \"src/main/java/com/shipspace/service/ShipService.java\"}"
+  },
+  {
+   "seq": 34,
+   "t": 340.41,
+   "type": "patch",
+   "path": "src/main/java/com/shipspace/service/ShipService.java",
+   "diff": "--- a/src/main/java/com/shipspace/service/ShipService.java\n+++ b/src/main/java/com/shipspace/service/ShipService.java\n@@ -73,7 +73,7 @@\n         \n         // Calculate edit window expiration (Requirement 4.4)\n         Instant now = Instant.now();\n-        Instant editWindowExpires = now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS);\n+        Instant editWindowExpires = now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.MINUTES);\n         \n         // Create ship entity (Requirement 4.2)\n         Ship ship = Ship.builder()\n"
+  },
+  {
+   "seq": 35,
+   "t": 342.55,
+   "type": "recovered",
+   "reason": "the server lost the conversation; replaying it from the local transcript"
+  },
+  {
+   "seq": 36,
+   "t": 345.81,
+   "type": "tool_call",
+   "tool": "run_tests",
+   "args": {
+    "selector": "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation"
+   }
+  },
+  {
+   "seq": 37,
+   "t": 468.0,
+   "type": "tool_result",
+   "tool": "run_tests",
+   "preview": "{\"exit_code\": 0, \"summary\": \"1 passed\"}"
+  },
+  {
+   "seq": 38,
+   "t": 478.12,
+   "type": "tool_call",
+   "tool": "run_tests",
+   "args": {
+    "selector": "com.shipspace.service.ShipServiceTest"
+   }
+  },
+  {
+   "seq": 39,
+   "t": 509.73,
+   "type": "tool_result",
+   "tool": "run_tests",
+   "preview": "{\"exit_code\": 0, \"summary\": \"19 passed\"}"
+  },
+  {
+   "seq": 40,
+   "t": 509.73,
+   "type": "tool_call",
+   "tool": "run_tests",
+   "args": {
+    "selector": "com.shipspace.controller.ShipControllerTest"
+   }
+  },
+  {
+   "seq": 41,
+   "t": 568.75,
+   "type": "tool_result",
+   "tool": "run_tests",
+   "preview": "{\"exit_code\": 0, \"summary\": \"26 passed\"}"
+  },
+  {
+   "seq": 42,
+   "t": 580.02,
+   "type": "tool_call",
+   "tool": "show_diff",
+   "args": {}
+  },
+  {
+   "seq": 43,
+   "t": 580.58,
+   "type": "tool_result",
+   "tool": "show_diff",
+   "preview": "{\"diff\": \"--- a/src/main/java/com/shipspace/service/ShipService.java\\n+++ b/src/main/java/com/shipspace/service/ShipService.java\\n@@ -73,7 +73,7 @@\\n         \\n         // Calculate edit window expiration (Requirement 4.4)\\n         Instant now = Instant.now();\\n-        Instant editWindowExpires = now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS);\\n+        Instant editWindowExpires = now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.MINUTES);\\n         \\n         // Create ship entity (Requirement 4.2)\\n         Ship ship = Ship.builder()\\n\"}"
+  },
+  {
+   "seq": 44,
+   "t": 593.44,
+   "type": "message",
+   "phase": "fix",
+   "text": "Fix complete.\n\n**Confirmed root causes:**\n- **H1 (confirmed):** `ShipService.createShip` (`ShipService.java:76`) computed `now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS)`, producing a 10-hour (600-minute) edit window instead of 10 minutes. Log evidence: s-9001 created 14:02:11Z, updated 17:05:40Z (~3h later, \"Successfully updated\"); s-9017 edited ~3h38m later. Enforcement (`Ship.isEditWindowOpen`) was correct \u2014 the expiry it compared against was wrong.\n- **H2 (confirmed):** CI was green because `.github/workflows/ci-cd.yml` MVP_TESTS includes only `ShipControllerTest` (which mocks `ShipService`) and excludes `ShipServiceTest`, the test that asserts the 10-minute window.\n\n**Fix:** One-line change in `ShipService.java:76` \u2014 `ChronoUnit.HOURS` \u2192 `ChronoUnit.MINUTES`.\n\n**Verification:**\n- `ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation`: failed before (`expected 10L but was 600L`), passes after.\n- Full `ShipServiceTest` (19 tests) and `ShipControllerTest` (26 tests): all pass."
+  },
+  {
+   "seq": 45,
+   "t": 697.0,
+   "type": "verification",
+   "attempt": 1,
+   "tests": {
+    "com.shipspace.config.BannedUserWriteFilterTest#bannedUser_cannotWrite": "passed",
+    "com.shipspace.config.BannedUserWriteFilterTest#bannedUser_canLogoutWhenApiContextPathIsPresent": "passed",
+    "com.shipspace.config.BannedUserWriteFilterTest#bannedUser_canRead": "passed",
+    "com.shipspace.config.MongoIndexInitializerTest#auditIndexes_supportAdminAuditLogBrowsing": "passed",
+    "com.shipspace.config.MongoIndexInitializerTest#indexedCollections_includeReportsForModerationQueries": "passed",
+    "com.shipspace.config.MongoIndexInitializerTest#indexedCollections_useActualDocumentCollectionNames": "passed",
+    "com.shipspace.controller.AdminControllerTest#listUsers_ordersNewestFirstForRecentDashboardPanel": "passed",
+    "com.shipspace.controller.AdminControllerTest#banUser_updatesTargetUser": "passed",
+    "com.shipspace.controller.AdminControllerTest#getStats_returnsRepositoryCountsWithoutDerivedPlaceholders": "passed",
+    "com.shipspace.controller.AdminControllerTest#listReports_ordersNewestFirstForPendingDashboardPanel": "passed",
+    "com.shipspace.controller.AdminControllerTest#banUser_blocksSelfBan": "passed",
+    "com.shipspace.controller.AdminControllerTest#getUser_returnsAdminVisibleFields": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminReportResolve_persistsSupportedResolutionStatuses": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminReportResolve_rejectsPendingAsResolutionTarget": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#representativeAdminRoutesAllowAdminJwtThroughSecurity": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminRead_allowsAdminJwtThroughSecurity": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminUnbanRouteRestoresWriteAccess": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#authMeReturnsCurrentUserRolesWithoutSensitiveTokens": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#auditLogsRoute_deniesUserJwtAndAllowsAdminJwtWithDtoResponse": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminCannotRemoveOwnAdminRoleThroughRoute": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#allCurrentAdminRoutesDenyUserJwt": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminReportResolve_handlesTerminalDuplicatesPredictably": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminRead_deniesMissingMalformedExpiredAndUserJwt": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminCannotSelfBanOrSelfUnbanThroughRoute": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminBanRoute_persistsAndBannedUserCanReadAndLogoutButCannotWrite": "passed",
+    "com.shipspace.controller.AdminSecurityRouteTest#adminMutation_deniesUserJwtAndAllowsAdminJwtThroughSecurity": "passed",
+    "com.shipspace.controller.AuthControllerTest#getCurrentUser_UserNotFound_ThrowsException": "passed",
+    "com.shipspace.controller.AuthControllerTest#authenticateWithGitHub_InvalidState_RejectsBeforeGitHubExchange": "passed",
+    "com.shipspace.controller.AuthControllerTest#refreshToken_ValidRefreshToken_ReturnsNewAuthResponse": "passed",
+    "com.shipspace.controller.AuthControllerTest#getCurrentUser_ValidAuthentication_ReturnsUserInfo": "passed",
+    "com.shipspace.controller.AuthControllerTest#refreshToken_InvalidRefreshToken_ThrowsException": "passed",
+    "com.shipspace.controller.AuthControllerTest#getOAuthState_GeneratesServerStateToken": "passed",
+    "com.shipspace.controller.AuthControllerTest#authenticateWithGitHub_ValidCode_ReturnsAuthResponse": "passed",
+    "com.shipspace.controller.AuthControllerTest#authenticateWithGitHub_BlankState_RejectsBeforeGitHubExchange": "passed",
+    "com.shipspace.controller.AuthControllerTest#authenticateWithGitHub_InvalidCode_ThrowsException": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getShipLikes_WithCustomPagination_UsesCorrectParameters": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getShipComments_WithCustomPagination_UsesCorrectParameters": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getLikeStatus_UserHasLiked_ReturnsTrue": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getLikeStatus_UserHasNotLiked_ReturnsFalse": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getShipComments_WithAuthenticatedViewer_PassesViewerIdForUpvoteState": "passed",
+    "com.shipspace.controller.EngagementControllerTest#addComment_EmptyContent_ShouldBeValidatedByFramework": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getShipComments_ValidRequest_ReturnsPagedComments": "passed",
+    "com.shipspace.controller.EngagementControllerTest#unlikeShip_ValidRequest_ReturnsUnlikedResponse": "passed",
+    "com.shipspace.controller.EngagementControllerTest#getShipLikes_ValidRequest_ReturnsPagedLikes": "passed",
+    "com.shipspace.controller.EngagementControllerTest#addComment_ValidRequest_ReturnsCreatedComment": "passed",
+    "com.shipspace.controller.EngagementControllerTest#likeShip_ValidRequest_ReturnsLikeToggleResponse": "passed",
+    "com.shipspace.controller.FeedControllerTest#getTrendingFeed_EmptyFeed": "passed",
+    "com.shipspace.controller.FeedControllerTest#getFollowingFeed_Success": "passed",
+    "com.shipspace.controller.FeedControllerTest#getPersonalizedFeed_Success": "passed",
+    "com.shipspace.controller.FeedControllerTest#getTrendingFeedWithTimeWindow_Success": "passed",
+    "com.shipspace.controller.FeedControllerTest#getPersonalizedFeed_Degradation_ServesTrending": "passed",
+    "com.shipspace.controller.FeedControllerTest#getTrendingFeed_Success_Unauthenticated": "passed",
+    "com.shipspace.controller.FeedControllerTest#getLatestFeed_Success_Unauthenticated": "passed",
+    "com.shipspace.controller.FeedControllerTest#getFollowingFeed_EmptyFeed": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsAllRequiredFields": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_TimestampUpdatesOnEachCall": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsVersion": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ConsistentResponseStructure": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsSuccessResponse": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_TimestampIsValidISOFormat": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ResponseBodyNotEmpty": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_StatusValueIsString": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsServiceName": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsTimestamp": "passed",
+    "com.shipspace.controller.HealthControllerTest#healthCheck_ReturnsStatusUp": "passed",
+    "com.shipspace.controller.ProjectControllerTest#updateProject_Unauthorized": "passed",
+    "com.shipspace.controller.ProjectControllerTest#updateProject_PartialUpdate": "passed",
+    "com.shipspace.controller.ProjectControllerTest#updateProject_Success": "passed",
+    "com.shipspace.controller.ProjectControllerTest#deleteProject_Forbidden": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProjectShips_WithPagination": "passed",
+    "com.shipspace.controller.ProjectControllerTest#createProject_NameTooLong": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProject_NotFound": "passed",
+    "com.shipspace.controller.ProjectControllerTest#deleteProject_Unauthorized": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProjectShips_Success": "passed",
+    "com.shipspace.controller.ProjectControllerTest#createProject_MinimalData": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProjectShips_EmptyPage": "passed",
+    "com.shipspace.controller.ProjectControllerTest#updateProject_NotFound": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProject_Success": "passed",
+    "com.shipspace.controller.ProjectControllerTest#getProjectShips_ProjectNotFound": "passed",
+    "com.shipspace.controller.ProjectControllerTest#deleteProject_Success": "passed",
+    "com.shipspace.controller.ProjectControllerTest#updateProject_Forbidden": "passed",
+    "com.shipspace.controller.ProjectControllerTest#createProject_Success": "passed",
+    "com.shipspace.controller.ProjectControllerTest#createProject_Unauthorized": "passed",
+    "com.shipspace.controller.ProjectControllerTest#createProject_ValidationError": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_Success": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_NotFound": "passed",
+    "com.shipspace.controller.ShipControllerTest#deleteShip_Unauthorized": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_EditWindowExpired": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_PartialUpdate": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_Forbidden": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_MinimalData": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_Unauthorized": "passed",
+    "com.shipspace.controller.ShipControllerTest#getShip_Success": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_ContentTooLong": "passed",
+    "com.shipspace.controller.ShipControllerTest#deleteShip_Forbidden": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_ContentTooLong": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_Success": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_ShipNotFound": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_ValidationError": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_SingleImage": "passed",
+    "com.shipspace.controller.ShipControllerTest#deleteShip_Success": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_Unauthorized": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_Success": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_Unauthorized": "passed",
+    "com.shipspace.controller.ShipControllerTest#getShip_NotFound": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_ProjectNotFound": "passed",
+    "com.shipspace.controller.ShipControllerTest#createShip_ProjectNotOwned": "passed",
+    "com.shipspace.controller.ShipControllerTest#getShip_WithImages": "passed",
+    "com.shipspace.controller.ShipControllerTest#uploadImages_Forbidden": "passed",
+    "com.shipspace.controller.ShipControllerTest#updateShip_EditWindowExpired": "passed",
+    "com.shipspace.controller.SocialControllerTest#followUser_Success": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowers_CustomPagination": "passed",
+    "com.shipspace.controller.SocialControllerTest#unfollowUser_Idempotent": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_Success": "passed",
+    "com.shipspace.controller.SocialControllerTest#unfollowUser_Success": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_CustomPagination": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_WithSorting": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowers_Unauthorized": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowers_EmptyList": "passed",
+    "com.shipspace.controller.SocialControllerTest#followUser_Idempotent": "passed",
+    "com.shipspace.controller.SocialControllerTest#unfollowUser_Unauthorized": "passed",
+    "com.shipspace.controller.SocialControllerTest#unfollowUser_TargetNotFound": "passed",
+    "com.shipspace.controller.SocialControllerTest#followUser_TargetNotFound": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowers_Success": "passed",
+    "com.shipspace.controller.SocialControllerTest#followUser_SelfFollow": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowers_WithSorting": "passed",
+    "com.shipspace.controller.SocialControllerTest#followUser_Unauthorized": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_MultiplePagesNavigation": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_Unauthorized": "passed",
+    "com.shipspace.controller.SocialControllerTest#getFollowing_EmptyList": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserActivity_Unauthorized": "passed",
+    "com.shipspace.controller.UserControllerTest#getUserProfile_NotFound": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserActivity_EmptyActivity": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserProjects_Unauthorized": "passed",
+    "com.shipspace.controller.UserControllerTest#updateCurrentUserProfile_Success": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserProjects_Success": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserProjects_EmptyList": "passed",
+    "com.shipspace.controller.UserControllerTest#updateCurrentUserProfile_InvalidEmail": "passed",
+    "com.shipspace.controller.UserControllerTest#updateCurrentUserProfile_Unauthorized": "passed",
+    "com.shipspace.controller.UserControllerTest#getUserProjects_Success": "passed",
+    "com.shipspace.controller.UserControllerTest#getUserProfile_Success": "passed",
+    "com.shipspace.controller.UserControllerTest#getCurrentUserActivity_Success": "passed",
+    "com.shipspace.service.AuthServiceRbacTest#getCurrentUserResponse_exposesRolesAndBannedState": "passed",
+    "com.shipspace.service.AuthServiceRbacTest#refreshToken_usesPersistedRolesInNewAccessToken": "passed",
+    "com.shipspace.service.EngagementServiceTest#addComment_ValidRequest_CreatesComment": "passed",
+    "com.shipspace.service.EngagementServiceTest#removeCommentUpvote_WhenConcurrentDeleteAlreadyRemoved_DoesNotDecrement": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenCommentQualifies_TriggersScoring": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenAlreadyUpvoted_RemovesUpvote": "passed",
+    "com.shipspace.service.EngagementServiceTest#addComment_WhenShipNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenCommentAlreadyQualified_DoesNotTriggerScoring": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipLikes_WhenUserDeleted_HandlesGracefully": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipComments_ValidShip_ReturnsPagedComments": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenScoringFails_ContinuesWithUpvote": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipLikes_ValidShip_ReturnsPagedLikes": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenScoringReturnsFlase_DoesNotSetQualifiedFlag": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenNotUpvoted_AddsUpvote": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenShipNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenUpvoteCountIsZero_DoesNotGoNegative": "passed",
+    "com.shipspace.service.EngagementServiceTest#addComment_WhenUserNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenLikeCountIsZero_DoesNotGoNegative": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenRaceConditionOccurs_HandlesGracefully": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipComments_WhenShipNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipComments_WhenUserDeleted_HandlesGracefully": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenUserNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleCommentUpvote_WhenCommentNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#hasUserLikedShip_WhenNotLiked_ReturnsFalse": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipLikes_WhenShipNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenNotLiked_AddsLike": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenAlreadyLiked_RemovesLike": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenUserNotFound_ThrowsException": "passed",
+    "com.shipspace.service.EngagementServiceTest#getShipComments_WithCurrentUser_EnrichesUpvotedState": "passed",
+    "com.shipspace.service.EngagementServiceTest#toggleLike_WhenRaceConditionOccurs_HandlesGracefully": "passed",
+    "com.shipspace.service.EngagementServiceTest#hasUserLikedShip_WhenLiked_ReturnsTrue": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_ExistingAdminRemovedFromConfig_RetainsPersistedAdminRole": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_ConfiguredAdminGithubId_AddsAdminRole": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_GitHubUserApiFailure_ThrowsException": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#getUserByGithubId_UserDoesNotExist_ReturnsEmpty": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_ExistingUserAddedToAdminConfig_GainsAdminOnNextLogin": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_NewUser_CreatesUserSuccessfully": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_ExistingUser_UpdatesUserSuccessfully": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_NullAccessToken_ThrowsException": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_PartialGitHubData_CreatesUserWithAvailableData": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_ConfiguredAdminGithubId_TrimsWhitespaceAndKeepsUserRole": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_InvalidOAuthCode_ThrowsException": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#authenticateWithGitHub_AdminLikeUsernameWithoutConfiguredNumericId_DoesNotAddAdminRole": "passed",
+    "com.shipspace.service.GitHubOAuthServiceTest#getUserByGithubId_UserExists_ReturnsUser": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testGetImageReferenceFromUpload_Success": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_EmptyFile": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_Success": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_NullFile": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testCleanupUploadProgress": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_FileTooLarge": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_ValidatesPngImage": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_RenamedExecutableRejectedByMagicBytes": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testGetImageReferenceFromUpload_NotComplete": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImageAsync_Success": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testGetUploadProgress_NotFound": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_ValidatesJpegImage": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_ApiError": "passed",
+    "com.shipspace.service.MultibaseServiceTest#testUploadImage_InvalidContentType": "passed",
+    "com.shipspace.service.NotificationServiceTest#markAllAsRead_OnlyCurrentUserUnread": "passed",
+    "com.shipspace.service.NotificationServiceTest#createNotification_PersistsStructuredTarget": "passed",
+    "com.shipspace.service.NotificationServiceTest#markAsRead_MissingNotification_NotFound": "passed",
+    "com.shipspace.service.NotificationServiceTest#markAsRead_OtherUserNotification_NotFound": "passed",
+    "com.shipspace.service.NotificationServiceTest#markAsRead_AlreadyRead_IsIdempotent": "passed",
+    "com.shipspace.service.NotificationServiceTest#markAsRead_UnreadNotification_PersistsRead": "passed",
+    "com.shipspace.service.NotificationServiceTest#getUnreadCount_UsesCurrentUser": "passed",
+    "com.shipspace.service.NotificationServiceTest#getNotifications_UsesCurrentUserAndStablePagination": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldUpdateOnlyProvidedFields": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldThrowExceptionWhenUploadingImagesAfterEditWindowExpires": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldVerifyShipOwnershipSuccessfully": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldThrowExceptionWhenVerifyingOwnershipForNonExistentShip": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldThrowExceptionWhenVerifyingOwnershipForNonOwner": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldUploadImagesToShipSuccessfully": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldThrowExceptionWhenCreatingShipForNonOwnedProject": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldThrowExceptionWhenNonOwnerTriesToUploadImages": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldCreateShipWithExternalLinks": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldThrowExceptionWhenShipNotFound": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldDenyShipDeletionByNonOwner": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldThrowExceptionWhenNonOwnerTriesToUpdateShip": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldUpdateShipWithinEditWindow": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldContinueUploadingOtherImagesIfOneFails": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldThrowExceptionWhenCreatingShipForNonExistentProject": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldDeleteOwnedShipAndCascadeReferences": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldRetrieveShipByIdSuccessfully": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldThrowExceptionWhenUpdatingShipAfterEditWindowExpires": "passed",
+    "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation": "passed",
+    "com.shipspace.service.UserServiceTest#getUserActivity_CustomLimit": "passed",
+    "com.shipspace.service.UserServiceTest#updateUserProfile_EditableFieldsOnly": "passed",
+    "com.shipspace.service.UserServiceTest#getPublicProfile_Success": "passed",
+    "com.shipspace.service.UserServiceTest#getUserActivity_EmptyActivity": "passed",
+    "com.shipspace.service.UserServiceTest#updateUserProfile_PartialFields": "passed",
+    "com.shipspace.service.UserServiceTest#getUserById_Success": "passed",
+    "com.shipspace.service.UserServiceTest#getUserById_NotFound": "passed",
+    "com.shipspace.service.UserServiceTest#getUserProjects_Success": "passed",
+    "com.shipspace.service.UserServiceTest#updateProjectCount_Success": "passed",
+    "com.shipspace.service.UserServiceTest#getUserProjects_EmptyList": "passed",
+    "com.shipspace.service.UserServiceTest#getUserActivity_Success": "passed",
+    "com.shipspace.util.JwtUtilTest#validateRefreshToken_AccessToken_ReturnsFalse": "passed",
+    "com.shipspace.util.JwtUtilTest#extractTokenType_AccessToken_ReturnsAccess": "passed",
+    "com.shipspace.util.JwtUtilTest#extractUsername_ValidToken_ReturnsUsername": "passed",
+    "com.shipspace.util.JwtUtilTest#extractTokenType_RefreshToken_ReturnsRefresh": "passed",
+    "com.shipspace.util.JwtUtilTest#generateToken_ValidUserIdAndUsername_ReturnsToken": "passed",
+    "com.shipspace.util.JwtUtilTest#validateRefreshToken_ValidRefreshToken_ReturnsTrue": "passed",
+    "com.shipspace.util.JwtUtilTest#extractUserId_ValidToken_ReturnsUserId": "passed",
+    "com.shipspace.util.JwtUtilTest#isTokenExpired_ValidToken_ReturnsFalse": "passed",
+    "com.shipspace.util.JwtUtilTest#validateToken_ExpiredToken_ReturnsFalse": "passed",
+    "com.shipspace.util.JwtUtilTest#validateToken_InvalidToken_ReturnsFalse": "passed",
+    "com.shipspace.util.JwtUtilTest#generateRefreshToken_ValidUserId_ReturnsToken": "passed",
+    "com.shipspace.util.JwtUtilTest#validateToken_ValidToken_ReturnsTrue": "passed",
+    "com.shipspace.util.JwtUtilTest#init_ShortSecret_ThrowsStartupFailure": "passed"
+   },
+   "verified": true,
+   "fixed": [
+    "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation"
+   ],
+   "still_failing": [],
+   "regressions": [],
+   "missing": [],
+   "before": {
+    "passed": 232,
+    "failed": 1
+   },
+   "after": {
+    "passed": 251
+   }
+  },
+  {
+   "seq": 46,
+   "t": 697.0,
+   "type": "phase",
+   "phase": "review"
+  },
+  {
+   "seq": 47,
+   "t": 711.5,
+   "type": "second_opinion",
+   "verdict": "approve",
+   "confidence": "high",
+   "summary": "Patch changes ChronoUnit.HOURS to MINUTES on the editWindowExpires calculation, directly fixing the 10-hour window that allowed 3h-late edits in s-9001/s-9017. Enforcement logic in Ship.isEditWindowOpen was already correct; only expiry was wrong, now fixed and previously failing ShipServiceTest passes with no regressions.",
+   "hypotheses": [
+    {
+     "id": "H1",
+     "assessment": "supported",
+     "note": "Line 76 with HOURS plus 3h successful updates directly imply 600-min window; isEditWindowOpen exists but uses wrong expiry, so claim follows."
+    },
+    {
+     "id": "H2",
+     "assessment": "supported",
+     "note": "CI MVP_TESTS excludes ShipServiceTest and ShipControllerTest mocks ShipService; excluded test demonstrates it would have caught bug (expected 10 vs 600)."
+    }
+   ],
+   "risks": [
+    "CI still excludes ShipServiceTest in MVP_TESTS, so future regression would stay green despite correct fix",
+    "Existing persisted ships created before fix keep 10-hour editWindowExpires in DB \u2014 no migration/backfill considered",
+    "No search/fix for similar ChronoUnit misuse outside ShipService.java; Instant.now without Clock injection leaves tests flaky"
+   ],
+   "provider": "baseten",
+   "model": "meta-models/muse-spark-open-1026",
+   "tokens": 6788,
+   "duration_s": 14.1
+  },
+  {
+   "seq": 48,
+   "t": 712.11,
+   "type": "phase",
+   "phase": "report"
+  },
+  {
+   "seq": 49,
+   "t": 727.73,
+   "type": "report",
+   "report": {
+    "incident": "Users can still edit their ships hours after posting. Ship s-9001 was rewritten about 3 hours after it was created, after it had collected 40 likes. Product rule (Requirement 4.4): a ship can only be edited for 10 minutes after creation. CI is green.",
+    "provider": "meta",
+    "model": "muse-spark-1.3",
+    "isolation": "docker",
+    "hypotheses": [
+     {
+      "id": "H1",
+      "claim": "ShipService.createShip uses ChronoUnit.HOURS instead of MINUTES, making edit window 10 hours not 10 minutes",
+      "symptom": "Ship s-9001 edited ~3h after creation despite 10-min rule",
+      "next_check": "Read logs and ShipService tests to confirm window calculation and why tests miss it",
+      "status": "confirmed",
+      "evidence": [
+       "src/main/java/com/shipspace/service/ShipService.java:76 now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS)",
+       "log shipspace-app: s-9001 created 2026-10-27T14:02:11.455Z updated 2026-10-27T17:05:40.140Z (~3h03m later, Successfully updated)",
+       "log shipspace-app: s-9017 created 2026-10-27T18:20:03.560Z updated 2026-10-27T21:58:44.902Z (~3h38m later, Successfully updated)",
+       "Ship.isEditWindowOpen src/main/java/com/shipspace/model/Ship.java:111 Instant.now().isBefore(editWindowExpires) \u2014 check exists but compares against wrong expiry"
+      ],
+      "reason": "HOURS unit makes window 10 hours (600 min) not 10 min, so 3h-late edits succeed; enforcement code itself is correct, only expiry calculation wrong."
+     },
+     {
+      "id": "H2",
+      "claim": "In-scope (CI) tests do not assert the created editWindowExpires duration, so the 10-hour bug goes undetected",
+      "symptom": "CI is green despite 10-minute rule violation",
+      "next_check": "Inspect ShipControllerTest and other in-scope tests for edit-window assertions",
+      "status": "confirmed",
+      "evidence": [
+       ".github/workflows/ci-cd.yml:23 MVP_TESTS list excludes ShipServiceTest (only ShipControllerTest in scope)",
+       "src/test/java/com/shipspace/controller/ShipControllerTest.java:67-68 @MockBean ShipService \u2014 never exercises real expiry calc, stubs 10 MINUTES responses",
+       "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation fails on current code: expected 10L but was 600L"
+      ],
+      "reason": "The test that asserts 10-min window (ShipServiceTest) is excluded from CI MVP_TESTS; in-scope ShipControllerTest mocks ShipService so the HOURS bug is invisible to CI."
+     }
+    ],
+    "findings": {
+     "issues": [
+      {
+       "category": "correctness",
+       "evidence": [
+        "src/main/java/com/shipspace/service/ShipService.java:76 now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS)",
+        "log shipspace-app: s-9001 created 2026-10-27T14:02:11.455Z updated 2026-10-27T17:05:40.140Z (~3h03m later, Successfully updated)",
+        "log shipspace-app: s-9017 created 2026-10-27T18:20:03.560Z updated 2026-10-27T21:58:44.902Z (~3h38m later, Successfully updated)",
+        "Ship.isEditWindowOpen src/main/java/com/shipspace/model/Ship.java:111 Instant.now().isBefore(editWindowExpires) \u2014 check exists but compares against wrong expiry"
+       ],
+       "fix": "Change ShipService.java:76 from now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS) to now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.MINUTES) to restore 10-minute window per Requirement 4.4. Verified by com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation passing with no regressions.",
+       "hypothesis_ids": [
+        "H1"
+       ],
+       "root_cause": "HOURS unit makes window 10 hours (600 min) not 10 min, so 3h-late edits succeed; enforcement code itself is correct, only expiry calculation wrong.",
+       "severity": "high",
+       "title": "Edit window calculated as 10 hours instead of 10 minutes allows late ship edits"
+      },
+      {
+       "category": "reliability",
+       "evidence": [
+        ".github/workflows/ci-cd.yml:23 MVP_TESTS list excludes ShipServiceTest (only ShipControllerTest in scope)",
+        "src/test/java/com/shipspace/controller/ShipControllerTest.java:67-68 @MockBean ShipService \u2014 never exercises real expiry calc, stubs 10 MINUTES responses",
+        "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation fails on current code: expected 10L but was 600L"
+       ],
+       "fix": "Include ShipServiceTest in CI MVP_TESTS in .github/workflows/ci-cd.yml so the 10-minute expiry assertion runs in CI; in-scope ShipControllerTest alone mocks ShipService and cannot catch the expiry bug.",
+       "hypothesis_ids": [
+        "H2"
+       ],
+       "root_cause": "The test that asserts 10-min window (ShipServiceTest) is excluded from CI MVP_TESTS; in-scope ShipControllerTest mocks ShipService so the HOURS bug is invisible to CI.",
+       "severity": "medium",
+       "title": "CI is green because covering expiry test is excluded and in-scope test mocks service"
+      }
+     ],
+     "summary": "Ship s-9001 was rewritten ~3h after creation in violation of Requirement 4.4 10-minute edit rule. Root cause was ChronoUnit.HOURS instead of MINUTES creating a 10-hour window. CI stayed green because the asserting ShipServiceTest is excluded from MVP_TESTS and ShipControllerTest mocks the service. Patch to MINUTES fixes expiry and makes the covering test pass."
+    },
+    "diff": "--- a/src/main/java/com/shipspace/service/ShipService.java\n+++ b/src/main/java/com/shipspace/service/ShipService.java\n@@ -73,7 +73,7 @@\n         \n         // Calculate edit window expiration (Requirement 4.4)\n         Instant now = Instant.now();\n-        Instant editWindowExpires = now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.HOURS);\n+        Instant editWindowExpires = now.plus(EDIT_WINDOW_MINUTES, ChronoUnit.MINUTES);\n         \n         // Create ship entity (Requirement 4.2)\n         Ship ship = Ship.builder()\n",
+    "verification": {
+     "verified": true,
+     "fixed": [
+      "com.shipspace.service.ShipServiceTest#shouldCreateShipSuccessfullyWithValidProjectAssociation"
+     ],
+     "still_failing": [],
+     "regressions": [],
+     "missing": [],
+     "before": {
+      "passed": 232,
+      "failed": 1
+     },
+     "after": {
+      "passed": 251
+     }
+    },
+    "second_opinion": {
+     "verdict": "approve",
+     "confidence": "high",
+     "summary": "Patch changes ChronoUnit.HOURS to MINUTES on the editWindowExpires calculation, directly fixing the 10-hour window that allowed 3h-late edits in s-9001/s-9017. Enforcement logic in Ship.isEditWindowOpen was already correct; only expiry was wrong, now fixed and previously failing ShipServiceTest passes with no regressions.",
+     "hypotheses": [
+      {
+       "id": "H1",
+       "assessment": "supported",
+       "note": "Line 76 with HOURS plus 3h successful updates directly imply 600-min window; isEditWindowOpen exists but uses wrong expiry, so claim follows."
+      },
+      {
+       "id": "H2",
+       "assessment": "supported",
+       "note": "CI MVP_TESTS excludes ShipServiceTest and ShipControllerTest mocks ShipService; excluded test demonstrates it would have caught bug (expected 10 vs 600)."
+      }
+     ],
+     "risks": [
+      "CI still excludes ShipServiceTest in MVP_TESTS, so future regression would stay green despite correct fix",
+      "Existing persisted ships created before fix keep 10-hour editWindowExpires in DB \u2014 no migration/backfill considered",
+      "No search/fix for similar ChronoUnit misuse outside ShipService.java; Instant.now without Clock injection leaves tests flaky"
+     ],
+     "provider": "baseten",
+     "model": "meta-models/muse-spark-open-1026",
+     "tokens": 6788,
+     "duration_s": 14.1
+    },
+    "usage": {
+     "input_tokens": 323455,
+     "output_tokens": 11212,
+     "cached_tokens": 75822,
+     "model_calls": 15,
+     "tool_calls": 18,
+     "by_phase": {
+      "investigate": 176022,
+      "fix": 154254,
+      "report": 4391
+     }
+    },
+    "duration_s": 727.7
+   }
+  }
+ ]
+}

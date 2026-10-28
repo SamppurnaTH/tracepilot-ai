@@ -14,7 +14,7 @@ node_modules/
 .next/
 
 # Runtime output
-runs/
+/runs/
 targets/*/logs/*.log
 !targets/*/logs/.gitkeep
 
