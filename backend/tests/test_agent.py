@@ -266,20 +266,45 @@ def test_regression_test_must_fail_first_and_then_proves_the_fix():
     assert "tests/test_regression_always_green.py" not in report["diff"]
 
 
-def test_green_suite_with_no_reproducing_test_is_not_verified():
-    report, _ = inventory_run(
+def test_green_suite_gets_one_reproduce_step_and_no_pointless_retry():
+    report, client = inventory_run(
         [
             [call("propose_hypothesis", claim="negative qty accepted", symptom="stock above 100", next_check="read reserve")],
             [call("resolve_hypothesis", id="H1", status="confirmed", evidence=["app.py reserve"], reason="code")],
             "Confirmed.",
+            "I could not write a failing test.",  # the extra reproduce step
             [call("edit_file", path="inventory_api/app.py", old=QTY_GUARD[0], new=QTY_GUARD[1])],
             "Fixed.",
-            "Still nothing failing.",
-            "Done.",
             REPORT,
         ]
     )
     assert not report["verification"]["verified"]  # nothing was failing, so nothing was proven
+    phases = [e["phase"] for e in report["events"] if e["type"] == "phase"]
+    assert phases[:3] == ["investigate", "investigate", "fix"]
+    assert "No test fails yet" in str(client.requests[3]["input"])
+    assert sum(e["type"] == "verification" for e in report["events"]) == 1  # a second attempt couldn't prove anything
+
+
+def test_existing_tests_seen_failing_count_as_reproduction(monkeypatch):
+    from app.tools import Workspace
+
+    node = "tests/test_inventory.py::test_reservation_takes_stock"
+    monkeypatch.setattr(Workspace, "run_tests", lambda self, selector=None: {"exit_code": 1, "summary": "1 failed", "failed_tests": [node]})
+    inv = Investigation("stock is wrong", INVENTORY, client=FakeClient([
+        [call("run_tests", selector="tests/test_inventory.py")],
+        [call("propose_hypothesis", claim="c", symptom="s", next_check="n")],
+        [call("resolve_hypothesis", id="H1", status="confirmed", evidence=["test fails"], reason="r")],
+        "Confirmed.",
+        "Fixed nothing.",
+        REPORT,
+    ]), model="fake", isolation="process", app="inventory_api.app:app")  # fmt: skip
+    report = inv.run()
+    assert inv.observed_failures == {node: "failed"}
+    assert "reproduced" in [e["type"] for e in report["events"]]
+    phases = [e["phase"] for e in report["events"] if e["type"] == "phase"]
+    assert phases.count("investigate") == 1  # already reproduced: no extra step
+    # The test passes in reality, so after the (empty) fix it counts as fixed: the harness re-ran it.
+    assert node in report["verification"]["fixed"]
 
 
 def test_regression_tool_is_not_available_while_fixing():

@@ -8,15 +8,26 @@ Local absolute paths are scrubbed from all output before it reaches the model.
 
 import json
 import re
+import shutil
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
 
 from .config import REPO_ROOT
-from .sandbox import TEXT_SUFFIXES, Sandbox
+from .sandbox import M2_REPO, TEXT_SUFFIXES, Sandbox, is_generated
 
 MAX_OUTPUT_CHARS = 8000
 MAX_TEST_OUTPUT_CHARS = 4000
 MAX_FILE_LINES = 400
+MAX_FILE_CHARS = 16_000  # one read of a huge file (docs, generated code) must not flood the context
+MAX_LISTED_FILES = 80
+
+# Java test classes that need services the sandbox deliberately lacks (network, a database, Docker).
+# They are excluded from every Maven run, and the exclusion is reported, never hidden.
+NETWORK_TEST_MARKERS = ("Testcontainers", "@Container", "flapdoodle", "EmbeddedMongo", "@SpringBootTest", "@DataMongoTest", "GenericContainer")
+EXCLUDES_FILE = ".tracepilot-surefire-excludes"
+# JUnit "errors" that mean the environment, not the code under test, failed.
+INFRA_ERRORS = ("Failed to load ApplicationContext", "Connection refused", "MongoTimeout", "UnknownHost", "ContainerLaunch", "DockerClient", "RedisConnection")
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 REQUEST_RUNNER = (REPO_ROOT / "sandbox" / "request_runner.py").read_text(encoding="utf-8")
 
@@ -86,6 +97,9 @@ class Workspace:
         # Longest first, so the most specific base is stripped before its parents.
         bases = {str(self.root), str(sandbox.source), str(REPO_ROOT), str(Path.home())}
         self._scrub_bases = sorted(bases, key=len, reverse=True)
+        self.kind = getattr(sandbox, "kind", "python")
+        self.excluded = self._exclude_network_tests() if self.kind == "maven" else []
+        self.extra_tests: list[str] = []  # reproducing test classes the agent added; always part of a scoped run
 
     def scrub(self, value: Any) -> Any:
         """Remove absolute local paths from a string, or from every string inside a JSON-like value."""
@@ -142,8 +156,10 @@ class Workspace:
             files = sorted(
                 p.relative_to(self.root).as_posix()
                 for p in target.rglob("*")
-                if p.is_file() and p.suffix in TEXT_SUFFIXES and "__pycache__" not in p.parts
+                if p.is_file() and p.suffix in TEXT_SUFFIXES and not is_generated(p.relative_to(self.root))
             )
+            if len(files) > 300:
+                return {"directory": path, "files": files[:300], "note": f"{len(files) - 300} more; list a subdirectory"}
             return {"directory": path, "files": files}
         if not target.exists():
             return {"error": f"file not found: {path}"}
@@ -153,8 +169,17 @@ class Workspace:
         lines = target.read_text(encoding="utf-8").splitlines()
         start = max(1, start_line)
         end = min(len(lines), end_line or len(lines), start + MAX_FILE_LINES - 1)
-        numbered = "\n".join(f"{n:4d}  {lines[n - 1]}" for n in range(start, end + 1))
-        return {"path": path, "lines": f"{start}-{end} of {len(lines)}", "content": numbered}
+        numbered, size = [], 0
+        for n in range(start, end + 1):
+            size += len(lines[n - 1]) + 7
+            if size > MAX_FILE_CHARS and numbered:
+                end = n - 1
+                break
+            numbered.append(f"{n:4d}  {lines[n - 1]}")
+        result = {"path": path, "lines": f"{start}-{end} of {len(lines)}", "content": "\n".join(numbered)}
+        if end < len(lines):
+            result["note"] = f"truncated; read more with start_line={end + 1}"
+        return result
 
     def send_request(
         self,
@@ -189,6 +214,8 @@ class Workspace:
         return self.scrub(json.loads(result.stdout.strip().splitlines()[-1]))
 
     def run_tests(self, selector: str | None = None) -> dict:
+        if self.kind == "maven":
+            return self._maven_run_tests(selector)
         args = ["-m", "pytest", "-q", "--tb=short", "-p", "no:cacheprovider"]
         if selector:
             if ".." in selector or not re.fullmatch(r"[\w/.:\-\[\]]+", selector):
@@ -241,10 +268,24 @@ class Workspace:
         files = sorted(
             p.relative_to(self.root).as_posix()
             for p in self.root.rglob("*")
-            if p.is_file() and p.suffix in TEXT_SUFFIXES and "__pycache__" not in p.parts and p.parent.name != "logs"
+            if p.is_file() and p.suffix in TEXT_SUFFIXES and not is_generated(p.relative_to(self.root)) and p.parent.name != "logs"
         )
         failing = sorted(t for t, o in outcomes.items() if o != "passed")
-        out = ["Workspace files: " + ", ".join(files), *log_digest]
+        if len(files) <= MAX_LISTED_FILES:
+            out = ["Workspace files: " + ", ".join(files)]
+        else:  # a big project: directories with file counts, so the model knows where to look
+            dirs: dict[str, int] = {}
+            for f in files:
+                d = "/".join(f.split("/")[:-1][:6]) or "."
+                dirs[d] = dirs.get(d, 0) + 1
+            out = [f"Workspace: {len(files)} text files. Directories (file count): " + ", ".join(f"{d} ({n})" for d, n in sorted(dirs.items()))]
+        if self.kind == "maven":
+            out.append("Project: Java/Maven; tests are JUnit, run offline in the sandbox.")
+            if self.sandbox.test_scope:
+                out.append(f"Test scope (what counts as green, as in CI): {', '.join(self.sandbox.test_scope)}")
+            if self.excluded:
+                out.append(f"Excluded {len(self.excluded)} test classes that need a database, network or Docker: {', '.join(self.excluded)}")
+        out += log_digest
         out.append(f"Tests: {len(outcomes) - len(failing)} passed, {len(failing)} failing")
         out.extend(f"  FAILING {t}" + (f": {reasons[t]}" if t in reasons else "") for t in failing)
         return self.scrub("\n".join(out))
@@ -255,6 +296,12 @@ class Workspace:
 
     def test_report(self, selector: str | None = None) -> tuple[dict[str, str], dict[str, str]]:
         """Per-test outcomes, plus pytest's one-line failure message for each failing test."""
+        if self.kind == "maven":
+            result = self._mvn(self._maven_selector(selector) if selector else None)
+            outcomes, reasons = self._surefire_results()
+            if not outcomes and result.exit_code != 0:
+                reasons["(build)"] = self._build_errors(result)
+            return outcomes, reasons
         args = ["-q", "-rA", "--tb=no", "-p", "no:cacheprovider"]
         if selector:
             if ".." in selector or not re.fullmatch(r"[\w/.:\-\[\]]+", selector):
@@ -271,6 +318,86 @@ class Workspace:
                 if match.group(3):
                     reasons[match.group(2)] = self.scrub(match.group(3))[:240]
         return outcomes, reasons
+
+    # --- Java / Maven ------------------------------------------------------------
+
+    def _exclude_network_tests(self) -> list[str]:
+        excluded = []
+        for path in sorted((self.root / "src" / "test").rglob("*.java")):
+            if any(m in path.read_text(encoding="utf-8", errors="ignore") for m in NETWORK_TEST_MARKERS):
+                excluded.append(path.stem)
+        (self.root / EXCLUDES_FILE).write_text("".join(f"**/{name}.java\n" for name in excluded), encoding="utf-8")
+        return excluded
+
+    @staticmethod
+    def _maven_selector(selector: str) -> str:
+        """Accept a test class, Class#method, or a path like src/test/java/com/x/FooTest.java."""
+        if selector.endswith(".java"):
+            selector = Path(selector).stem
+        if not re.fullmatch(r"[\w.#*,+]+", selector):
+            raise ValueError("selector must be a test class, Class#method, or a path under src/test/java")
+        return selector
+
+    def _mvn(self, selector: str | None = None):
+        shutil.rmtree(self.root / "target" / "surefire-reports", ignore_errors=True)
+        argv = [
+            "mvn", "-o", "-B", "-q", f"-Dmaven.repo.local={M2_REPO}", "test",
+            f"-Dsurefire.excludesFile={EXCLUDES_FILE}", "-DfailIfNoTests=false",
+            "-Dsurefire.failIfNoSpecifiedTests=false", "-DtrimStackTrace=true",
+        ]  # fmt: skip
+        argv += [a for a in self.sandbox.test_args if a.startswith("-D")]  # only properties, never other goals
+        scope = getattr(self.sandbox, "test_scope", None)
+        if not selector and scope:
+            selector = ",".join([*scope, *self.extra_tests])
+        if selector:
+            argv.append(f"-Dtest={selector}")
+        return self.sandbox.run(argv, timeout=1200)
+
+    def _surefire_results(self) -> tuple[dict[str, str], dict[str, str]]:
+        outcomes, reasons = {}, {}
+        for report in sorted((self.root / "target" / "surefire-reports").glob("TEST-*.xml")):
+            try:
+                cases = ET.parse(report).getroot().iter("testcase")
+            except ET.ParseError:
+                continue
+            for case in cases:
+                node = f"{case.get('classname')}#{case.get('name')}"
+                if case.find("skipped") is not None:
+                    continue
+                failure, error = case.find("failure"), case.find("error")
+                if failure is None and error is None:
+                    outcomes[node] = "passed"
+                    continue
+                bad = failure if failure is not None else error
+                message = f"{bad.get('type', '')}: {bad.get('message') or ''}".strip(": ")
+                # An exception from the code under test is a failing test, as in pytest; a broken environment is not.
+                infra = error is not None and any(m in (message + (error.text or "")) for m in INFRA_ERRORS)
+                outcomes[node] = "error" if infra else "failed"
+                reasons[node] = self.scrub(message)[:240]
+        return outcomes, reasons
+
+    def _build_errors(self, result) -> str:
+        lines = [line for line in (result.stdout + result.stderr).splitlines() if "[ERROR]" in line or "error:" in line]
+        return _truncate(self.scrub("\n".join(lines[:30]) or (result.stdout + result.stderr)[-1500:]), 2500)
+
+    def _maven_run_tests(self, selector: str | None) -> dict:
+        result = self._mvn(self._maven_selector(selector) if selector else None)
+        if result.timed_out:
+            return {"error": "tests timed out"}
+        outcomes, reasons = self._surefire_results()
+        if not outcomes:
+            return {"exit_code": result.exit_code, "summary": "no tests ran", "build_errors": self._build_errors(result)}
+        tally = {o: sum(1 for v in outcomes.values() if v == o) for o in set(outcomes.values())}
+        summary = ", ".join(f"{n} {o}" for o, n in sorted(tally.items()))
+        failing = {t: reasons.get(t, outcomes[t]) for t, o in outcomes.items() if o != "passed"}
+        if not failing:
+            return {"exit_code": 0, "summary": summary}
+        return {
+            "exit_code": result.exit_code,
+            "summary": summary,
+            "failing": dict(list(failing.items())[:20]),
+            "failed_tests": [t for t, o in outcomes.items() if o == "failed"][:50],  # real failures, not environment errors
+        }
 
     # --- fix tools ----------------------------------------------------------
 
@@ -335,11 +462,11 @@ INVESTIGATION_TOOLS: list[dict] = [
     {
         "type": "function",
         "name": "run_tests",
-        "description": "Run the application's pytest suite (or one test file / node id) in the sandbox and return the pass/fail summary and output.",
+        "description": "Run the project's test suite in the sandbox, or one test (pytest: a file or node id; Java: a class, Class#method or test file path), and return the pass/fail summary and failures.",
         "parameters": {
             "type": "object",
             "properties": {
-                "selector": {"type": "string", "description": "Optional, e.g. tests/test_orders.py::test_total_without_coupon"},
+                "selector": {"type": "string", "description": "Optional, e.g. tests/test_orders.py::test_total_without_coupon or OrderServiceTest#totalWithoutCoupon"},
             },
             "required": [],
             "additionalProperties": False,

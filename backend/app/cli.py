@@ -18,7 +18,7 @@ from pathlib import Path
 from .agent import Investigation
 from .handoff import markdown_report, pr_description
 from .reviewer import Reviewer
-from .sandbox import docker_available, project_image
+from .sandbox import detect_kind, docker_available, project_image
 
 SKIP_DIRS = {"tests", "test", "venv", "node_modules", "build", "dist", "__pycache__", "tracepilot-out"}
 APP_ASSIGNMENT = re.compile(r"^(\w+)\s*(?::\s*\w+\s*)?=\s*(?:fastapi\.)?(?:FastAPI|Starlette)\(", re.MULTILINE)
@@ -44,6 +44,8 @@ def print_event(event: dict) -> None:
         print(f"{t}  SEEDED {event['requests']} requests, statuses {event['statuses']}")
     elif kind == "baseline":
         print(f"{t}  BASELINE tests: {event['tally']}")
+        if event["tally"].get("failed") or event["tally"].get("error"):
+            print(f"{t}    note: tests already fail before any change; the fix must turn them green. Scope with --tests to match your CI.")
     elif kind == "phase":
         print(f"\n{t}  === {event['phase'].upper()} ===")
     elif kind == "thinking":
@@ -55,6 +57,10 @@ def print_event(event: dict) -> None:
         print(f"{t}  {'+' if mark == 'CONFIRMED' else 'x'} {event['id']} {mark}: {event['reason'][:160]}")
     elif kind == "tool_call":
         print(f"{t}    -> {event['tool']}({json.dumps(event['args'])[:140]})")
+    elif kind == "reproduced":
+        print(f"{t}  REPRODUCED by existing tests (re-run after the fix): {', '.join(event['tests'][:5])}")
+    elif kind == "excluded_tests":
+        print(f"{t}  EXCLUDED {len(event['classes'])} test classes ({event['reason']}): {', '.join(event['classes'])}")
     elif kind == "regression_test":
         verdict = "kept: fails on the current code" if event["accepted"] else "not kept: it does not fail"
         print(f"{t}  REPRODUCING TEST {event['path']} ({len(event.get('tests', {}))} tests) {verdict}")
@@ -77,7 +83,7 @@ def print_event(event: dict) -> None:
     elif kind == "recovered":
         print(f"{t}  recovered: {event['reason']}")
     elif kind == "budget":
-        print(f"{t}  step budget reached in {event['phase']}")
+        print(f"{t}  budget reached in {event['phase']} ({event.get('tokens', 0):,} tokens)")
     elif kind == "skip_fix":
         print(f"{t}  no fix attempted: {event['reason']}")
 
@@ -97,20 +103,23 @@ def investigate(args: argparse.Namespace) -> int:
             print(f"error: log file not found: {log}", file=sys.stderr)
             return 2
 
-    app = None if args.app == "none" else (args.app or detect_app(repo))
-    print(f"Project:  {repo}")
-    print(f"HTTP app: {app or 'none found (requests disabled; pass --app module:attribute)'}")
+    kind = detect_kind(repo)
+    app = None if args.app == "none" or kind == "maven" else (args.app or detect_app(repo))
+    print(f"Project:  {repo} ({'Java/Maven, JUnit' if kind == 'maven' else 'Python, pytest'})")
+    print(f"HTTP app: {app or 'none (requests disabled)'}")
     image = None
     if args.isolation != "process" and docker_available():
-        print("Sandbox:  preparing the Docker image (installs requirements.txt once, then cached)...")
-        image = project_image(repo)
-    elif args.isolation == "docker":
-        print("error: Docker is not available", file=sys.stderr)
+        print("Sandbox:  preparing the Docker image (dependencies are downloaded once, then cached)...")
+        image = project_image(repo, kind)
+    elif args.isolation == "docker" or kind == "maven":
+        print("error: Docker is not available (Java projects always run in Docker)", file=sys.stderr)
         return 2
 
     reviewer = None if args.no_review else Reviewer.from_env()
     investigation = Investigation(
-        incident.strip(), repo, on_event=print_event, isolation=args.isolation, app=app, logs=logs, image=image, reviewer=reviewer
+        incident.strip(), repo, on_event=print_event, isolation=args.isolation, app=app, logs=logs, image=image, reviewer=reviewer, kind=kind,
+        test_scope=[t.strip() for t in args.tests.split(",") if t.strip()] if args.tests else None,
+        test_args=args.test_args.split() if args.test_args else None,
     )
     report = investigation.run()
     report.pop("events", None)
@@ -160,9 +169,15 @@ def main(argv: list[str] | None = None) -> int:
     inv.add_argument("--logs", nargs="*", default=[], help="log files to use as evidence (JSON lines or plain text)")
     inv.add_argument("--app", help="ASGI app as module:attribute; detected automatically for FastAPI; 'none' to disable")
     inv.add_argument("--out", help="where to write the hand-off (default: <repo>/tracepilot-out/<time>)")
+    inv.add_argument("--tests", help="Java: comma-separated test classes that define green, e.g. the list your CI runs (default: all)")
+    inv.add_argument("--test-args", help="Java: extra -D properties for the test run, e.g. \"-Dspring.profiles.active=test\"")
     inv.add_argument("--isolation", default="auto", choices=["auto", "docker", "process"])
     inv.add_argument("--no-review", action="store_true", help="skip the Muse Spark Open second opinion")
     inv.add_argument("--apply", action="store_true", help="apply the patch with git apply, only if it was verified")
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if "--test-args" in argv[:-1]:  # its value starts with "-D", which argparse would read as another option
+        i = argv.index("--test-args")
+        argv[i : i + 2] = [f"--test-args={argv[i + 1]}"]
     args = parser.parse_args(argv)
     return investigate(args)
 

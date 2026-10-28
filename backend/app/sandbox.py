@@ -32,10 +32,22 @@ IMAGE_DIR = REPO_ROOT / "sandbox"
 # the user's log files explicitly. Secrets, VCS data, caches and build output never enter the copy.
 COPY_IGNORE = shutil.ignore_patterns(
     "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", ".tox", ".env*", ".venv", "venv", "node_modules",
-    ".git", ".hg", "dist", "build", "*.egg-info", "*.log", "*.pyc", "tracepilot-out",
+    ".git", ".hg", "dist", "build", "target", ".gradle", ".idea", "*.egg-info", "*.log", "*.pyc", "*.class", "*.jar",
+    "tracepilot-out",
 )  # fmt: skip
-TEXT_SUFFIXES = {".py", ".md", ".ini", ".txt", ".json", ".toml", ".cfg", ".yaml", ".yml", ".sql"}
+# Maven's dependencies are baked into the project image, read-only, so runs never need the network.
+M2_REPO = "/opt/m2"
+# Resource limits per project kind: a JVM running Spring tests needs far more than a Python test run.
+LIMITS = {"python": ("512m", "1", "128", "64m"), "maven": ("3g", "2", "1024", "512m")}
+TEXT_SUFFIXES = {".py", ".md", ".ini", ".txt", ".json", ".toml", ".cfg", ".yaml", ".yml", ".sql", ".java", ".kt", ".xml", ".properties"}
 MAX_COPY_FILES = 5000
+# Build output and harness files inside the copy: never part of a patch, never listed to the model.
+GENERATED_PARTS = {"__pycache__", ".pytest_cache", "target"}
+HARNESS_FILES = {".tracepilot-surefire-excludes"}
+
+
+def is_generated(rel: Path) -> bool:
+    return bool(GENERATED_PARTS.intersection(rel.parts)) or rel.name in HARNESS_FILES
 SECRET_MARKERS = ("KEY", "TOKEN", "SECRET", "PASSWORD", "CREDENTIAL")
 
 
@@ -70,31 +82,74 @@ def ensure_image() -> None:
         raise RuntimeError(f"failed to build sandbox image:\n{build.stderr[-2000:]}")
 
 
-def project_image(source: Path) -> str:
-    """The sandbox image for a project: the base image plus the project's requirements.txt, if it has one.
+def detect_kind(source: Path) -> str:
+    """"maven" for a Java project with a pom.xml, otherwise "python"."""
+    return "maven" if (source / "pom.xml").is_file() else "python"
+
+
+def _build(tag: str, files: dict[str, Path | str], dockerfile: str, what: str) -> str:
+    if _docker("image", "inspect", tag).returncode == 0:
+        return tag
+    with tempfile.TemporaryDirectory(prefix="tracepilot-image-") as ctx:
+        for name, src in files.items():
+            dest = Path(ctx) / name
+            if isinstance(src, Path) and src.is_dir():
+                shutil.copytree(src, dest, ignore=COPY_IGNORE)
+            else:
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                dest.write_text(src if isinstance(src, str) else src.read_text(encoding="utf-8"), encoding="utf-8")
+        (Path(ctx) / "Dockerfile").write_text(dockerfile, encoding="utf-8")
+        build = _docker("build", "-t", tag, ctx, timeout=2400)
+    if build.returncode != 0:
+        raise RuntimeError(f"failed to {what}:\n{(build.stdout + build.stderr)[-3000:]}")
+    return tag
+
+
+def maven_image(source: Path) -> str:
+    """A JDK + Maven image with the project's dependencies and test plugins downloaded, cached by pom.xml.
+
+    The build compiles the project once (the only time the network is used) so that every plugin and
+    surefire provider is in the local repository; the sources are discarded and only /opt/m2 is kept.
+    """
+    pom = (source / "pom.xml").read_text(encoding="utf-8")
+    files: dict[str, Path | str] = {"pom.xml": pom}
+    if (source / "src").is_dir():
+        files["src"] = source / "src"
+    # Surefire downloads its JUnit provider only when a test actually runs, so one trivial test runs at build time.
+    files["src/test/java/TracePilotWarmupTest.java"] = "class TracePilotWarmupTest { @org.junit.jupiter.api.Test void warmup() {} }\n"
+    dockerfile = (
+        "FROM maven:3.9.9-eclipse-temurin-17\n"
+        "RUN useradd --create-home --uid 10001 sandbox\n"
+        "COPY . /build\n"
+        f"RUN cd /build && mvn -B -q -Dmaven.repo.local={M2_REPO} test -Dtest=TracePilotWarmupTest "
+        "-Dsurefire.failIfNoSpecifiedTests=false -DfailIfNoTests=false; "
+        f"mvn -B -q -Dmaven.repo.local={M2_REPO} dependency:resolve-plugins dependency:go-offline; "
+        f"rm -rf /build && chmod -R a+rX {M2_REPO}\n"
+        "USER sandbox\nWORKDIR /workspace\n"
+    )
+    tag = f"tracepilot-sandbox-maven:{hashlib.sha256((pom + dockerfile).encode()).hexdigest()[:12]}"
+    return _build(tag, files, dockerfile, "download the project's Maven dependencies into the sandbox image")
+
+
+def project_image(source: Path, kind: str = "python") -> str:
+    """The sandbox image for a project: the base image plus the project's own dependencies.
 
     Dependencies are installed once, at build time (the only time the network is used), and the image
-    is cached by the requirements' hash. Investigations still run with no network.
+    is cached by a hash of the dependency file. Investigations still run with no network.
     """
+    if kind == "maven":
+        return maven_image(source)
     ensure_image()
     requirements = source / "requirements.txt"
     if not requirements.is_file():
         return IMAGE
     text = requirements.read_text(encoding="utf-8")
     tag = f"tracepilot-sandbox-project:{hashlib.sha256(text.encode()).hexdigest()[:12]}"
-    if _docker("image", "inspect", tag).returncode == 0:
-        return tag
-    with tempfile.TemporaryDirectory(prefix="tracepilot-image-") as ctx:
-        (Path(ctx) / "requirements.txt").write_text(text, encoding="utf-8")
-        (Path(ctx) / "Dockerfile").write_text(
-            f"FROM {IMAGE}\nUSER root\nCOPY requirements.txt /tmp/requirements.txt\n"
-            "RUN pip install -r /tmp/requirements.txt pytest httpx && rm /tmp/requirements.txt\nUSER sandbox\n",
-            encoding="utf-8",
-        )
-        build = _docker("build", "-t", tag, ctx, timeout=1800)
-    if build.returncode != 0:
-        raise RuntimeError(f"failed to install the project's requirements.txt in the sandbox image:\n{build.stderr[-2000:]}")
-    return tag
+    dockerfile = (
+        f"FROM {IMAGE}\nUSER root\nCOPY requirements.txt /tmp/requirements.txt\n"
+        "RUN pip install -r /tmp/requirements.txt pytest httpx && rm /tmp/requirements.txt\nUSER sandbox\n"
+    )
+    return _build(tag, {"requirements.txt": text}, dockerfile, "install the project's requirements.txt in the sandbox image")
 
 
 class LocalRunner:
@@ -112,9 +167,14 @@ class LocalRunner:
         pass
 
     def python(self, args: list[str], stdin: str | None, timeout: int) -> RunResult:
+        return self.run([sys.executable, *args], stdin, timeout)
+
+    def run(self, argv: list[str], stdin: str | None, timeout: int) -> RunResult:
+        if argv[0] == "mvn" and not shutil.which("mvn"):
+            return RunResult(127, "", "Maven is not installed; Java projects need Docker isolation")
         try:
             proc = subprocess.run(
-                [sys.executable, *args],
+                [shutil.which(argv[0]) or argv[0], *argv[1:]],
                 cwd=self.root,
                 env=self.env,
                 input=stdin,
@@ -131,25 +191,28 @@ class LocalRunner:
 class DockerRunner:
     isolation = "docker"
 
-    def __init__(self, root: Path, image: str = IMAGE):
+    def __init__(self, root: Path, image: str = IMAGE, kind: str = "python"):
         self.root = root
         self.image = image
+        self.limits = LIMITS.get(kind, LIMITS["python"])
         self.name = f"tracepilot-sbx-{uuid.uuid4().hex[:10]}"
 
     def start(self) -> None:
         if self.image == IMAGE:
             ensure_image()
+        memory, cpus, pids, tmp = self.limits
         run = _docker(
             "run", "-d", "--rm",
             "--name", self.name,
             "--network", "none",
             "--read-only",
-            "--tmpfs", "/tmp:rw,size=64m",
+            "--tmpfs", f"/tmp:rw,exec,size={tmp}",
             "--cap-drop", "ALL",
             "--security-opt", "no-new-privileges",
-            "--pids-limit", "128",
-            "--memory", "512m",
-            "--cpus", "1",
+            "--pids-limit", pids,
+            "--memory", memory,
+            "--cpus", cpus,
+            "-e", "HOME=/tmp",
             "-v", f"{self.root}:/workspace:rw",
             self.image, "sleep", "infinity",
         )  # fmt: skip
@@ -160,8 +223,11 @@ class DockerRunner:
         _docker("rm", "-f", self.name, timeout=30)
 
     def python(self, args: list[str], stdin: str | None, timeout: int) -> RunResult:
+        return self.run(["python", *args], stdin, timeout)
+
+    def run(self, argv: list[str], stdin: str | None, timeout: int) -> RunResult:
         try:
-            proc = _docker("exec", "-i", self.name, "python", *args, stdin=stdin, timeout=timeout)
+            proc = _docker("exec", "-i", self.name, *argv, stdin=stdin, timeout=timeout)
         except subprocess.TimeoutExpired:
             # A hung process may still be running: replace the container with a fresh one.
             self.stop()
@@ -180,6 +246,9 @@ class Sandbox:
         app: str | None = "orders_api.app:app",
         logs: list[Path] | None = None,
         image: str = IMAGE,
+        kind: str = "python",
+        test_scope: list[str] | None = None,
+        test_args: list[str] | None = None,
     ):
         if isolation not in {"auto", "docker", "process"}:
             raise ValueError("isolation must be 'auto', 'docker' or 'process'")
@@ -188,6 +257,10 @@ class Sandbox:
         self.app = app  # "module:attribute" of an ASGI app to send requests to, or None
         self.logs = logs or []
         self.image = image
+        self.kind = kind  # "python" (pytest) or "maven" (JUnit via Maven)
+        # The tests that define "green" (e.g. the classes CI runs), and extra test-runner flags. None = whole suite.
+        self.test_scope = test_scope
+        self.test_args = test_args or []
         self._tmp: Path | None = None
         self.runner: LocalRunner | DockerRunner | None = None
 
@@ -222,7 +295,7 @@ class Sandbox:
         use_docker = self.requested_isolation == "docker" or (
             self.requested_isolation == "auto" and docker_available()
         )
-        self.runner = DockerRunner(self.root, self.image) if use_docker else LocalRunner(self.root)
+        self.runner = DockerRunner(self.root, self.image, self.kind) if use_docker else LocalRunner(self.root)
         try:
             self.runner.start()
         except Exception:
@@ -242,6 +315,11 @@ class Sandbox:
         if self.runner is None:
             raise RuntimeError("sandbox is not open")
         return self.runner.python(args, stdin, timeout)
+
+    def run(self, argv: list[str], stdin: str | None = None, timeout: int = 120) -> RunResult:
+        if self.runner is None:
+            raise RuntimeError("sandbox is not open")
+        return self.runner.run(argv, stdin, timeout)
 
     def resolve(self, rel_path: str) -> Path:
         path = (self.root / rel_path).resolve()
@@ -269,7 +347,7 @@ class Sandbox:
         chunks = []
         for copy in sorted(self.root.rglob("*")):
             rel = copy.relative_to(self.root)
-            if not copy.is_file() or copy.suffix not in TEXT_SUFFIXES or "__pycache__" in rel.parts:
+            if not copy.is_file() or copy.suffix not in TEXT_SUFFIXES or is_generated(rel):
                 continue
             original = self.source / rel
             before = original.read_text(encoding="utf-8").splitlines(keepends=True) if original.exists() else []

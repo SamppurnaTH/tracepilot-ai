@@ -168,3 +168,21 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - A link-preview card for X, Discord and Slack (`opengraph-image.tsx`), with numbers drawn from `eval.json`. Open Graph and Twitter metadata were added.
 - An estimated cost is shown per run, in the eval table and on the landing page. It uses $1.25 per million tokens, measured from the billing page ($2.51 for about 2.0M tokens).
 - The README now leads with a 3-command quickstart for your own project and a Mermaid architecture diagram.
+
+**Java / Maven support, tested on a real Spring Boot codebase** ([ShipSpace](https://github.com/SamppurnaTH/ShipeSpace), the author's own project: about 260 Java files, 102 test classes):
+
+- **Sandbox image:** the project type is detected from `pom.xml`. A JDK 17 + Maven image is built per project, cached by a hash of `pom.xml`. The build compiles the project and runs one trivial warm-up test, because Surefire downloads its JUnit 5 provider only when a test runs (found the hard way: the first image lacked `surefire-junit-platform`). After that, every run is offline (`mvn -o`) against a read-only repository.
+- **Resource limits** are set per project type: 3 GB, 2 CPUs and 1,024 PIDs for the JVM.
+- **Per-test results** come from Surefire's XML reports. Assertion failures, and exceptions from the code under test, count as failures. Errors from a missing environment (Mongo timeouts, refused connections, Spring contexts that fail to load) are environment errors and are never accepted as reproductions.
+- **Excluded tests:** test classes needing a database, network or Docker are excluded, listed in the brief, and emitted as an event.
+- **JUnit regression tests:** the agent writes them as new files under `src/test/java`, with the class name checked against the file. Existing tests under `src/test/` are read-only.
+- **Found in ShipSpace:** its CI runs a curated list of 19 test classes with the `test` profile. Outside that list, some tests fail today: `ScoringHooksIntegrationTest` has 4 failures with "Wanted but not invoked". So the CLI gained `--tests` (which tests define green) and `--test-args` (for example `-Dspring.profiles.active=test`). With CI's list, the sandbox baseline is 232/232 passing in about 4 minutes.
+- **First real run** on a copy with a planted bug (edit window `ChronoUnit.HOURS` instead of `MINUTES`): the agent found and fixed the right line, and the reviewer approved. But it was **not verified**, and it **cost 1.02M tokens**. It had proved the bug with an existing out-of-scope test the harness didn't count, then a confusing retry sent it reading the project docs.
+- **Fixes that came out of that run:**
+  - An existing test the agent sees fail while investigating now counts as reproduction and is re-run during verification.
+  - If a cause is confirmed but nothing fails, the agent gets one short "reproduce first" step, and there's no pointless second attempt.
+  - Each run has a 400K token budget, and a single file read is capped at 16K characters.
+  - The `--test-args "-D..."` parsing bug is fixed (argparse took the value for an option).
+- **Second real run: verified.** The agent reproduced the bug with ShipSpace's own `ShipServiceTest`, fixed the line, and went 232 → 251 passing with no regressions. It also explained why CI stayed green (the covering test isn't in CI's list, and the in-CI controller test mocks the service). Muse Spark Open approved and flagged backfilling ships already stored with a 10-hour window. It cost **335K tokens (about $0.42) in 12 minutes**. The patch passes `git apply --check`.
+- **One imprecision:** the generated PR description lists "include ShipServiceTest in CI" under "What changed", but the patch only changes `ShipService.java`. It's a recommendation, not an applied change.
+- 8 new Java tests (`test_java.py`), plus 1 new and 1 rewritten agent test. 115 backend tests pass.

@@ -14,13 +14,41 @@ cp .env.example .env                                                            
 .venv/Scripts/python tracepilot.py investigate --repo path/to/your/service --logs path/to/app.log --incident "Orders placed on Friday are promised for Saturday"
 ```
 
-It works on Python projects with pytest tests. Logs can be JSON lines or plain text. A FastAPI app is detected automatically, so the agent can also send requests to it.
+It works on **Python projects with pytest** and **Java projects with Maven and JUnit 5**; the type is detected from `pom.xml`. Logs can be JSON lines or plain text. A FastAPI app is detected automatically, so the agent can also send requests to it.
 
-1. **Isolation:** the project is copied into a Docker sandbox with no network, a read-only root and a non-root user. Its `requirements.txt` is installed once into a cached image. Your files are never touched.
+For Java, two options match what your CI does:
+- `--tests` sets which test classes define "green", such as the list your CI runs.
+- `--test-args` passes extra properties, such as `"-Dspring.profiles.active=test"`.
+
+Test classes that need a database, network or Docker (Testcontainers, embedded MongoDB, `@SpringBootTest`) are excluded and listed, because the sandbox blocks all three.
+
+```bash
+.venv/Scripts/python tracepilot.py investigate --repo path/to/spring-service --logs app.log \
+  --tests "ShipControllerTest,UserServiceTest" --test-args "-Dspring.profiles.active=test" \
+  --incident "Users can edit ships hours after posting; the rule is 10 minutes"
+```
+
+1. **Isolation:** the project is copied into a Docker sandbox with no network, a read-only root and a non-root user. Its dependencies (`requirements.txt`, or Maven's from `pom.xml`) are downloaded once into a cached image. That's the only time the network is used. Your files are never touched.
 2. **Hand-off:** you get `tracepilot-out/<time>/` containing `fix.patch` (including any test the agent wrote), `pr.md` (a ready PR description), `report.md` and `run.json`.
 3. **Applying:** add `--apply` to apply the patch with `git apply`, which only happens if it was verified. The exit code is 0 when verified and 1 when not.
 
-Tested on a project it had never seen: a non-web shipping module with plain-text logs, an extra dependency and green CI. The agent wrote the failing test itself and fixed an off-by-one that promised Saturday deliveries, going from 4/5 to 5/5 tests. The reviewer approved, and it cost 62K tokens (about $0.08) in 2.2 minutes.
+Tested on projects it had never seen:
+
+- **A Python shipping module** (not a web app) with plain-text logs, an extra dependency and green CI. The agent wrote the failing test itself and fixed an off-by-one that promised Saturday deliveries, going from 4/5 to 5/5 tests. The reviewer approved. It cost 62K tokens (about $0.08) in 2.2 minutes.
+- **[ShipSpace](https://github.com/SamppurnaTH/ShipeSpace)**, a real Spring Boot 3 / MongoDB / Redis app with about 260 Java files and 102 test classes. One bug was **planted in a separate copy**: the ship edit window was computed with `ChronoUnit.HOURS` instead of `MINUTES`.
+  - **Diagnosis:** the agent found it from the incident and the logs, then explained why CI stayed green: the test that checks the window isn't in CI's test list, and the controller test that is in CI mocks the service.
+  - **Fix:** it reproduced the bug with the project's own existing test, fixed it, and verified 232 → 251 passing with no regressions.
+  - **Second opinion:** Muse Spark Open approved and flagged a data backfill for ships already stored.
+  - **Cost:** 335K tokens (about $0.42) in 12 minutes.
+
+## Private code and data
+
+TracePilot needs no GitHub access: it reads a folder on your machine, so private repositories work the same as public ones. Your code only runs inside the local sandbox, but the parts the agent reads go to model providers:
+
+- **What leaves your machine:** code snippets, log lines and test results are sent to the Meta Model API, and the patch is sent to Baseten for the review.
+- **Free credits:** while Meta's free credits are in use, Meta may use that content for product improvement.
+- **Company code:** use paid usage, or self-host. Muse Spark Open is an open-weight model, so it can run entirely inside your own network.
+- **Secrets:** `.env` files are never copied into the sandbox, and secret-looking environment variables are stripped. Still, don't point TracePilot at code that contains real credentials.
 
 ## Architecture
 

@@ -26,8 +26,12 @@ MAX_INVESTIGATION_STEPS = 16
 MAX_FIX_STEPS = 10
 MAX_FIX_ATTEMPTS = 2
 REVIEW_RETRIES = 1  # extra fix rounds when the independent reviewer rejects the patch
+MAX_REPRODUCE_STEPS = 6
+TOKEN_BUDGET = 400_000  # per investigation; past it, the model must stop calling tools and wrap up
 REPEAT_LIMIT = 2
-PROTECTED_PREFIXES = ("tests/", "tests\\")
+# Existing tests are ground truth. Python: tests/; Java (Maven layout): src/test/.
+PROTECTED_PREFIXES = ("tests/", "tests\\", "src/test/", "src\\test\\")
+JAVA_TEST_PATH = re.compile(r"src/test/java/(?:[A-Za-z_]\w*/)*[A-Z]\w*Test\.java")
 REGRESSION_NAME = re.compile(r"[a-z0-9_]{1,40}")
 
 SYSTEM_PROMPT = """You are TracePilot, an evidence-driven software investigation agent.
@@ -40,8 +44,9 @@ Rules:
 - Never confirm a hypothesis from intuition alone. If evidence contradicts it, reject it and form a better one.
 - Look for the cause of every reported symptom, and note any closely related defect you discover.
 - Tests are the ground truth: never weaken or edit them.
-- If a confirmed root cause has no failing test that demonstrates it, write one with write_regression_test
-  before you finish investigating. It must fail on the current code; it then proves the fix.
+- A fix is proven by a test that fails before it and passes after. An existing test you run that fails counts;
+  if no failing test demonstrates a confirmed root cause, write one with write_regression_test before you
+  finish investigating. It must fail on the current code.
 - Be economical: every round trip re-sends the whole conversation. Batch independent tool calls into one turn
   (several reads, requests or hypotheses at once), use the evidence brief instead of re-discovering it,
   and read only the code you need."""
@@ -93,6 +98,24 @@ REGRESSION_TOOL: dict = {
             "code": {"type": "string", "description": "The complete pytest file"},
         },
         "required": ["name", "code"],
+        "additionalProperties": False,
+    },
+}
+
+JAVA_REGRESSION_TOOL: dict = {
+    "type": "function",
+    "name": "write_regression_test",
+    "description": "Add a new JUnit 5 test class under src/test/java that reproduces a confirmed root cause. "
+    "The harness runs it at once and keeps it only if every test in it fails on the current code; after the fix, it must pass. "
+    "Existing tests can't be changed. The sandbox has no network, database or Docker: write a plain unit test "
+    "(or @WebMvcTest with mocks), never @SpringBootTest or Testcontainers.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "path": {"type": "string", "description": "New file, e.g. src/test/java/com/acme/feed/FeedRegressionTest.java; the class name must match"},
+            "code": {"type": "string", "description": "The complete Java file, including its package line"},
+        },
+        "required": ["path", "code"],
         "additionalProperties": False,
     },
 }
@@ -173,10 +196,13 @@ class Investigation:
         client: Any = None,
         model: str | None = None,
         isolation: str = "auto",
+        kind: str = "python",
         app: str | None = "orders_api.app:app",
         seed_requests: list[dict] | None = None,
         logs: list[Path] | None = None,
         image: str | None = None,
+        test_scope: list[str] | None = None,
+        test_args: list[str] | None = None,
         reviewer: Reviewer | None = None,
     ):
         self.incident = incident
@@ -184,16 +210,22 @@ class Investigation:
         self.provider = provider
         self.on_event = on_event or (lambda event: None)
         self.isolation = isolation
+        self.kind = kind
         self.app = app
         self.seed_requests = seed_requests or []
         self.logs = logs or []
         self.image = image
+        self.test_scope = test_scope
+        self.test_args = test_args
         self.reviewer = reviewer
         if client is None:
             client, model = get_client(provider)
         self.client, self.model = client, model
         self.hypotheses: dict[str, Hypothesis] = {}
         self.regression_tests: dict[str, str] = {}  # node id -> "failed", for tests the agent added that reproduce a bug
+        self._regression_files: dict[str, list[str]] = {}  # file the agent wrote -> its test ids
+        self.observed_failures: dict[str, str] = {}  # existing tests the agent saw fail during the investigation
+        self.token_budget = TOKEN_BUDGET
         self._attempts = 0
         self.events: list[dict] = []
         self.usage = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0, "model_calls": 0, "tool_calls": 0, "by_phase": {}}
@@ -287,6 +319,16 @@ class Investigation:
         self._emit("tool_result", tool=name, preview=result[:2000])
         if name == "edit_file" and "edited" in result:
             self._emit("patch", path=args.get("path"), diff=workspace.sandbox.diff())
+        if name == "run_tests" and self._phase == "investigate":
+            # An existing test that fails before any change is reproducing evidence: verification re-runs it.
+            failed = json.loads(result).get("failed_tests", []) if result.startswith("{") else []
+            new = [t for t in failed if t not in self.observed_failures]
+            if new:
+                self.observed_failures.update({t: "failed" for t in new})
+                for cls in sorted({t.split("#")[0].rsplit(".", 1)[-1] for t in new}):
+                    if cls not in workspace.extra_tests:
+                        workspace.extra_tests.append(cls)
+                self._emit("reproduced", tests=new)
         return result
 
     def _propose(self, args: dict) -> dict:
@@ -317,19 +359,30 @@ class Investigation:
 
     def _regression_test(self, workspace: Workspace, args: dict) -> dict:
         """Add a test that reproduces a bug. It is kept only if it fails now, so it can prove the fix later."""
-        name, code = str(args.get("name", "")), str(args.get("code", ""))
-        if not REGRESSION_NAME.fullmatch(name):
-            return {"error": "name must be 1-40 lowercase letters, digits or underscores"}
-        if "def test_" not in code:
-            return {"error": "code must define at least one test function (def test_...)"}
-        path = f"tests/test_regression_{name}.py"
+        code = str(args.get("code", ""))
+        if workspace.kind == "maven":
+            path = str(args.get("path", "")).replace("\\", "/")
+            if not JAVA_TEST_PATH.fullmatch(path):
+                return {"error": "path must be a new file like src/test/java/com/acme/FooRegressionTest.java"}
+            if f"class {Path(path).stem}" not in code or "@Test" not in code:
+                return {"error": f"code must declare class {Path(path).stem} with at least one @Test method"}
+        else:
+            name = str(args.get("name", ""))
+            if not REGRESSION_NAME.fullmatch(name):
+                return {"error": "name must be 1-40 lowercase letters, digits or underscores"}
+            if "def test_" not in code:
+                return {"error": "code must define at least one test function (def test_...)"}
+            path = f"tests/test_regression_{name}.py"
         target = workspace.sandbox.resolve(path)
-        if target.exists() and not any(node.startswith(path) for node in self.regression_tests):
+        if target.exists() and path not in self._regression_files:
             return {"error": f"{path} already exists and is not one of your regression tests"}
         self._emit("tool_call", tool="write_regression_test", args={"path": path})
-        self.regression_tests = {k: v for k, v in self.regression_tests.items() if not k.startswith(path)}
+        for node in self._regression_files.pop(path, []):
+            self.regression_tests.pop(node, None)
+        target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(code, encoding="utf-8")
         outcomes, reasons = workspace.test_report(path)
+        outcomes = {k: v for k, v in outcomes.items() if k != "(build)"}
         if not outcomes or any(o != "failed" for o in outcomes.values()):
             target.unlink()
             self._emit("regression_test", path=path, accepted=False, tests=outcomes)
@@ -340,6 +393,9 @@ class Investigation:
                 "note": "Not kept: every test must FAIL on the current code (an error or a pass doesn't reproduce the bug).",
             }
         self.regression_tests.update(outcomes)
+        self._regression_files[path] = list(outcomes)
+        if workspace.kind == "maven" and Path(path).stem not in workspace.extra_tests:
+            workspace.extra_tests.append(Path(path).stem)
         self._emit("regression_test", path=path, accepted=True, tests=outcomes, reasons=reasons)
         return {"accepted": True, "path": path, "failing_now": reasons or list(outcomes)}
 
@@ -355,6 +411,8 @@ class Investigation:
             self._emit("verification", attempt=self._attempts, tests=after, **verification)
             if verification["verified"]:
                 break
+            if not any(o != "passed" for o in baseline.values()):
+                break  # nothing failed before the fix, so another attempt can't prove anything either
             prompt = (
                 "Verification failed. Still failing: "
                 f"{verification['still_failing'] or 'none'}; regressions: {verification['regressions'] or 'none'}. "
@@ -377,9 +435,10 @@ class Investigation:
                 {"type": "function_call_output", "call_id": call.call_id, "output": self._dispatch(workspace, call.name, call.arguments, tools)}
                 for call in calls
             ]
-            if step == max_steps:
-                self._emit("budget", phase=phase, steps=max_steps)
-                outputs.append({"role": "user", "content": "Step budget reached. Stop calling tools and summarize what you established."})
+            spent = self.usage["input_tokens"] + self.usage["output_tokens"]
+            if step == max_steps or spent > self.token_budget:
+                self._emit("budget", phase=phase, steps=step, tokens=spent)
+                outputs.append({"role": "user", "content": "Budget reached. Stop calling tools and summarize what you established."})
                 response = self._create(outputs)
                 break
             response = self._create(outputs, tools)
@@ -393,7 +452,8 @@ class Investigation:
     def run(self) -> dict:
         self._started = time.monotonic()
         extra = {"image": self.image} if self.image else {}
-        with Sandbox(self.source, isolation=self.isolation, app=self.app, logs=self.logs, **extra) as sandbox:
+        extra.update(test_scope=self.test_scope, test_args=self.test_args)
+        with Sandbox(self.source, isolation=self.isolation, app=self.app, logs=self.logs, kind=self.kind, **extra) as sandbox:
             workspace = Workspace(sandbox)
             self._emit("start", incident=self.incident, provider=self.provider, model=self.model, isolation=sandbox.isolation)
 
@@ -409,7 +469,10 @@ class Investigation:
             brief = workspace.brief(log_digest, baseline, reasons)
             self._emit("brief", text=brief)
 
-            investigate_tools = tools_for(self.app, INVESTIGATION_TOOLS) + HYPOTHESIS_TOOLS + [REGRESSION_TOOL]
+            if workspace.excluded:
+                self._emit("excluded_tests", classes=workspace.excluded, reason="they need a database, network or Docker, which the sandbox blocks")
+            regression_tool = JAVA_REGRESSION_TOOL if self.kind == "maven" else REGRESSION_TOOL
+            investigate_tools = tools_for(self.app, INVESTIGATION_TOOLS) + HYPOTHESIS_TOOLS + [regression_tool]
             self._run_phase(
                 workspace,
                 "investigate",
@@ -428,8 +491,21 @@ class Investigation:
             )
 
             confirmed = [h for h in self.hypotheses.values() if h.status == "confirmed"]
-            # The agent's reproducing tests join the baseline as failures the fix must turn green.
-            baseline = {**baseline, **self.regression_tests}
+            reproduced = lambda: any(o != "passed" for o in {**baseline, **self.regression_tests, **self.observed_failures}.values())  # noqa: E731
+            if confirmed and not reproduced():
+                # A fix that nothing failed before can't be verified: ask once for a reproducing test.
+                self._run_phase(
+                    workspace,
+                    "investigate",
+                    [{"role": "user", "content": "No test fails yet, so no fix could be proven. Before any change, reproduce each confirmed "
+                      "root cause: run an existing test that fails because of it, or write one with write_regression_test. "
+                      "Reply with a short summary when done."}],  # fmt: skip
+                    investigate_tools,
+                    MAX_REPRODUCE_STEPS,
+                )
+            # Reproducing tests (written by the agent, or existing ones it saw fail) join the baseline:
+            # the fix must turn them green.
+            baseline = {**baseline, **self.regression_tests, **self.observed_failures}
             verification = compare_outcomes(baseline, baseline)
             second_opinion = None
             if confirmed:

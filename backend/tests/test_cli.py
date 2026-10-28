@@ -103,3 +103,13 @@ def test_handoff_documents_from_a_report():
 def test_cli_rejects_a_missing_repo(argv, capsys):
     assert main(argv) == 2
     assert "not a directory" in capsys.readouterr().err
+
+
+def test_test_args_may_start_with_a_dash(monkeypatch):
+    # "--test-args -Dspring.profiles.active=test" is how users write it; argparse alone rejects a value starting with "-".
+    import app.cli as cli
+
+    seen = {}
+    monkeypatch.setattr(cli, "investigate", lambda args: seen.setdefault("args", args) and 0)
+    cli.main(["investigate", "--repo", ".", "--incident", "x", "--test-args", "-Dspring.profiles.active=test"])
+    assert seen["args"].test_args == "-Dspring.profiles.active=test"
