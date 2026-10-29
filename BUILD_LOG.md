@@ -293,3 +293,10 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - No SSH keys or AWS credentials are stored in GitHub. The first automatic deploy (`213e1e7`) went live, and `/health` reports that exact release.
 - Fixed a race that CI caught: a run was marked completed before its uploaded project was deleted. The final status is now published only after cleanup.
 - 147 backend tests pass.
+
+**Live reasoning:**
+
+- Each model step now streams a `thinking` event: Muse Spark's own note alongside its tool calls, plus its reasoning summary.
+- Summaries are requested with `reasoning: {summary: "auto"}`. Measured side by side, this costs no extra tokens: the model reasons either way.
+- The activity log shows the notes as quoted lines between the tool calls, and while a run is live the outcome card shows "Muse Spark is thinking" with the latest one.
+- Checked live on the hosted backend (Docker): Orders API went from 3/5 to 5/5 tests, verified and approved by Muse Spark Open, in 61K tokens and 1.7 minutes, with 6 notes from "Fixing your order totals and privacy reports — tracing the 500s and cross-user reads" to "Edits applied — now verifying the fixes hold".
