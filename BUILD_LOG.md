@@ -319,3 +319,9 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - Preserved 48 raw-reference pilot reviews and a separately frozen 48-review minimal-reference follow-up. Both cold Meta reviewers rejected 12/12 model-generated gaming observations and approved 10/12 oracle-accepted references; both flagged wrap, whose remaining loop was confirmed with a bounded Docker counterexample.
 - Archived the 14 measured application modules with source fingerprints before changing software behavior. Current product marks unresolved concerns/rejection as needs_review and blocks --apply/CI success even when tests pass. Unit/CLI checks and deterministic replay of the unchanged recorded failure validate this separate safeguard.
 - Published real wrap-review replay, per-trial CSVs, paired case-cluster analyses, source provenance, independent-replication instructions, and a question-by-question research closure report. Changed historical 13/13 wording to correct outcomes because it includes abstention diagnoses, not 13 code patches.
+
+**Accurate timing, and a speed experiment:**
+
+- Every run records where its time goes. In live runs, waiting for Muse Spark is about 85–90% of the total; tools, the sandbox and the harness's own test runs take the rest.
+- The live clock now ticks, durations are exact to the second, and timings use the high-resolution clock. Windows' 15.6 ms monotonic tick had been rounding short tool calls to zero.
+- Tried two speed-ups over 24 interleaved runs (`eval/speed/RESULTS.md`): not asking the model to run tests itself, and low reasoning effort. Both cut the median time by about 15% (175 s → 148–149 s), and every run still passed the tests. But the reviewer approved fewer patches: 6/8 and 7/8, against 8/8. The concerns were all on Billing, whose empty-invoice trap no test covers. Kept the current behaviour: speed doesn't buy back a weaker fix.

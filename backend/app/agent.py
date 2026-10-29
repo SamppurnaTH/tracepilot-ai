@@ -273,6 +273,10 @@ class Investigation:
             "prepare_s": 0.0, "sandbox_s": 0.0, "model_s": 0.0, "tools_s": 0.0, "verify_s": 0.0, "review_s": 0.0, "by_phase": {},
         }
         self._phase_mark: tuple[str, float] | None = None
+        # Tunable per run, for speed experiments (backend/scripts/speed_experiment.py). Reasoning summaries cost
+        # no extra tokens: the model reasons either way, and the summary makes it visible.
+        self.reasoning: dict[str, str] = {"summary": "auto"}
+        self.fix_closing = "Run the relevant tests after editing, then reply with a short summary."
 
     @classmethod
     def from_scenario(cls, scenario: Scenario, **kwargs) -> "Investigation":
@@ -317,8 +321,7 @@ class Investigation:
             return self._call_model(input_items, tools, chain, **kwargs)
 
     def _call_model(self, input_items: list, tools: list[dict] | None, chain: bool, **kwargs):
-        # Reasoning summaries cost no extra tokens: the model reasons either way, and the summary makes it visible.
-        params: dict[str, Any] = {"model": self.model, "input": input_items, "reasoning": {"summary": "auto"}, **kwargs}
+        params: dict[str, Any] = {"model": self.model, "input": input_items, "reasoning": dict(self.reasoning), **kwargs}
         if tools:
             params["tools"] = tools
         if not chain:
@@ -610,7 +613,7 @@ class Investigation:
                     workspace,
                     baseline,
                     "Fix phase. For each confirmed root cause, make the smallest correct change to the application code with edit_file. "
-                    "Do not modify tests. Run the relevant tests after editing, then reply with a short summary.",
+                    "Do not modify tests. " + self.fix_closing,
                     MAX_FIX_ATTEMPTS,
                 )
                 second_opinion = self._second_opinion(sandbox, verification)
