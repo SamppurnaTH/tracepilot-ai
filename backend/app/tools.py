@@ -216,7 +216,8 @@ class Workspace:
     def run_tests(self, selector: str | None = None) -> dict:
         if self.kind == "maven":
             return self._maven_run_tests(selector)
-        args = ["-m", "pytest", "-q", "--tb=short", "-p", "no:cacheprovider"]
+        # --color=no: FORCE_COLOR or PY_COLORS in the environment would otherwise send escape codes to the model.
+        args = ["-m", "pytest", "-q", "--tb=short", "--color=no", "-p", "no:cacheprovider"]
         if selector:
             if ".." in selector or not re.fullmatch(r"[\w/.:\-\[\]]+", selector):
                 raise ValueError("selector must be a test path or node id, e.g. tests/test_orders.py::test_x")
@@ -302,7 +303,8 @@ class Workspace:
             if not outcomes and result.exit_code != 0:
                 reasons["(build)"] = self._build_errors(result)
             return outcomes, reasons
-        args = ["-q", "-rA", "--tb=no", "-p", "no:cacheprovider"]
+        # --color=no: with FORCE_COLOR or PY_COLORS set, colour codes would hide every result line from the parser.
+        args = ["-q", "-rA", "--tb=no", "--color=no", "-p", "no:cacheprovider"]
         if selector:
             if ".." in selector or not re.fullmatch(r"[\w/.:\-\[\]]+", selector):
                 raise ValueError("selector must be a test path or node id")

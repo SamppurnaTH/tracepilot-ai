@@ -85,6 +85,16 @@ def test_run_tests_reports_planted_failures(ws):
     assert "2 failed" in result["summary"] and "3 passed" in result["summary"]
 
 
+@pytest.mark.parametrize("variable", ["FORCE_COLOR", "PY_COLORS"])
+def test_forced_colour_does_not_hide_test_results(ws, variable):
+    # Terminals and CI often force colour; escape codes must not hide the results from the harness or the model.
+    ws.sandbox.runner.env[variable] = "1"
+    outcomes, _ = ws.test_report()
+    assert len(outcomes) == 5 and list(outcomes.values()).count("failed") == 2
+    result = call(ws, "run_tests")
+    assert "[" not in result["output"] and "2 failed" in result["summary"]
+
+
 def test_run_tests_single_node(ws):
     result = call(ws, "run_tests", selector="tests/test_orders.py::test_total_with_coupon")
     assert result["exit_code"] == 0
