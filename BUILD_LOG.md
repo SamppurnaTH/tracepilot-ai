@@ -262,3 +262,34 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
   - All numbers are real.
 - **Verified in the browser:** every screen; a live run started from the New investigation page and stopped with Stop (the backend reported `cancelled`); and phone width on every route. One fix came out of that: a visually hidden table label could widen the page.
 - 136 backend tests pass.
+
+**Brand:** the TracePilot AI mark (an "A" with a flight-path swoosh and a star for the verified fix) in indigo, sky and violet, with Inter for UI text and JetBrains Mono for code. Added to the sidebar, landing nav, favicon and the link-preview card. The card shows real results: 13/13 incidents fixed against hidden tests, 8/8 test-gaming patches caught, and 31% fewer tokens.
+
+**Live backend on AWS (EC2, Mumbai):**
+
+- `deploy/setup.sh` sets up a fresh Ubuntu server in one command. It installs Docker, Python and Caddy, runs the API as a systemd service on `127.0.0.1`, builds the sandbox image, and serves HTTPS at `<ip>.sslip.io` with a Let's Encrypt certificate.
+- Guards for a public server:
+  - 2 investigations at a time and 40 a day;
+  - Docker-only mode (never falls back to process isolation);
+  - CORS limited to the Vercel site;
+  - an access key for investigating uploaded code.
+- The site is connected (`NEXT_PUBLIC_API_URL`). The first live run, Orders API, ran in Docker on the server: fixed and verified, approved by Muse Spark Open (Baseten) with high confidence, in 85K tokens and 3.2 minutes.
+- Cost: the server is about $1.29 a day, covered by AWS credits. Model calls are about $0.05–0.11 a run on the Meta credits.
+
+**Admin console and signed-in workspace:**
+
+- `/admin`: email and password sign-in with PBKDF2-hashed passwords, hashed session tokens, per-email rate limiting and 8-hour sessions. Admin, operator and viewer roles; team management; workspace settings; an audit log; and stopping runs.
+- `/app/*`: a signed-in workspace that reuses the product pages. Viewers are read-only.
+- **The demo stays public.** Anyone can start, watch, stop and replay the example scenarios without an account; the concurrency and daily limits still apply. Investigations of uploaded code need a signed-in operator or the access key, and are hidden from signed-out visitors.
+- Shared pages link within the area they're shown in: `/app/…` inside the workspace, public pages outside it.
+- Checked on the live site: a signed-out visitor ran Refunds API live and got the correct "no code change" outcome, in 49K tokens and 1.8 minutes.
+
+## Oct 29
+
+**Continuous delivery without inbound SSH:**
+
+- GitHub Actions runs the backend tests, lint, type checks and a production build on every pull request and push.
+- GitHub-hosted runners couldn't reach EC2, because SSH is restricted to the owner's IP. So the server deploys itself instead: every 2 minutes it checks `main`, asks GitHub whether CI passed for the newest commit, and then runs the release-based update. That update creates a new release, waits for running investigations, backs up accounts, checks health and rolls back on failure.
+- No SSH keys or AWS credentials are stored in GitHub. The first automatic deploy (`213e1e7`) went live, and `/health` reports that exact release.
+- Fixed a race that CI caught: a run was marked completed before its uploaded project was deleted. The final status is now published only after cleanup.
+- 147 backend tests pass.
