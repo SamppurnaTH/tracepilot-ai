@@ -1,76 +1,98 @@
 # TracePilot AI
 
-**A verification-first debugging agent.** TracePilot turns a software incident into a test that reproduces it, a patch your test suite confirms, and a second opinion from an independent open-weight model, with the evidence to review before you merge. When the cause isn't in the code, it says so instead of patching. Built for the Meta Global AI Developer Hackathon (Indie Developer track, problem statement: Push the Frontier).
+**The AI debugger that proves its fix.** TracePilot turns a software incident into a test that reproduces it, a patch your test suite confirms, and a review by an independent open-weight model, with the evidence to check before you merge. When the cause isn't in the code, it says so instead of patching.
 
-**Live demo: [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app)** replays real, unedited investigations of five incidents.
+Built with **Meta Muse Spark** (investigator) and **Muse Spark Open on Baseten** (independent reviewer) for the **Meta Global AI Developer Hackathon**: Indie Developer track, problem statement *Push the Frontier*.
 
-**Results:**
-- **[Same model, with and without TracePilot](eval/COMPARISON.md):** 13/13 actually fixed vs 12/13, with 31% fewer tokens and 35% less time.
-- **[Evaluation](eval/RESULTS.md):** 8/8 runs verified and 8/8 test-gaming patches caught, at about $0.10 per investigation.
+| | |
+|---|---|
+| **Live product** | [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app), connected to a live backend |
+| **Results** | [Same model, with and without TracePilot](eval/COMPARISON.md) · [Evaluation and reviewer benchmark](eval/RESULTS.md) |
+| **Build history** | [`BUILD_LOG.md`](BUILD_LOG.md): everything was built during the hackathon building period (Oct 27 – Nov 4, 2026) |
 
-## Quickstart: run it on your own project
+## Try it in 60 seconds
 
-Needs Python 3.11+, Docker (recommended), and a Meta Model API key. A Baseten key is optional and enables the second opinion.
+1. Open **[Example scenarios](https://tracepilot-ai.vercel.app/examples)**. No account needed.
+2. Click **Run live** on one of the six web-service scenarios. It starts a real investigation on the hosted backend: Muse Spark investigates inside a Docker sandbox, and every step streams to your browser. A run takes about 2–4 minutes.
+3. Or click **Watch run** to replay a recorded investigation step by step.
+4. In the finished run, look at **Root cause** (the evidence behind each hypothesis), **Tests** (before and after, including the test the agent wrote), and **AI review** (Muse Spark Open's verdict).
 
-```bash
-python -m venv .venv && .venv/Scripts/python -m pip install -r backend/requirements.txt   # .venv/bin/python on macOS/Linux
-cp .env.example .env                                                                       # add MODEL_API_KEY (and BASETEN_API_KEY)
-.venv/Scripts/python tracepilot.py investigate --repo path/to/your/service --logs path/to/app.log --incident "Orders placed on Friday are promised for Saturday"
-```
+Good first picks:
 
-Attach screenshots with `--screenshot path/to/image.png` (PNG, JPEG, WebP or GIF); the model reads them as evidence.
+- **Checkout API:** the only evidence of the bug is a customer's screenshot. Muse Spark reads the cart from the image.
+- **Refunds API:** the cause is an expired provider key. The correct answer is "no code change", and TracePilot gives it.
 
-It works on **Python projects with pytest** and **Java projects with Maven and JUnit 5**; the type is detected from `pom.xml`. Logs can be JSON lines or plain text. A FastAPI app is detected automatically, so the agent can also send requests to it.
+The hosted backend runs at most 2 investigations at a time and 40 a day. Investigating your own uploaded code needs an access key, shared with the judges in the submission.
 
-For Java, two options match what your CI does:
-- `--tests` sets which test classes define "green", such as the list your CI runs.
-- `--test-args` passes extra properties, such as `"-Dspring.profiles.active=test"`.
+## The problem
 
-Test classes that need a database, network or Docker (Testcontainers, embedded MongoDB, `@SpringBootTest`) are excluded and listed, because the sandbox blocks all three.
+When production breaks, developers spend hours reading logs, replaying requests, tracing errors back to code and checking that a fix really works. AI coding assistants jump straight to writing code, and a patch that makes the tests pass isn't the same as a fix. It can special-case the failing input, hide the symptom, or "fix" something that was never a code problem.
 
-```bash
-.venv/Scripts/python tracepilot.py investigate --repo path/to/spring-service --logs app.log \
-  --tests "ShipControllerTest,UserServiceTest" --test-args "-Dspring.profiles.active=test" \
-  --incident "Users can edit ships hours after posting; the rule is 10 minutes"
-```
+TracePilot investigates first and proves its work:
 
-1. **Isolation:** the project is copied into a Docker sandbox with no network, a read-only root and a non-root user. Its dependencies (`requirements.txt`, or Maven's from `pom.xml`) are downloaded once into a cached image. That's the only time the network is used. Your files are never touched.
-2. **Hand-off:** you get `tracepilot-out/<time>/` containing `fix.patch` (including any test the agent wrote), `pr.md` (a ready PR description), `report.md` and `run.json`.
-3. **Applying:** add `--apply` to apply the patch with `git apply`, which only happens if it was verified. The exit code is 0 when verified and 1 when not.
+- **A reproducing test.** A test is kept only if it fails on the current code.
+- **A verified patch.** The harness, not the model, compares every test before and after. Existing tests are read-only.
+- **An independent review.** A second Meta model checks the causes and the patch without seeing the investigation, and catches patches that game the tests.
+- **An honest outcome.** When the cause is a config value, data or an external service, it says what to do instead of changing code.
 
-Tested on projects it had never seen:
+## Results
 
-- **A Python shipping module** (not a web app) with plain-text logs, an extra dependency and green CI. The agent wrote the failing test itself and fixed an off-by-one that promised Saturday deliveries, going from 4/5 to 5/5 tests. The reviewer approved. It cost 62K tokens (about $0.08) in 2.2 minutes.
-- **[ShipSpace](https://github.com/SamppurnaTH/ShipeSpace)**, a real Spring Boot 3 / MongoDB / Redis app with about 260 Java files and 102 test classes. One bug was **planted in a separate copy**: the ship edit window was computed with `ChronoUnit.HOURS` instead of `MINUTES`.
-  - **Diagnosis:** the agent found it from the incident and the logs, then explained why CI stayed green: the test that checks the window isn't in CI's test list, and the controller test that is in CI mocks the service.
-  - **Fix:** it reproduced the bug with the project's own existing test, fixed it, and verified 232 → 251 passing with no regressions.
-  - **Second opinion:** Muse Spark Open approved and flagged a data backfill for ships already stored.
-  - **Cost:** 335K tokens (about $0.42) in 12 minutes.
+Every number comes from real runs. The raw data is in `eval/`.
 
-## Private code and data
+**Same model, with and without TracePilot** ([details](eval/COMPARISON.md)). Both use `muse-spark-1.3`, the same sandbox, logs and tools. Every patch is judged by hidden acceptance tests that neither system sees.
 
-TracePilot needs no GitHub access: it reads a folder on your machine, so private repositories work the same as public ones. Your code only runs inside the local sandbox, but the parts the agent reads go to model providers:
+| 13 runs each | Plain agent | TracePilot |
+|---|---|---|
+| Actually fixed (hidden tests) | 12/13 | **13/13** |
+| Claimed fixed but wasn't | 0 | 0 |
+| Reproducing tests written | 0 | **5** |
+| Average tokens (TracePilot includes the reviewer) | 137,596 | **94,346** (31% fewer) |
+| Average time | 293 s | **191 s** (35% less) |
 
-- **What leaves your machine:** code snippets, log lines and test results are sent to the Meta Model API, and the patch is sent to Baseten for the review.
-- **Free credits:** while Meta's free credits are in use, Meta may use that content for product improvement.
-- **Company code:** use paid usage, or self-host. Muse Spark Open is an open-weight model, so it can run entirely inside your own network.
-- **Secrets:** `.env` files are never copied into the sandbox, and secret-looking environment variables are stripped. Still, don't point TracePilot at code that contains real credentials.
+**Evaluation and reviewer benchmark** ([details](eval/RESULTS.md)):
 
-## Architecture
+- **8/8** end-to-end runs verified (2 runs each of 4 incidents).
+- **8/8** test-gaming patches rejected by Muse Spark Open. Each one passes the full test suite. Examples: an ownership check for only the order id the test requests, a keyword blocklist that's still injectable with `UNION`, and hard-coded invoice totals.
+- **7/8** correct patches approved; one got "concerns".
+- About **$0.10 per investigation**.
+
+What this shows, honestly: the model is strong on its own, and the plain agent never claimed a false fix here. TracePilot's measurable gains are cost and speed, plus proof that ships with every fix. The largest gap was ShipSpace, a real Spring Boot app: 505K tokens and 18 minutes for the plain agent, against 335K and 12 minutes for the same one-line fix. Where verification matters most is a patch that looks right but isn't, and the reviewer benchmark measures exactly that.
+
+## Meta AI tooling
+
+TracePilot uses two Meta models with deliberately different jobs.
+
+**`muse-spark-1.3` on the Meta Model API: the investigator.**
+
+- **Responses API with multi-step tool calling.** It reads logs and code, sends requests to the running app, runs tests, writes a reproducing test and edits the sandbox copy. Tools are gated by phase: only the fix phase can edit.
+- **Structured hypotheses.** It registers ranked root-cause hypotheses and confirms or rejects each one with cited evidence. A confirmation without evidence is refused by the harness.
+- **Multimodal evidence.** Screenshots attached to an incident are sent as images, and the agent cites what it reads in them. In the checkout incident, the cart, coupon and wrong discount appear only in a customer's screenshot.
+- **Structured final report.** Issues, severity, root cause, evidence and the fix, written from recorded facts rather than the transcript.
+
+**Muse Spark Open (`meta-models/muse-spark-open-1026`) on Baseten: the independent reviewer.**
+
+- It gets the incident, the confirmed hypotheses and their evidence, the patch and the patched files, but none of the investigation transcript.
+- It rates each hypothesis as supported, weak or unsupported, and approves the patch, raises concerns or rejects it.
+- **If it rejects, its objections go back to Muse Spark for one more fix round**, then it reviews again. Two models check each other.
+- Because it's open-weight, the reviewer can run entirely inside a company's own network.
+
+A real catch: in one billing run the patch passed all 5 tests, but Muse Spark Open flagged a latent crash. `sum()` over an invoice with no lines returns the integer `0`, which has no `.quantize()`. No test covered it.
+
+## How it works
 
 ```mermaid
 flowchart LR
-    I["Incident + logs<br/>+ your repo"] --> H
+    I["Incident + logs<br/>+ screenshots + your repo"] --> H
     subgraph H["Harness (owns the facts)"]
-        B["Evidence brief<br/>log patterns, failing tests<br/>(free, no model call)"]
+        B["Evidence brief<br/>log patterns, failing tests<br/>(no model call)"]
         V["Verification<br/>per-test before/after"]
     end
     subgraph S["Docker sandbox<br/>no network, read-only, non-root"]
         C["Copy of the code"]
-        T["pytest"]
+        T["pytest / Maven"]
     end
     subgraph M1["muse-spark-1.3 · Meta Model API"]
-        A["Investigator<br/>hypotheses, tool calls,<br/>regression test, patch"]
+        A["Investigator<br/>hypotheses, tool calls,<br/>reproducing test, patch"]
     end
     subgraph M2["Muse Spark Open · Baseten"]
         R["Independent reviewer<br/>sees facts + patch,<br/>not the transcript"]
@@ -84,215 +106,142 @@ flowchart LR
     V --> O
 ```
 
-The model does the reasoning and the harness owns the facts. Hypotheses need cited evidence. A reproducing test is kept only if it fails before the fix. Existing tests are read-only. "Verified" is decided by comparing test outcomes, never by the model.
+1. **Sandbox:** the project is copied into a fresh Docker container with no network, a read-only root, a non-root user and CPU, memory and time limits. Your files are never touched.
+2. **Evidence brief:** before the first model call, the harness groups log errors and lists each failing test with its assertion message, at no token cost.
+3. **Investigate:** Muse Spark registers hypotheses, gathers evidence with tools and resolves each hypothesis.
+4. **Reproduce:** if no test catches a confirmed cause, the agent writes one. It's kept only if it fails on the current code.
+5. **Fix:** the agent edits the sandbox copy. Existing tests can't be edited.
+6. **Verify:** the harness compares every test's outcome before and after. A fix counts only if every failure now passes and nothing regressed. Otherwise the agent gets one more attempt.
+7. **Review:** Muse Spark Open reviews the causes and the patch cold; a rejection triggers one more fix round.
+8. **Hand-off:** `fix.patch` (including any new test), a ready PR description, a full report, and the run's events.
 
-> Built during the hackathon building period (Oct 27 to Nov 4, 2026). See `BUILD_LOG.md` for what was built and when.
+**Token economy.** Every model call re-sends the conversation, so input tokens are about 95% of the cost. The harness does the cheap work itself: the free evidence brief, compact stack traces, lean test output, batched tool calls, and a final report written from recorded facts in a fresh context. On the same incidents this cut tokens by about 34%. Each run reports its tokens by phase.
 
-## The problem
+## Demo scenarios
 
-Developers spend hours investigating failures: reading logs, replaying API calls, tracing errors back to source code, and checking whether a fix really works. Most AI coding assistants jump straight to generating code. TracePilot investigates first.
+Eight incidents, all with symptom-only incident reports. Answer keys live outside the sandbox, and a test (`test_targets_contain_no_answer_key`) guards that the agent never sees them. The shipping module and ShipSpace are recorded runs; the other six can also run live.
 
-## What TracePilot does
-
-1. **Ingest evidence:** application logs, API responses, error traces, and relevant source files.
-2. **Correlate:** links log lines, failing requests, and code paths.
-3. **Hypothesize:** produces ranked, testable root-cause hypotheses with the evidence behind each.
-4. **Check:** proposes diagnostic steps and runs only authorized, read-only checks in a sandbox.
-5. **Verify:** applies a proposed fix in the sandbox and confirms the failure is gone.
-6. **Report:** outputs a clear investigation report with evidence, root cause, fix, and verification result.
-
-## Meta tooling
-
-TracePilot uses two Meta models with different jobs:
-
-- **`muse-spark-1.3`** (Meta Model API, Responses API) runs the investigation: multi-step tool calling, hypothesis tracking, sandboxed fixes, and a structured final report.
-  It is also **multimodal**: screenshots attached to an incident are sent as images, and the agent cites what it reads in them. In the checkout incident, the cart, the coupon and the wrong discount appear only in a customer's screenshot.
-- **Muse Spark Open** (`meta-models/muse-spark-open-1026`, Meta open weights served by Baseten) is the **independent reviewer**. After the fix, it gets the incident, the confirmed hypotheses and their evidence, the patch and the patched files, but none of the investigation transcript. It rates each hypothesis as supported, weak or unsupported, and approves the patch, raises concerns or rejects it.
-
-Passing tests aren't proof on their own. `backend/scripts/check_reviewer.py` builds a patch that passes all 5 orders tests but only blocks the one order id the test requests, and Muse Spark Open rejects it: "IDOR remains for all other orders".
-
-## How it works
-
-1. **Sandbox:** the target app is copied into a fresh, locked-down Docker container. Realistic traffic is replayed inside it to produce logs.
-2. **Investigate:** the model registers hypotheses (`propose_hypothesis`), gathers evidence with tools (`read_log`, `read_file`, `send_request`, `run_tests`), and confirms or rejects each one (`resolve_hypothesis`). A confirmation without evidence is refused.
-3. **Reproduce:** real incidents often have no failing test. If a confirmed cause isn't caught by any test, the model writes one (`write_regression_test`). The harness runs it at once and keeps it only if it **fails on the current code**; a test that already passes reproduces nothing and is discarded.
-4. **Fix:** with confirmed root causes, the model edits the sandbox copy (`edit_file`). Existing tests can't be edited.
-5. **Verify:** the harness, not the model, compares every test's outcome before and after, including the agent's new tests. A fix counts only if something that failed now passes, every failure is fixed and nothing regressed. Otherwise the model gets one more attempt.
-6. **Second opinion:** Muse Spark Open reviews the causes and the patch cold, looking for weak evidence, symptom-only fixes and the same flaw surviving elsewhere. **If it rejects the patch, its objections go back to Muse Spark for one more fix round**, then it reviews again. The run continues if the reviewer is unavailable.
-7. **Report:** a structured report (issues, severity, root cause, evidence, fix), the diff, and the verification result. Every step streams live as an event.
-
-## Token economy
-
-Every model call re-sends the whole conversation, so input tokens are about 95% of the cost. TracePilot does the cheap work itself:
-
-- **Evidence brief:** before the first model call, the harness groups log warnings and errors and lists each failing test with its assertion message, at no token cost.
-- **Compact stack traces:** framework frames are dropped from logged tracebacks, so about 5,000 characters become the app's own frames plus the exception.
-- **Lean tool output:** a green test run returns only its summary, and failing output is capped.
-- **Fresh-context report:** the final report is written from the recorded facts and the patch, not the full transcript.
-- **Batched calls:** the model is told to batch independent tool calls into one turn.
-
-Measured with the eval harness (2 runs per incident), against one run of each incident before the changes. Every run still verified:
-
-| Scenario | Before | After (average) |
+| Scenario | What's wrong | Why it's hard |
 |---|---|---|
-| orders | 95K tokens | 49K (−48%) |
-| notes | 117K | 75K (−36%) |
-| billing | 117K | 95K (−19%) |
+| **Orders API** | A 500 from a missing coupon, and a missing ownership check (IDOR) | Two bugs, one of them a security hole |
+| **Notes API** | Search breaks on apostrophes: SQL injection | Slow-export warnings are a red herring |
+| **Billing API** | A disputed cent from float rounding, and a pagination off-by-one | Money and paging bugs together |
+| **Inventory API** | Phantom stock and an item oversold | **CI is green**: the agent must write the failing tests itself |
+| **Refunds API** | Refunds fail right after a deploy | The cause is an expired provider key: **no code change** is the right answer |
+| **Checkout API** | The wrong discount for a customer | **The only evidence is a screenshot** |
+| **Shipping module** | Orders placed on Friday promised for Saturday | Not a web app, plain-text logs, green CI |
+| **ShipSpace (Java)** | Ship edits allowed hours after posting; the rule is 10 minutes | A real Spring Boot 3 app with about 260 Java files and 102 test classes |
 
-That's **about 34% fewer tokens** on the same incidents. Runs vary, and the single best runs were 48K, 55K and 67K. Each run reports its tokens by phase, and the open-weight reviewer adds about 4–8K per run.
+ShipSpace is the author's own public project, [SamppurnaTH/ShipeSpace](https://github.com/SamppurnaTH/ShipeSpace). The bug was planted only in a separate copy. The agent found it from the incident and the logs, and explained why CI stayed green: the test that checks the window isn't in CI's test list, and the controller test that is in CI mocks the service. It reproduced the bug with the project's own test and verified 232 → 251 passing with no regressions. Muse Spark Open approved and flagged a data backfill for ships already stored.
 
-## Evaluation
+## Run it on your own project
 
-`backend/scripts/eval.py` runs repeated real investigations and a reviewer benchmark. It writes the raw results to `eval/results.json` and regenerates [`eval/RESULTS.md`](eval/RESULTS.md) and the website's evaluation section from them.
+Needs Python 3.11+, Docker (recommended) and a Meta Model API key. A Baseten key is optional and enables the reviewer.
 
-- **End to end: 8/8 runs verified** (2 per incident, 4 incidents). In both inventory runs, where CI was green, the agent wrote the reproducing tests itself.
-- **Reviewer benchmark:** every case passes the full test suite.
-  - **8/8 test-gaming patches caught.** Examples: an ownership check for only the order id the test uses, a keyword blocklist that's still injectable with `UNION`, and hard-coded invoice totals.
-  - **7/8 correct patches approved.** One reference fix got "concerns" instead.
-  - About 4K tokens per review.
-- **A real catch:** in one billing run, the patch passed all 5 tests, but Muse Spark Open flagged a latent crash: `sum()` over an invoice with no lines returns the integer `0`, which has no `.quantize()`. No test covered it.
+```bash
+python -m venv .venv && .venv/Scripts/python -m pip install -r backend/requirements.txt   # .venv/bin/python on macOS/Linux
+cp .env.example .env                                                                       # add MODEL_API_KEY (and BASETEN_API_KEY)
+.venv/Scripts/python tracepilot.py investigate --repo path/to/your/service --logs path/to/app.log --incident "Orders placed on Friday are promised for Saturday"
+```
 
-## How it compares
+- **Languages:** Python projects with pytest, and Java projects with Maven and JUnit 5 (detected from `pom.xml`). A FastAPI app is detected automatically, so the agent can send it requests.
+- **Evidence:** logs as JSON lines or plain text; screenshots with `--screenshot path/to/image.png` (PNG, JPEG, WebP or GIF).
+- **Java options:** `--tests` sets which test classes define "green", like your CI's list. `--test-args` passes properties such as `"-Dspring.profiles.active=test"`. Tests that need a database, network or Docker are excluded and listed, because the sandbox blocks all three.
+- **Output:** `tracepilot-out/<time>/` contains `fix.patch`, `pr.md`, `report.md` and `run.json`. Add `--apply` to apply the patch with `git apply`, only if it was verified. The exit code is 0 when verified and 1 when not.
 
-General coding agents (Cursor, GitHub Copilot's coding agent, OpenHands, Devin) and AI features in monitoring tools (such as Sentry) can also read code, investigate failures, edit files and run tests. TracePilot doesn't claim to be the first to do any of that. It's narrower on purpose: an incident goes in, and what comes out is a reproducing test, a patch verified by your tests and reviewed by a second model, or a clear "this isn't a code problem".
+In the browser, **New investigation** does the same with a project ZIP or a public repository URL.
 
-**Measured, same model.** [`backend/scripts/compare.py`](backend/scripts/compare.py) runs `muse-spark-1.3` two ways: as a plain coding agent (same sandbox, logs and tools, decides for itself when it's done), and inside TracePilot. Every patch is applied to a fresh copy and judged by hidden acceptance tests (`eval/hidden/`) that neither system sees. The cases are the five demo incidents, the shipping module and ShipSpace (13 runs per system).
+## The product
 
-| Same model (`muse-spark-1.3`) | Plain agent | TracePilot |
-|---|---|---|
-| Actually fixed (hidden tests) | 12/13 | **13/13** |
-| Claimed fixed but wasn't | 0 | 0 |
-| Reproducing tests written | 0 | **5** |
-| Average tokens (TracePilot includes the reviewer) | 137,596 | **94,346** (31% fewer) |
-| Average time | 293 s | **191 s** (35% less) |
+| Screen | What it does |
+|---|---|
+| **Landing** (`/`) | The pitch, the measured results and how it works |
+| **Example scenarios** (`/examples`) | All 8 incidents: run live, watch a recording, or view the result |
+| **New investigation** (`/investigate`) | Upload a ZIP or give a public repository, add logs and screenshots |
+| **Run** (`/run`) | The live console while running, with Stop. When done: the outcome, patch or recommended action, tests, AI review, evidence and the full log |
+| **Comparison results** (`/results`) | The same-model comparison and the reviewer benchmark |
+| **My runs** (`/runs`) | Recorded runs plus the backend's saved runs |
+| **Documentation** (`/docs`) | Getting started and the CLI guide |
+| **Workspace** (`/app`) | The same tools for signed-in team members |
+| **Admin Console** (`/admin`) | Accounts, roles, workspace settings and the audit log |
 
-What this shows, honestly:
+**Access.** The example scenarios are a public demo: anyone can run, watch and replay them. Investigating uploaded code needs a signed-in operator or the access key, and those runs are visible only to signed-in workspace users. Roles: **admin** (accounts, settings, audit log), **operator** (start and stop investigations) and **viewer** (read-only). Passwords are PBKDF2-hashed, session tokens are stored hashed, sign-in is rate-limited, and sessions last 8 hours.
 
-- **The model is strong on its own.** On these incidents the plain agent fixed almost everything, and it never claimed a fix that wasn't real.
-- **The measurable gains are cost and speed, plus proof that ships with the fix.** The largest gap was on ShipSpace: 505K tokens and 18 minutes for the plain agent, against 335K and 12 minutes for TracePilot, for the same one-line fix.
-- **The one miss** was the refunds incident, where the cause is an expired provider API key. One plain run diagnosed it correctly but also changed the service's logging code during the incident, spent 356K tokens, and said it hadn't fixed it. We score unrequested code changes on an external-cause incident as a failure; that's a judgment call, and the raw runs are in `eval/comparison.json`.
-- **Where verification matters most** is when a patch looks right but isn't. No such patch appeared in this comparison. The [reviewer benchmark](eval/RESULTS.md) measures that case directly: 8/8 patches that pass every test but game them were rejected.
+## Deployment
+
+```mermaid
+flowchart LR
+    U["Browser"] --> F["Next.js frontend<br/>Vercel"]
+    U -- "HTTPS + live events (SSE)" --> C["Caddy (HTTPS)<br/>AWS EC2"]
+    C --> API["FastAPI<br/>tracepilot.service"]
+    API --> D["Docker sandboxes"]
+    API --> MA["Meta Model API<br/>muse-spark-1.3"]
+    API --> BT["Baseten<br/>Muse Spark Open"]
+    G["GitHub Actions CI"] -. "status" .-> P["pull-deploy timer<br/>on EC2"]
+    P --> API
+```
+
+- **Frontend:** Vercel deploys each push to `main`.
+- **Backend:** a single AWS EC2 instance, set up with one command (`deploy/setup.sh`). Caddy serves HTTPS; the API listens only on `127.0.0.1`.
+- **Continuous delivery without inbound SSH:** GitHub Actions runs the backend tests, lint, type checks and a production build. Every two minutes the server checks `main`, and when CI has passed for the newest commit it deploys that exact revision as a new release. Each release waits for running investigations, backs up accounts, checks `/health` and rolls back on failure. GitHub holds no SSH keys or cloud credentials.
+- **Public-server guards:** concurrency and daily run limits, Docker-only sandboxing, a CORS allowlist, and the upload access key.
+
+See [`deploy/README.md`](deploy/README.md) for setup, operations and recovery.
+
+## Safety and privacy
+
+- **Only systems you own or are authorized to test.** All checks run on a disposable copy in a sandbox; the original code is never modified.
+- **Phase-gated tools:** the investigation phase can read and test; only the fix phase can edit, and only the sandbox copy.
+- **Secrets stay out:** `.env` files are never copied into the sandbox, secret-looking environment variables are stripped, and local paths are scrubbed from everything sent to the models.
+- **What leaves your machine:** code snippets, log lines and test results go to the Meta Model API, and the patch goes to Baseten for review. While Meta's free credits are in use, Meta may use that content for product improvement. For company code, use paid usage, or self-host Muse Spark Open inside your own network.
+- **Private repositories work:** the CLI reads a local folder and needs no GitHub access.
+- **Demo data is synthetic.** No real customer data or credentials were sent to any model.
 
 ## API
 
-| Endpoint | Purpose |
-|---|---|
-| `GET /api/scenarios` | Demo scenarios (incident text only) |
-| `POST /api/investigations` `{"scenario": "notes"}` | Start an investigation |
-| `GET /api/investigations/{id}/events` | Live event stream (server-sent events) |
-| `GET /api/investigations/{id}` | Status and final report |
-| `GET /api/runs`, `GET /api/runs/{name}` | Saved runs, for replay |
-| `POST /api/investigations/custom` (multipart) | Investigate your own project: a ZIP or a public repository URL, plus optional logs, screenshots and Java test options |
-| `POST /api/investigations/{id}/cancel` | Stop a running investigation before its next model call |
+| Endpoint | Access | Purpose |
+|---|---|---|
+| `GET /health` | Public | Status, active investigations and the deployed release |
+| `GET /api/scenarios` | Public | Demo scenarios (incident text only) |
+| `POST /api/investigations` `{"scenario": "notes"}` | Public (limited) | Start an example investigation |
+| `GET /api/investigations/{id}` · `/events` | Public for examples | Status and report; live server-sent events |
+| `POST /api/investigations/{id}/cancel` | Public for examples | Stop a run before its next model call |
+| `POST /api/investigations/custom` (multipart) | Operator or access key | Investigate a ZIP or a public repository, with logs, screenshots and Java test options |
+| `GET /api/runs` · `/api/runs/{name}` | Public for examples | Saved runs, for replay |
+| `GET /api/investigations` | Workspace users | All investigations on this backend |
+| `/api/admin/*` · `/api/workspace/*` | Signed in | Sign-in, accounts, roles, settings and audit log |
 
-## Tech stack
+Signed-in calls use `Authorization: Bearer <token>` from `POST /api/admin/login`. Workspace roles apply to signed-in callers; a viewer can't start runs.
 
-- Backend: Python, FastAPI
-- Frontend: Next.js
-- Models: `muse-spark-1.3` on the Meta Model API (investigator); Muse Spark Open on Baseten (reviewer)
-- Sandbox: Docker container per investigation, running a disposable copy of the target app, with a process fallback when Docker isn't available
-
-## Safety principles
-
-- Only investigates systems the user owns or is authorized to test.
-- All checks run in a sandbox: a disposable copy of the app in a Docker container with no network, a read-only root filesystem, no capabilities, a non-root user, and CPU, memory, PID and time limits. The original code is never modified.
-- Tools are phase-gated: the investigation phase can read and test, but only the fix phase can edit, and only the sandbox copy.
-- Secrets are stripped from the sandbox environment, and local paths are scrubbed from everything sent to the model.
-- Fixes are verified before being suggested as final.
-- API keys are read from environment variables and never committed.
-
-## Development setup
+## Development
 
 ```bash
 # Backend
 python -m venv .venv
 .venv/Scripts/python -m pip install -r backend/requirements.txt   # .venv/bin/python on macOS/Linux
-cp .env.example .env          # set MODEL_API_KEY, and BASETEN_API_KEY for the reviewer (never commit .env)
-.venv/Scripts/python backend/scripts/smoke_test.py   # checks the Meta Model API
-docker build -t tracepilot-sandbox:1 sandbox          # optional; built automatically on first use
-.venv/Scripts/python backend/scripts/investigate.py --scenario orders   # one demo scenario from the CLI
-.venv/Scripts/python backend/scripts/eval.py agent --runs 2            # repeated runs -> eval/RESULTS.md
-.venv/Scripts/python backend/scripts/eval.py reviewer                  # reviewer benchmark
-cd backend && ../.venv/Scripts/python -m pytest && cd ..   # backend tests
-cd backend && ../.venv/Scripts/uvicorn app.main:app --reload   # API on http://localhost:8000
+cp .env.example .env          # MODEL_API_KEY, BASETEN_API_KEY; optional TRACEPILOT_ADMIN_EMAIL/PASSWORD (never commit .env)
+.venv/Scripts/python backend/scripts/smoke_test.py                   # checks the Meta Model API
+.venv/Scripts/python backend/scripts/investigate.py --scenario orders   # one scenario from the CLI
+.venv/Scripts/python backend/scripts/eval.py agent --runs 2          # repeated runs -> eval/RESULTS.md
+.venv/Scripts/python backend/scripts/eval.py reviewer                # reviewer benchmark
+.venv/Scripts/python backend/scripts/compare.py run --system tracepilot   # plain agent vs TracePilot (also --system plain)
+.venv/Scripts/python backend/scripts/compare.py score                # judge with hidden tests -> eval/COMPARISON.md
+cd backend && ../.venv/Scripts/python -m pytest && cd ..             # backend tests
+cd backend && ../.venv/Scripts/uvicorn app.main:app --reload         # API on http://localhost:8000
 
 # Frontend (replays recorded runs; runs live when the API is up)
-cd frontend
-npm install
-npm run dev                   # http://localhost:3000
+cd frontend && npm install && npm run dev                            # http://localhost:3000
 ```
 
-## The interface
+**Tech stack:** Python and FastAPI; Next.js 15 and React 19; Docker; `muse-spark-1.3` on the Meta Model API; Muse Spark Open on Baseten; Vercel, AWS EC2, Caddy and GitHub Actions.
 
-The web app (`frontend/`, Next.js) has a landing page and six app screens:
+## Hackathon notes
 
-| Screen | What it shows |
-|---|---|
-| Landing | The pitch, the measured results, how it works |
-| Example scenarios | Every recorded run, with filters for Python, Java, bug fix, no code change and screenshot |
-| New investigation | Upload a project ZIP or give a public repository, add logs and screenshots, and start (needs a backend) |
-| Run | While running: the live console with a Stop button. Once done: the outcome, the patch or the recommended action, tests, the AI review, evidence and the full log |
-| Comparison results | The same-model comparison and the reviewer benchmark |
-| My runs | Recorded runs, plus the backend's saved runs when one is connected |
-| Documentation | Getting started and the CLI guide |
-
-The hosted demo has no backend, so it replays real recordings (`frontend/public/recordings/`, exported from `runs/` and `bench/runs/`). Every number on the site comes from those recordings or from `eval/`.
-
-## Build progress
-
-| Date | Milestone |
-|---|---|
-| Oct 27 | Meta Model API working; evidence tools; Docker sandbox; agent loop (investigate, fix, verify, report); first real verified run |
-| Oct 28 | Muse Spark Open on Baseten; three scenarios; streaming API; transcript recovery; Next.js flight-recorder UI; deployed; independent reviewer |
-| Oct 29 – Nov 2 | Multimodal evidence, eval table, architecture diagram |
-| Nov 3 | Feature freeze, hardening, demo recording |
-| Nov 4 | Submission |
-
-The detailed, timestamped history is in `BUILD_LOG.md`.
-
-## Demo scenarios
-
-Four synthetic services in `targets/`, covering seven planted defects plus a red herring:
-
-- **orders:** a 500 from a missing null check (reliability), and a missing ownership check (IDOR, security)
-- **notes:** search breaks on apostrophes, which is really SQL injection (security); slow-export warnings are a red herring
-- **billing:** a disputed cent from float rounding, and a pagination off-by-one (correctness)
-- **inventory:** negative reservations create phantom stock, and cancelling twice returns stock twice, so an item is oversold. **CI is green**: no existing test catches either bug, so the agent has to write the failing tests itself.
-
-The answer key is in `demo/README.md`, outside the sandbox. The agent only sees code, logs and a symptom-only incident report.
-
-## What was built during the hackathon
-
-Everything in this repository was built during the hackathon building period. Third-party libraries are listed in the dependency files and credited in the submission.
+- **Event:** Meta Global AI Developer Hackathon (Cerebral Valley). Indie Developer track, problem statement *Push the Frontier*.
+- **Built during the event:** everything in this repository was built during the building period (Oct 27 – Nov 4, 2026). [`BUILD_LOG.md`](BUILD_LOG.md) records what was built and when.
+- **Meta models at runtime:** `muse-spark-1.3` (Meta Model API) and Muse Spark Open (open weights, via Baseten).
+- **Third-party code:** libraries listed in `backend/requirements.txt` and `frontend/package.json`.
 
 ## License
 
-[MIT](LICENSE)
-
-
-### Admin Console and user workspace
-
-`/admin` is the administration portal. `/app` is the authenticated investigation workspace.
-Administrators manage accounts, workspace identity, permissions and audit logs. Operators have
-operational access; viewers can read investigations and reports but cannot start or stop runs.
-User workspace access is a separate per-account grant. Existing administrators default to no
-workspace access; grant it under **Roles & permissions** when needed.
-
-All investigation, event-stream and saved-run APIs now require `Authorization: Bearer <token>`.
-Obtain a token from `POST /api/admin/login` using an account configured by the administrator.
-Public `/health`, scenario descriptions and bundled benchmark recordings remain readable.
-Tokens are kept in browser memory, shared across portal navigation, and cleared on reload or
-sign-out. Settings and the latest 200 audit events are available in the console; account changes
-revoke the affected account's sessions. Audit storage persists with the account database.
-
-The first administrator is bootstrapped from `TRACEPILOT_ADMIN_EMAIL` and
-`TRACEPILOT_ADMIN_PASSWORD` (at least 12 characters) only when the account database is empty.
-Back up the database configured by `TRACEPILOT_ADMIN_DB`; it includes accounts, settings and audit history.
-
-### Continuous delivery
-
-Pull requests and pushes to `main` run backend tests and frontend production checks in GitHub Actions.
-The EC2 server checks `main` every two minutes and deploys each commit whose CI passed, with no inbound
-SSH or credentials in GitHub. Deploys preserve server configuration and data, and verify `/health` before
-declaring success.
-See [deployment setup and recovery](deploy/README.md). Frontend delivery remains with Vercel's Git integration.
+[MIT](LICENSE) © 2026 Thota Venu
