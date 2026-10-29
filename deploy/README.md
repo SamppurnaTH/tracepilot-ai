@@ -8,46 +8,25 @@ The Next.js frontend remains on Vercel. The FastAPI backend runs on the existing
 
 1. Run the complete Python test suite, including sandbox isolation, authorization and account migration checks.
 2. Run `npm ci`, lint, TypeScript validation and a production Next.js build.
-3. On `main`, deploy that exact commit only when both jobs pass and `EC2_DEPLOY_ENABLED=true`.
-4. Ignore superseded commits and serialize deployments to the production environment.
 
-GitHub-hosted runners connect to EC2. No local AWS CLI credentials or local EC2 connection is needed for subsequent deployments. The instance must accept SSH from the runner; do not disable host-key verification or open SSH publicly just to make a job pass. For a server with private SSH access, use an approved runner with access to that network or configure AWS Systems Manager instead.
+The server deploys itself. Every two minutes `tracepilot-pull-deploy.timer` runs `deploy/pull-deploy.sh`, which:
 
-### Repository variables
+1. Reads the newest commit on `main` and stops if it is already deployed.
+2. Asks the GitHub API whether CI passed for that commit. Still running: check again later. Failed: never deploy it.
+3. Hands the commit to `deploy/receive-deploy.sh`, which downloads that exact revision and runs `deploy/update.sh` (see below).
 
-| Variable | Purpose |
-| --- | --- |
-| `EC2_HOST` | EC2 public DNS name or IP |
-| `EC2_USER` | Existing SSH user, normally `ubuntu` for this Ubuntu installation |
-| `EC2_PORT` | SSH port; defaults to `22` |
-| `EC2_DEPLOY_PUBLIC_KEY` | Public half of the dedicated deployment key |
-| `EC2_DEPLOY_ENABLED` | Set to `true` only after successful bootstrap and host-key pinning |
-| `NEXT_PUBLIC_API_URL` | Optional API URL for the CI frontend build; set the production value separately on Vercel |
-
-### Environment secrets
-
-Use the `ec2-production` GitHub environment, restricted to the `main` branch.
-
-| Secret | Purpose |
-| --- | --- |
-| `EC2_SSH_PRIVATE_KEY` | Dedicated deployment key. Its public key is installed with a forced deployment command: no shell, PTY or port forwarding. |
-| `EC2_KNOWN_HOSTS` | Pinned SSH host-key entry, obtained during the one-time bootstrap |
-| `EC2_BOOTSTRAP_KEY` | Existing instance key, temporarily used for bootstrap. Delete it when bootstrap is finished, including if setup is abandoned. |
-
-Never commit private keys, model credentials, account databases or `.env` files.
+The instance only makes outbound HTTPS requests. SSH stays restricted to your own IP, and GitHub holds no SSH keys, AWS credentials or model keys. Superseded commits are skipped automatically: only the newest commit on `main` is ever deployed.
 
 ## One-time setup on an existing server
 
-The instance must already have `/opt/tracepilot/.env`, Docker, Python, rsync, and the `tracepilot` service from `deploy/setup.sh`.
+The instance must already have `/opt/tracepilot/.env`, Docker, Python, rsync and the `tracepilot` service from `deploy/setup.sh`. Then:
 
-1. Set the repository variables and the two private-key secrets described above. Keep `EC2_DEPLOY_ENABLED=false`.
-2. Run **Actions → Bootstrap EC2 deployment access → Run workflow** on `main`.
-3. The runner installs the root-owned deployment receiver and the restricted public key, preserving existing SSH keys. The first connection uses trust on first use for the specified host; all routine deployments require the pinned host key.
-4. Store the host-key entry printed between `EC2_HOST_KEY_BEGIN` and `EC2_HOST_KEY_END` as `EC2_KNOWN_HOSTS` in the production environment. Verify the fingerprint using the instance's existing trusted console connection when available.
-5. Delete `EC2_BOOTSTRAP_KEY` and set `EC2_DEPLOY_ENABLED=true`.
-6. Run **CI and EC2 deployment** manually, or push the next change to `main`.
+```bash
+cd ~/tracepilot-ai && git pull && sudo bash deploy/install-pull-deploy.sh
+journalctl -u tracepilot-pull-deploy -f
+```
 
-If SSH times out, fix runner-to-instance network access before retrying. A successful CI build alone does not mean the EC2 service has been updated. The deployment job must finish successfully.
+The first check deploys the current `main` if its CI passed, converting the server to the release layout below. After that, do not re-run `deploy/setup.sh` for routine updates: it would point the service back at the pre-release layout. A merge to `main` is live on EC2 within about two minutes of CI passing.
 
 ## Release behavior
 

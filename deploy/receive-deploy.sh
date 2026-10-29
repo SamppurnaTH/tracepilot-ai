@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Root-owned, forced SSH command. Only main's current immutable revision is deployable.
+# Root-owned; called by tracepilot-pull-deploy. Only main's current immutable revision is deployable.
 set -euo pipefail
 revision="${1:-}"
 [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || { echo 'Expected a full commit SHA, not a shell command.' >&2; exit 2; }

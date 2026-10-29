@@ -292,6 +292,7 @@ Back up the database configured by `TRACEPILOT_ADMIN_DB`; it includes accounts, 
 ### Continuous delivery
 
 Pull requests and pushes to `main` run backend tests and frontend production checks in GitHub Actions.
-After the one-time EC2 bootstrap, passing pushes automatically deploy the tested backend revision,
-preserve server configuration and data, and verify `/health` before declaring success.
+The EC2 server checks `main` every two minutes and deploys each commit whose CI passed, with no inbound
+SSH or credentials in GitHub. Deploys preserve server configuration and data, and verify `/health` before
+declaring success.
 See [deployment setup and recovery](deploy/README.md). Frontend delivery remains with Vercel's Git integration.
