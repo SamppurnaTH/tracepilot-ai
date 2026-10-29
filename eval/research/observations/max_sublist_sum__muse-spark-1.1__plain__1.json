@@ -1,0 +1,39 @@
+{
+  "id": "max_sublist_sum__muse-spark-1.1__plain__1",
+  "case": "max_sublist_sum",
+  "model": "muse-spark-1.1",
+  "condition": "plain",
+  "repeat": 1,
+  "started_utc": "2026-10-29T11:43:36Z",
+  "error": null,
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -4,7 +4,7 @@\n     max_so_far = 0\n \n     for x in arr:\n-        max_ending_here = max_ending_here + x\n+        max_ending_here = max(0, max_ending_here + x)\n         max_so_far = max(max_so_far, max_ending_here)\n \n     return max_so_far\n",
+  "claimed_fixed": true,
+  "usage": {
+    "input_tokens": 10414,
+    "output_tokens": 4132,
+    "cached_tokens": 7974,
+    "model_calls": 6,
+    "tool_calls": 6,
+    "by_phase": {
+      "agent": 14546
+    }
+  },
+  "reviewer_tokens": 0,
+  "duration_s": 75.5,
+  "outcome": null,
+  "review_verdict": null,
+  "heldout_pass": true,
+  "visible_pass": true,
+  "heldout_tests": {
+    "tests/test_heldout.py::test_contract[case_0]": "passed",
+    "tests/test_heldout.py::test_contract[case_1]": "passed",
+    "tests/test_heldout.py::test_contract[case_2]": "passed",
+    "tests/test_heldout.py::test_contract[case_3]": "passed"
+  },
+  "heldout_reasons": {},
+  "visible_tests": {
+    "tests/test_public.py::test_contract[case_0]": "passed",
+    "tests/test_public.py::test_contract[case_1]": "passed"
+  },
+  "false_success": false
+}

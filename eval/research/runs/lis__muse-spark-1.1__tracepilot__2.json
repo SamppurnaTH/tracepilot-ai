@@ -1,0 +1,569 @@
+{
+  "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+  "provider": "meta",
+  "model": "muse-spark-1.1",
+  "isolation": "docker",
+  "hypotheses": [
+    {
+      "id": "H1",
+      "claim": "longest is overwritten when improving an existing tail, causing length to shrink and returning wrong result",
+      "symptom": "Example lis([4,1,5,3,7,6,2]) expected 3 but implementation returns 2",
+      "next_check": "Trace execution and run regression test with documented example",
+      "status": "confirmed",
+      "evidence": [
+        "program.py:12-14 longest = length+1 inside if that also handles tail improvement",
+        "tests/test_regression_doc_example.py::test_doc_example failed assert 2 == 3",
+        "manual trace [4,1,5,3,7,6,2] longest shrinks from 3 to 2 at i=6"
+      ],
+      "reason": "Trace shows when processing final value 2, length=1, longest drops from 3 to 2 because longest = length+1 unconditionally inside improvement branch. Test failure assert 2 == 3 confirms.",
+      "fix_in": "code"
+    }
+  ],
+  "findings": {
+    "issues": [
+      {
+        "category": "correctness",
+        "evidence": [
+          "program.py:12-14 longest = length+1 inside if that also handles tail improvement",
+          "tests/test_regression_doc_example.py::test_doc_example failed assert 2 == 3",
+          "manual trace [4,1,5,3,7,6,2] longest shrinks from 3 to 2 at i=6"
+        ],
+        "fix": "Patch changes program.py to separate the extend vs improve-tail branches. The combined condition `if length == longest or val < arr[ends[length + 1]]:` was split into `if length == longest: ends[length + 1] = i; longest = length + 1` and `elif val < arr[ends[length + 1]]: ends[length + 1] = i` so longest is only updated on extension. Patch also adds tests/test_regression_doc_example.py with test_doc_example asserting lis([4,1,5,3,7,6,2]) == 3.",
+        "hypothesis_ids": [
+          "H1"
+        ],
+        "root_cause": "longest is overwritten when improving an existing tail, causing length to shrink and returning wrong result",
+        "severity": "high",
+        "title": "longest overwritten on tail improvement causes incorrect LIS length"
+      }
+    ],
+    "summary": "Incident: The function's behavior disagrees with its documented contract and supplied examples. Investigation confirmed H1: longest was unconditionally set to length+1 inside a branch that also handles tail improvement, causing shrink from 3 to 2 on input [4,1,5,3,7,6,2] and failure assert 2 == 3. Fix separates extend-longest case from improve-tail case. Verification: verified=true, fixed=[tests/test_regression_doc_example.py::test_doc_example], still_failing=[], regressions=[]. Independent review verdict=approve: Patch correctly separates the 'extend longest' case from 'improve tail' case, preventing longest from being overwritten with length+1=2 when processing trailing small values."
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -9,9 +9,11 @@\n \n         length = max(prefix_lengths) if prefix_lengths else 0\n \n-        if length == longest or val < arr[ends[length + 1]]:\n+        if length == longest:\n             ends[length + 1] = i\n             longest = length + 1\n+        elif val < arr[ends[length + 1]]:\n+            ends[length + 1] = i\n \n     return longest\n \n--- /dev/null\n+++ b/tests/test_regression_doc_example.py\n@@ -0,0 +1,4 @@\n+from program import lis\n+\n+def test_doc_example():\n+    assert lis([4, 1, 5, 3, 7, 6, 2]) == 3\n",
+  "excluded_tests": [],
+  "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+  "verification": {
+    "verified": true,
+    "fixed": [
+      "tests/test_regression_doc_example.py::test_doc_example"
+    ],
+    "still_failing": [],
+    "regressions": [],
+    "missing": [],
+    "before": {
+      "passed": 2,
+      "failed": 1
+    },
+    "after": {
+      "passed": 3
+    }
+  },
+  "outcome": "fixed",
+  "second_opinion": {
+    "verdict": "approve",
+    "confidence": "high",
+    "summary": "Patch correctly separates the 'extend longest' case from 'improve tail' case, preventing longest from being overwritten with length+1=2 when processing trailing small values. This directly fixes the regression (assert 2==3 on [4,1,5,3,7,6,2]) and restores the standard patience-sorting invariant without adding new logic errors.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "Line 12-14 unconditionally assigned longest=length+1 in the improvement branch; trace showing 3->2 at i=6 and test failure 2==3 directly supports cause."
+      }
+    ],
+    "risks": [],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 5110,
+    "duration_s": 13.3
+  },
+  "usage": {
+    "input_tokens": 36593,
+    "output_tokens": 10771,
+    "cached_tokens": 30782,
+    "model_calls": 12,
+    "tool_calls": 11,
+    "by_phase": {
+      "investigate": 26290,
+      "fix": 17343,
+      "report": 3731
+    }
+  },
+  "timing": {
+    "prepare_s": 0.0,
+    "sandbox_s": 1.43,
+    "model_s": 159.28,
+    "tools_s": 2.6,
+    "verify_s": 0.81,
+    "review_s": 13.31,
+    "by_phase": {
+      "investigate": 99.14,
+      "fix": 52.91,
+      "review": 13.31,
+      "report": 10.66
+    }
+  },
+  "duration_s": 177.5,
+  "events": [
+    {
+      "seq": 1,
+      "t": 0.54,
+      "type": "start",
+      "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+      "provider": "meta",
+      "model": "muse-spark-1.1",
+      "isolation": "docker"
+    },
+    {
+      "seq": 2,
+      "t": 1.42,
+      "type": "baseline",
+      "tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      },
+      "tally": {
+        "passed": 2
+      }
+    },
+    {
+      "seq": 3,
+      "t": 1.43,
+      "type": "brief",
+      "text": "Workspace files: program.py, tests/test_public.py\nTests: 2 passed, 0 failing",
+      "supplied_to_model": true
+    },
+    {
+      "seq": 4,
+      "t": 1.43,
+      "type": "phase",
+      "phase": "investigate"
+    },
+    {
+      "seq": 5,
+      "t": 3.2,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "."
+      }
+    },
+    {
+      "seq": 6,
+      "t": 3.2,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"directory\": \".\", \"files\": [\"program.py\", \"tests/test_public.py\"]}"
+    },
+    {
+      "seq": 7,
+      "t": 24.6,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 8,
+      "t": 24.6,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"program.py\", \"lines\": \"1-37 of 37\", \"content\": \"   1  \\n   2  def lis(arr):\\n   3      ends = {}\\n   4      longest = 0\\n   5  \\n   6      for i, val in enumerate(arr):\\n   7  \\n   8          prefix_lengths = [j for j in range(1, longest + 1) if arr[ends[j]] < val]\\n   9  \\n  10          length = max(prefix_lengths) if prefix_lengths else 0\\n  11  \\n  12          if length == longest or val < arr[ends[length + 1]]:\\n  13              ends[length + 1] = i\\n  14              longest = length + 1\\n  15  \\n  16      return longest\\n  17  \\n  18  \\n  19  \\n  20  \\\"\\\"\\\"\\n  21  Longest Increasing Subsequence\\n  22  longest-increasing-subsequence\\n  23  \\n  24  \\n  25  Input:\\n  26      arr: A sequence of ints\\n  27  \\n  28  Precondition:\\n  29      The ints in arr are unique\\n  30  \\n  31  Output:\\n  32      The length of the longest monotonically increasing subsequence of arr\\n  33  \\n  34  Example:\\n  35      >>> lis([4, 1, 5, 3, 7, 6, 2])\\n  36      3\\n  37  \\\"\\\"\\\"\"}"
+    },
+    {
+      "seq": 9,
+      "t": 24.6,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "tests/test_public.py"
+      }
+    },
+    {
+      "seq": 10,
+      "t": 24.6,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"tests/test_public.py\", \"lines\": \"1-7 of 7\", \"content\": \"   1  import json\\n   2  import pytest\\n   3  from program import lis as function\\n   4  CASES = json.loads('[[[[]], 0], [[[3]], 1]]')\\n   5  @pytest.mark.parametrize(\\\"arguments,expected\\\", CASES, ids=[\\\"case_%d\\\" % i for i in range(len(CASES))])\\n   6  def test_contract(arguments, expected):\\n   7      assert function(*arguments) == expected\"}"
+    },
+    {
+      "seq": 11,
+      "t": 26.68,
+      "type": "recovered",
+      "reason": "the server lost the conversation; replaying it from the local transcript"
+    },
+    {
+      "seq": 12,
+      "t": 34.61,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Analyzing a LIS function mismatch between code behavior, documentation, and examples under uniqueness precondition. Identifying a longest-length update bug in the patience-sorting LIS implementation. Formulating a hypothesis for the longest-length regression and drafting a regression test."
+    },
+    {
+      "seq": 13,
+      "t": 34.61,
+      "type": "hypothesis",
+      "id": "H1",
+      "claim": "longest is overwritten when improving an existing tail, causing length to shrink and returning wrong result",
+      "symptom": "Example lis([4,1,5,3,7,6,2]) expected 3 but implementation returns 2",
+      "next_check": "Trace execution and run regression test with documented example",
+      "status": "open",
+      "evidence": [],
+      "reason": "",
+      "fix_in": "code"
+    },
+    {
+      "seq": 14,
+      "t": 47.63,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Analyzing a patience sorting LIS implementation bug and correcting the longest length update logic. Isolating the bug where tail replacement incorrectly resets the longest length counter."
+    },
+    {
+      "seq": 15,
+      "t": 47.63,
+      "type": "tool_call",
+      "tool": "write_regression_test",
+      "args": {
+        "path": "tests/test_regression_doc_example.py"
+      }
+    },
+    {
+      "seq": 16,
+      "t": 48.49,
+      "type": "regression_test",
+      "path": "tests/test_regression_doc_example.py",
+      "accepted": false,
+      "tests": {
+        "tests/test_regression_doc_example.py::test_additional": "passed",
+        "tests/test_regression_doc_example.py::test_doc_example": "failed"
+      }
+    },
+    {
+      "seq": 17,
+      "t": 70.11,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Analyzing the LIS code bug, noting the linear prefix scan makes it O(n^2) instead of O(n log n) and checking correctness of the ends update logic. Identifying the incorrect unconditional longest increment and correcting it to only update on extension. Applying an abstract transformation under the interface constraint."
+    },
+    {
+      "seq": 18,
+      "t": 70.11,
+      "type": "hypothesis_update",
+      "id": "H1",
+      "claim": "longest is overwritten when improving an existing tail, causing length to shrink and returning wrong result",
+      "symptom": "Example lis([4,1,5,3,7,6,2]) expected 3 but implementation returns 2",
+      "next_check": "Trace execution and run regression test with documented example",
+      "status": "confirmed",
+      "evidence": [
+        "program.py:12-14 longest = length+1 inside if that also handles tail improvement",
+        "tests/test_regression_doc_example.py::test_doc_example failed assert 2 == 3",
+        "manual trace [4,1,5,3,7,6,2] longest shrinks from 3 to 2 at i=6"
+      ],
+      "reason": "Trace shows when processing final value 2, length=1, longest drops from 3 to 2 because longest = length+1 unconditionally inside improvement branch. Test failure assert 2 == 3 confirms.",
+      "fix_in": "code"
+    },
+    {
+      "seq": 19,
+      "t": 70.11,
+      "type": "tool_call",
+      "tool": "write_regression_test",
+      "args": {
+        "path": "tests/test_regression_doc_example.py"
+      }
+    },
+    {
+      "seq": 20,
+      "t": 70.96,
+      "type": "regression_test",
+      "path": "tests/test_regression_doc_example.py",
+      "accepted": true,
+      "tests": {
+        "tests/test_regression_doc_example.py::test_doc_example": "failed"
+      },
+      "reasons": {
+        "tests/test_regression_doc_example.py::test_doc_example": "assert 2 == 3"
+      }
+    },
+    {
+      "seq": 21,
+      "t": 80.96,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Analyzing a LIS algorithm bug and explaining the tail update logic and correctness tradeoff."
+    },
+    {
+      "seq": 22,
+      "t": 80.96,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 23,
+      "t": 80.96,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"program.py\", \"lines\": \"1-37 of 37\", \"content\": \"   1  \\n   2  def lis(arr):\\n   3      ends = {}\\n   4      longest = 0\\n   5  \\n   6      for i, val in enumerate(arr):\\n   7  \\n   8          prefix_lengths = [j for j in range(1, longest + 1) if arr[ends[j]] < val]\\n   9  \\n  10          length = max(prefix_lengths) if prefix_lengths else 0\\n  11  \\n  12          if length == longest or val < arr[ends[length + 1]]:\\n  13              ends[length + 1] = i\\n  14              longest = length + 1\\n  15  \\n  16      return longest\\n  17  \\n  18  \\n  19  \\n  20  \\\"\\\"\\\"\\n  21  Longest Increasing Subsequence\\n  22  longest-increasing-subsequence\\n  23  \\n  24  \\n  25  Input:\\n  26      arr: A sequence of ints\\n  27  \\n  28  Precondition:\\n  29      The ints in arr are unique\\n  30  \\n  31  Output:\\n  32      The length of the longest monotonically increasing subsequence of arr\\n  33  \\n  34  Example:\\n  35      >>> lis([4, 1, 5, 3, 7, 6, 2])\\n  36      3\\n  37  \\\"\\\"\\\"\"}"
+    },
+    {
+      "seq": 24,
+      "t": 100.57,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Correcting the patience sorting LIS implementation to only increment longest when extending the current maximum length. Applying the minimal fix to update longest only on extension and noting binary search as an alternative. Reviewing available tools and noting the absence of an edit capability for program.py. Concluding the read-only investigation phase and preparing the summary before enabling edits."
+    },
+    {
+      "seq": 25,
+      "t": 100.57,
+      "type": "message",
+      "phase": "investigate",
+      "text": "Investigated `lis` in `program.py`.\n\n**Symptom:** `lis([4,1,5,3,7,6,2])` returns 2 instead of documented 3.\n\n**Root cause (H1 confirmed):** At `program.py:12-14`, `longest = length+1` is executed even when improving an existing tail (`val < arr[ends[length+1]]`). When `length < longest`, `longest` should stay unchanged. Trace of the example: after processing up to 6, longest=3; processing 2 with length=1 overwrites `ends[2]` and incorrectly sets `longest=2`, losing the longer subsequence.\n\n**Regression test:** `tests/test_regression_doc_example.py::test_doc_example` fails with `assert 2 == 3` on current code, confirming the bug.\n\n**Fix needed:** only increment `longest` when `length == longest`; otherwise keep current longest."
+    },
+    {
+      "seq": 26,
+      "t": 100.57,
+      "type": "phase",
+      "phase": "fix"
+    },
+    {
+      "seq": 27,
+      "t": 111.95,
+      "type": "thinking",
+      "phase": "fix",
+      "text": "Analyzing the LIS implementation bug and correcting the longest length update logic."
+    },
+    {
+      "seq": 28,
+      "t": 111.95,
+      "type": "tool_call",
+      "tool": "edit_file",
+      "args": {
+        "path": "program.py",
+        "old": "        if length == longest or val < arr[ends[length + 1]]:\n            ends[length + 1] = i\n            longest = length + 1",
+        "new": "        if length == longest:\n            ends[length + 1] = i\n            longest = length + 1\n        elif val < arr[ends[length + 1]]:\n            ends[length + 1] = i"
+      }
+    },
+    {
+      "seq": 29,
+      "t": 111.96,
+      "type": "tool_result",
+      "tool": "edit_file",
+      "preview": "{\"edited\": \"program.py\"}"
+    },
+    {
+      "seq": 30,
+      "t": 111.96,
+      "type": "patch",
+      "path": "program.py",
+      "diff": "--- a/program.py\n+++ b/program.py\n@@ -9,9 +9,11 @@\n \n         length = max(prefix_lengths) if prefix_lengths else 0\n \n-        if length == longest or val < arr[ends[length + 1]]:\n+        if length == longest:\n             ends[length + 1] = i\n             longest = length + 1\n+        elif val < arr[ends[length + 1]]:\n+            ends[length + 1] = i\n \n     return longest\n \n--- /dev/null\n+++ b/tests/test_regression_doc_example.py\n@@ -0,0 +1,4 @@\n+from program import lis\n+\n+def test_doc_example():\n+    assert lis([4, 1, 5, 3, 7, 6, 2]) == 3\n"
+    },
+    {
+      "seq": 31,
+      "t": 123.53,
+      "type": "tool_call",
+      "tool": "run_tests",
+      "args": {}
+    },
+    {
+      "seq": 32,
+      "t": 124.4,
+      "type": "tool_result",
+      "tool": "run_tests",
+      "preview": "{\"exit_code\": 0, \"summary\": \"3 passed in 0.05s\"}"
+    },
+    {
+      "seq": 33,
+      "t": 136.65,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 34,
+      "t": 136.65,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"result\": {\"path\": \"program.py\", \"lines\": \"1-39 of 39\", \"content\": \"   1  \\n   2  def lis(arr):\\n   3      ends = {}\\n   4      longest = 0\\n   5  \\n   6      for i, val in enumerate(arr):\\n   7  \\n   8          prefix_lengths = [j for j in range(1, longest + 1) if arr[ends[j]] < val]\\n   9  \\n  10          length = max(prefix_lengths) if prefix_lengths else 0\\n  11  \\n  12          if length == longest:\\n  13              ends[length + 1] = i\\n  14              longest = length + 1\\n  15          elif val < arr[ends[length + 1]]:\\n  16              ends[length + 1] = i\\n  17  \\n  18      return longest\\n  19  \\n  20  \\n  21  \\n  22  \\\"\\\"\\\"\\n  23  Longest Increasing Subsequence\\n  24  longest-increasing-subsequence\\n  25  \\n  26  \\n  27  Input:\\n  28      arr: A sequence of ints\\n  29  \\n  30  Precondition:\\n  31      The ints in arr are unique\\n  32  \\n  33  Output:\\n  34      The length of the longest monotonically increasing subsequence of arr\\n  35  \\n  36  Example:\\n  37      >>> lis([4, 1, 5, 3, 7, 6, 2])\\n  38      3\\n  39  \\\"\\\"\\\"\"}, \"note\": \"You have run this exact call 3 times. Try a different check.\"}"
+    },
+    {
+      "seq": 35,
+      "t": 152.67,
+      "type": "message",
+      "phase": "fix",
+      "text": "Fixed `lis` in `program.py`: split the conditional so `longest` is only incremented when `length == longest` (extending the LIS). Improving an existing tail (`val < arr[ends[length+1]]`) now only updates `ends[length+1]` without changing `longest`. Previously the combined `if` set `longest = length+1` even on tail improvement, shrinking longest from 3 to 2 on the documented example `[4,1,5,3,7,6,2]`.\n\nTests: 3 passed (public + regression doc example)."
+    },
+    {
+      "seq": 36,
+      "t": 153.48,
+      "type": "verification",
+      "attempt": 1,
+      "tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed",
+        "tests/test_regression_doc_example.py::test_doc_example": "passed"
+      },
+      "verified": true,
+      "fixed": [
+        "tests/test_regression_doc_example.py::test_doc_example"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "passed": 2,
+        "failed": 1
+      },
+      "after": {
+        "passed": 3
+      }
+    },
+    {
+      "seq": 37,
+      "t": 153.48,
+      "type": "phase",
+      "phase": "review"
+    },
+    {
+      "seq": 38,
+      "t": 166.79,
+      "type": "second_opinion",
+      "verdict": "approve",
+      "confidence": "high",
+      "summary": "Patch correctly separates the 'extend longest' case from 'improve tail' case, preventing longest from being overwritten with length+1=2 when processing trailing small values. This directly fixes the regression (assert 2==3 on [4,1,5,3,7,6,2]) and restores the standard patience-sorting invariant without adding new logic errors.",
+      "hypotheses": [
+        {
+          "id": "H1",
+          "assessment": "supported",
+          "note": "Line 12-14 unconditionally assigned longest=length+1 in the improvement branch; trace showing 3->2 at i=6 and test failure 2==3 directly supports cause."
+        }
+      ],
+      "risks": [],
+      "provider": "baseten",
+      "model": "meta-models/muse-spark-open-1026",
+      "tokens": 5110,
+      "duration_s": 13.3
+    },
+    {
+      "seq": 39,
+      "t": 166.8,
+      "type": "phase",
+      "phase": "report"
+    },
+    {
+      "seq": 40,
+      "t": 177.46,
+      "type": "report",
+      "report": {
+        "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+        "provider": "meta",
+        "model": "muse-spark-1.1",
+        "isolation": "docker",
+        "hypotheses": [
+          {
+            "id": "H1",
+            "claim": "longest is overwritten when improving an existing tail, causing length to shrink and returning wrong result",
+            "symptom": "Example lis([4,1,5,3,7,6,2]) expected 3 but implementation returns 2",
+            "next_check": "Trace execution and run regression test with documented example",
+            "status": "confirmed",
+            "evidence": [
+              "program.py:12-14 longest = length+1 inside if that also handles tail improvement",
+              "tests/test_regression_doc_example.py::test_doc_example failed assert 2 == 3",
+              "manual trace [4,1,5,3,7,6,2] longest shrinks from 3 to 2 at i=6"
+            ],
+            "reason": "Trace shows when processing final value 2, length=1, longest drops from 3 to 2 because longest = length+1 unconditionally inside improvement branch. Test failure assert 2 == 3 confirms.",
+            "fix_in": "code"
+          }
+        ],
+        "findings": {
+          "issues": [
+            {
+              "category": "correctness",
+              "evidence": [
+                "program.py:12-14 longest = length+1 inside if that also handles tail improvement",
+                "tests/test_regression_doc_example.py::test_doc_example failed assert 2 == 3",
+                "manual trace [4,1,5,3,7,6,2] longest shrinks from 3 to 2 at i=6"
+              ],
+              "fix": "Patch changes program.py to separate the extend vs improve-tail branches. The combined condition `if length == longest or val < arr[ends[length + 1]]:` was split into `if length == longest: ends[length + 1] = i; longest = length + 1` and `elif val < arr[ends[length + 1]]: ends[length + 1] = i` so longest is only updated on extension. Patch also adds tests/test_regression_doc_example.py with test_doc_example asserting lis([4,1,5,3,7,6,2]) == 3.",
+              "hypothesis_ids": [
+                "H1"
+              ],
+              "root_cause": "longest is overwritten when improving an existing tail, causing length to shrink and returning wrong result",
+              "severity": "high",
+              "title": "longest overwritten on tail improvement causes incorrect LIS length"
+            }
+          ],
+          "summary": "Incident: The function's behavior disagrees with its documented contract and supplied examples. Investigation confirmed H1: longest was unconditionally set to length+1 inside a branch that also handles tail improvement, causing shrink from 3 to 2 on input [4,1,5,3,7,6,2] and failure assert 2 == 3. Fix separates extend-longest case from improve-tail case. Verification: verified=true, fixed=[tests/test_regression_doc_example.py::test_doc_example], still_failing=[], regressions=[]. Independent review verdict=approve: Patch correctly separates the 'extend longest' case from 'improve tail' case, preventing longest from being overwritten with length+1=2 when processing trailing small values."
+        },
+        "diff": "--- a/program.py\n+++ b/program.py\n@@ -9,9 +9,11 @@\n \n         length = max(prefix_lengths) if prefix_lengths else 0\n \n-        if length == longest or val < arr[ends[length + 1]]:\n+        if length == longest:\n             ends[length + 1] = i\n             longest = length + 1\n+        elif val < arr[ends[length + 1]]:\n+            ends[length + 1] = i\n \n     return longest\n \n--- /dev/null\n+++ b/tests/test_regression_doc_example.py\n@@ -0,0 +1,4 @@\n+from program import lis\n+\n+def test_doc_example():\n+    assert lis([4, 1, 5, 3, 7, 6, 2]) == 3\n",
+        "excluded_tests": [],
+        "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+        "verification": {
+          "verified": true,
+          "fixed": [
+            "tests/test_regression_doc_example.py::test_doc_example"
+          ],
+          "still_failing": [],
+          "regressions": [],
+          "missing": [],
+          "before": {
+            "passed": 2,
+            "failed": 1
+          },
+          "after": {
+            "passed": 3
+          }
+        },
+        "outcome": "fixed",
+        "second_opinion": {
+          "verdict": "approve",
+          "confidence": "high",
+          "summary": "Patch correctly separates the 'extend longest' case from 'improve tail' case, preventing longest from being overwritten with length+1=2 when processing trailing small values. This directly fixes the regression (assert 2==3 on [4,1,5,3,7,6,2]) and restores the standard patience-sorting invariant without adding new logic errors.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "assessment": "supported",
+              "note": "Line 12-14 unconditionally assigned longest=length+1 in the improvement branch; trace showing 3->2 at i=6 and test failure 2==3 directly supports cause."
+            }
+          ],
+          "risks": [],
+          "provider": "baseten",
+          "model": "meta-models/muse-spark-open-1026",
+          "tokens": 5110,
+          "duration_s": 13.3
+        },
+        "usage": {
+          "input_tokens": 36593,
+          "output_tokens": 10771,
+          "cached_tokens": 30782,
+          "model_calls": 12,
+          "tool_calls": 11,
+          "by_phase": {
+            "investigate": 26290,
+            "fix": 17343,
+            "report": 3731
+          }
+        },
+        "timing": {
+          "prepare_s": 0.0,
+          "sandbox_s": 1.43,
+          "model_s": 159.28,
+          "tools_s": 2.6,
+          "verify_s": 0.81,
+          "review_s": 13.31,
+          "by_phase": {
+            "investigate": 99.14,
+            "fix": 52.91,
+            "review": 13.31,
+            "report": 10.66
+          }
+        },
+        "duration_s": 177.5
+      }
+    }
+  ]
+}

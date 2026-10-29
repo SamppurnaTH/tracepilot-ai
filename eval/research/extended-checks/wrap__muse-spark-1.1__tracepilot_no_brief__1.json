@@ -1,0 +1,13 @@
+{
+  "id": "wrap__muse-spark-1.1__tracepilot_no_brief__1",
+  "model": "muse-spark-1.1",
+  "condition": "tracepilot_no_brief",
+  "repeat": 1,
+  "posthoc": true,
+  "passes": true,
+  "timed_out": false,
+  "error": null,
+  "exit_code": 0,
+  "stdout": "contract invariants passed\n",
+  "stderr": ""
+}

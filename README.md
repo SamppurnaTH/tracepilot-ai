@@ -8,7 +8,7 @@ Built with **Meta Muse Spark** (investigator) and **Muse Spark Open on Baseten**
 |---|---|
 | **Live product** | [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app), connected to a live backend |
 | **Results** | [Same model, with and without TracePilot](eval/COMPARISON.md) · [Evaluation and reviewer benchmark](eval/RESULTS.md) |
-| **Build history** | [`BUILD_LOG.md`](BUILD_LOG.md): everything was built during the hackathon building period (Oct 27 – Nov 4, 2026) |
+| **Build history** | [`BUILD_LOG.md`](BUILD_LOG.md): TracePilot work during Oct 27 – Nov 4, 2026; pre-existing ShipSpace and reused dependencies disclosed |
 
 ## Try it in 60 seconds
 
@@ -39,11 +39,13 @@ TracePilot investigates first and proves its work:
 
 Every number comes from real runs. The raw data is in `eval/`.
 
-**Same model, with and without TracePilot** ([details](eval/COMPARISON.md)). Both use `muse-spark-1.3`, the same sandbox, logs and tools. Every patch is judged by hidden acceptance tests that neither system sees.
+**Judge evidence:** [answers to every question](docs/JUDGE_QA.md) · [uncertainty and error rates](eval/STATISTICS.md) · [threat model / data flow](SECURITY.md) · [honest case studies](docs/CASE_STUDIES.md) · [90-second demo](docs/DEMO_SCRIPT.md) · [official rubric alignment](docs/HACKATHON_ALIGNMENT.md). The UI exposes the same limits at `/evidence` and alongside benchmarks.
+
+**Same model, with and without TracePilot** ([details](eval/COMPARISON.md)). Both use `muse-spark-1.3`, the same sandbox, logs and basic tools. Code patches are judged by hidden acceptance tests. Refunds is scored as a correct external-cause diagnosis with no application patch, not verified operational recovery.
 
 | 13 runs each | Plain agent | TracePilot |
 |---|---|---|
-| Actually fixed (hidden tests) | 12/13 | **13/13** |
+| Correct outcomes (acceptance criteria) | 12/13 | **13/13** |
 | Claimed fixed but wasn't | 0 | 0 |
 | Reproducing tests written | 0 | **5** |
 | Average tokens (TracePilot includes the reviewer) | 137,596 | **94,346** (31% fewer) |
@@ -56,7 +58,21 @@ Every number comes from real runs. The raw data is in `eval/`.
 - **7/8** correct patches approved; one got "concerns".
 - About **$0.10 per investigation**.
 
+These are small, project-authored evaluations, not independent or statistically significant population claims. The eight gaming observations repeat four distinct attacks; they are not eight independently authored patches. Unsafe approvals: 0/8 (descriptive 95% Wilson interval 0–32.4%); correct-patch nonapprovals: 1/8 (2.2–47.1%, one concerns verdict, no hard reject). TracePilot 13/13 has a 77.2–100% interval. Incident-cluster cost/speed intervals include zero. [Rebuildable statistics](eval/STATISTICS.md) disclose the method and source hashes. The controlled research extension is reported separately; the original pilot alone does not establish component effects or a smaller-model advantage.
+
+The dollar figure is a model-cost estimate/order of magnitude from the saved usage, not a proposed retail price or all-in cost. Hosting, separate reviewer billing, retries and support are not fully represented. Provider rates and cache effects can change.
+
 What this shows, honestly: the model is strong on its own, and the plain agent never claimed a false fix here. TracePilot's measurable gains are cost and speed, plus proof that ships with every fix. The largest gap was ShipSpace, a real Spring Boot app: 505K tokens and 18 minutes for the plain agent, against 335K and 12 minutes for the same one-line fix. Where verification matters most is a patch that looks right but isn't, and the reviewer benchmark measures exactly that.
+
+## Controlled research extension
+
+**Completed findings and claim corrections:** [research closure](docs/RESEARCH_CLOSURE.md). The measured harness is archived; current product code separately blocks application of a patch with unresolved review concerns or rejection.
+
+The original service-incident pilot is kept separate from a locally frozen **96-trial external-source matrix**: six QuixBugs algorithms, Muse Spark 1.1 and 1.3, four workflows (plain, plain+brief, TracePilot, TracePilot without brief), two repetitions. Source revisions, splits, budgets, raw observations and a second scoring pass for every patch are retained. [Current status and results](eval/research/RESULTS.md) · [Protocol](docs/RESEARCH_PROTOCOL.md) · [Replication instructions](eval/research/README.md).
+
+The reviewer follow-up has **48 observations** comparing cold Muse Spark 1.3 and Muse Spark Open review on upstream fixes and six model-generated overfitting attacks. Each reviewer rejected 12/12 gaming observations and approved 10/12 reference observations. Their two reference nonapprovals concerned `wrap`: a separate time-limited Docker check confirmed a zero-progress hang that the upstream test oracle missed. These are not automatically false rejections. The raw-reference pilot is retained separately because whole-module upstream files changed documentation and created a merge-readiness confound.
+
+This does not establish private-repository generalization, smaller-model gains or independent model-family blind spots. The benchmark is public and may be known to models. The brief is isolated; remaining harness features are a bundled comparison. Do not assume the original 31% token saving applies to new workloads. Completed and pending cells, null/negative results, cached usage, reviewer overhead and wide intervals are visible in the report.
 
 ## Meta AI tooling
 
@@ -119,7 +135,7 @@ flowchart LR
 
 ## Demo scenarios
 
-Eight incidents, all with symptom-only incident reports. Answer keys live outside the sandbox, and a test (`test_targets_contain_no_answer_key`) guards that the agent never sees them. The shipping module and ShipSpace are recorded runs; the other six can also run live.
+Eight original incidents, all with symptom-only incident reports, plus a recorded external-study review-required case. Answer keys live outside the sandbox, and a test (`test_targets_contain_no_answer_key`) guards that the agent never sees them. The shipping module and ShipSpace are recorded runs; the other six can also run live.
 
 | Scenario | What's wrong | Why it's hard |
 |---|---|---|
@@ -147,16 +163,19 @@ cp .env.example .env                                                            
 - **Languages:** Python projects with pytest, and Java projects with Maven and JUnit 5 (detected from `pom.xml`). A FastAPI app is detected automatically, so the agent can send it requests.
 - **Evidence:** logs as JSON lines or plain text; screenshots with `--screenshot path/to/image.png` (PNG, JPEG, WebP or GIF).
 - **Java options:** `--tests` sets which test classes define "green", like your CI's list. `--test-args` passes properties such as `"-Dspring.profiles.active=test"`. Tests that need a database, network or Docker are excluded and listed, because the sandbox blocks all three.
-- **Output:** `tracepilot-out/<time>/` contains `fix.patch`, `pr.md`, `report.md` and `run.json`. Add `--apply` to apply the patch with `git apply`, only if it was verified. The exit code is 0 when verified and 1 when not.
+- **Defaults and limits:** Maven discovers its default test scope without either option. Profiles remain explicit because guessing them can change application behavior. Recognized infrastructure-dependent Java test classes are excluded and named; Python service-dependent tests may error. Unsupported non-Python/non-Maven projects get a clear refusal before model calls. Verification does not cover excluded tests, production-only data, intermittent behavior or unseen concurrency schedules.
+- **Output:** `tracepilot-out/<time>/` contains `fix.patch`, `pr.md`, `report.md` and `run.json`. Add `--apply` to apply the patch with `git apply`, only if it was verified. The exit code is 0 for a test-verified patch without unresolved review objections, or for a no-code-change diagnosis; 1 means unverified or review required.
 
 In the browser, **New investigation** does the same with a project ZIP or a public repository URL.
+
+**CI integration:** copy the [manual GitHub Actions example](examples/github-actions/tracepilot.yml) using [these setup instructions](examples/github-actions/README.md). It uploads evidence for human review; it does not install a GitHub App, open a PR or apply a patch. CLI exit 0 also includes a no-code-change diagnosis; inspect the JSON outcome.
 
 ## The product
 
 | Screen | What it does |
 |---|---|
 | **Landing** (`/`) | The pitch, the measured results and how it works |
-| **Example scenarios** (`/examples`) | All 8 incidents: run live, watch a recording, or view the result |
+| **Example scenarios** (`/examples`) | Eight original incidents plus a real review-required study replay; run supported examples live or watch recordings |
 | **New investigation** (`/investigate`) | Upload a ZIP or give a public repository, add logs and screenshots |
 | **Run** (`/run`) | The live console while running, with Stop. When done: the outcome, patch or recommended action, tests, AI review, evidence and the full log |
 | **Comparison results** (`/results`) | The same-model comparison and the reviewer benchmark |
@@ -190,10 +209,12 @@ See [`deploy/README.md`](deploy/README.md) for setup, operations and recovery.
 
 ## Safety and privacy
 
+Data flow: `repository/logs/screenshots → harness → Meta investigator; incident facts + patch + changed-file excerpts → Baseten Meta reviewer; reports/events → run storage`. See [the threat model](SECURITY.md) for actual boundaries, provider qualifications, dependency-build exposure, team access and retention limits.
+
 - **Only systems you own or are authorized to test.** All checks run on a disposable copy in a sandbox; the original code is never modified.
 - **Phase-gated tools:** the investigation phase can read and test; only the fix phase can edit, and only the sandbox copy.
 - **Secrets stay out:** `.env` files are never copied into the sandbox, secret-looking environment variables are stripped, and local paths are scrubbed from everything sent to the models.
-- **What leaves your machine:** code snippets, log lines and test results go to the Meta Model API, and the patch goes to Baseten for review. While Meta's free credits are in use, Meta may use that content for product improvement. For company code, use paid usage, or self-host Muse Spark Open inside your own network.
+- **What leaves your machine:** code snippets, logs, test results and screenshots go to the Meta Model API; incident evidence, patch and changed files go to Baseten. Contributor/free-credit terms may permit product improvement; verify your account contract. A private Muse Spark Open reviewer endpoint is configurable, but investigation still calls Meta. Self-hosting only review does not make the entire system private, and paid usage alone is not a privacy guarantee. Never upload embedded secrets or private customer data without appropriate approval.
 - **Private repositories work:** the CLI reads a local folder and needs no GitHub access.
 - **Demo data is synthetic.** No real customer data or credentials were sent to any model.
 

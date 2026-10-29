@@ -40,6 +40,9 @@ def java_project(tmp_path: Path) -> Path:
 
 def test_detect_kind(tmp_path):
     assert detect_kind(java_project(tmp_path)) == "maven"
+    with pytest.raises(ValueError, match="Unsupported project"):
+        detect_kind(tmp_path / "empty")
+    (tmp_path / "app.py").write_text("x = 1")
     assert detect_kind(tmp_path) == "python"
 
 

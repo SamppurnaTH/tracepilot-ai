@@ -8,8 +8,8 @@ import s from "@/components/app.module.css";
 import { AppShell } from "@/components/AppShell";
 import { cx } from "@/components/bits";
 import { Icon } from "@/components/icons";
-import { estimateCost } from "@/lib/run";
 import { kTokens, minutes, useData } from "@/lib/useData";
+import evidence from "../../../public/evidence.json";
 
 const CASE_LABEL: Record<string, [string, string]> = {
   orders: ["Orders: 500 + data exposure", "Python"],
@@ -43,6 +43,18 @@ function Bars({ title, sub, a, b, fmt }: { title: string; sub: string; a: number
           </div>
         ))}
       </div>
+      <section className={s.panel} aria-label="Evidence and uncertainty">
+        <h2 className={s.panelTitle}>Evidence, with limits</h2>
+        <p className={s.pageText}>13 runs per system across 7 authored incidents. These results do not establish a statistically significant success advantage. Both model roles use Meta models in separate contexts; shared blind spots remain possible.</p>
+        <div className={s.tableWrap}><table className={s.table}><thead><tr><th>Measurement</th><th>Observed</th><th>Descriptive 95% interval</th></tr></thead><tbody>{([
+          ["TracePilot correct outcomes", evidence.systems.tracepilot],
+          ["Plain agent correct outcomes", evidence.systems.plain],
+          ["Unsafe patches approved", evidence.reviewer.unsafe_approval],
+          ["Correct patches not approved", evidence.reviewer.correct_patch_nonapproval],
+        ] as const).map(([label, rate]) => <tr key={label}><td>{label}</td><td>{rate.count}/{rate.total}</td><td>{rate.wilson_95?.map((n) => `${(n * 100).toFixed(1)}%`).join("–")}</td></tr>)}</tbody></table></div>
+        <p className={s.footnote}>Wilson intervals describe this small repeated-case set. “Concerns” counts as nonapproval, not rejection. These original fixtures were project-authored. The separate completed research extension adds external-source tests, brief ablations and a Meta-version comparison; its null and negative results are reported separately.</p>
+        <div className={s.actions}><Link href="/evidence" className={s.btn}>Judge evidence & limitations</Link><a href="/evidence.json" className={s.btn} download>Download statistics & source hashes</a></div>
+      </section>
     </div>
   );
 }
@@ -60,7 +72,7 @@ export default function Results() {
         <div>
           <h1 className={s.pageTitle}>TracePilot vs a plain AI agent</h1>
           <p className={s.pageText}>
-            Same model (muse-spark-1.3) · same sandbox, logs and tools · real incidents · judged by hidden acceptance tests that neither system sees.
+            Original service pilot: same model (muse-spark-1.3), sandbox and basic tools. Code cases use hidden acceptance tests; Refunds scores an external-cause diagnosis with no application patch.
           </p>
         </div>
         <button className={s.btn} disabled={!comparison} onClick={() => downloadText("tracepilot-benchmark.json", JSON.stringify(comparison, null, 2))}><Icon name="download" size={15} /> Export benchmark</button>
@@ -74,7 +86,7 @@ export default function Results() {
               Benchmark results ({tp.runs} runs each)
             </h2>
             <div className={s.charts}>
-              <Bars title="Success rate" sub="Higher is better" a={tp.correct / tp.runs} b={plain.correct / plain.runs} fmt={(n) => `${(n * 100).toFixed(n === 1 ? 0 : 1)}%`} />
+              <Bars title="Correct outcomes" sub="Includes no-code-change diagnoses" a={tp.correct / tp.runs} b={plain.correct / plain.runs} fmt={(n) => `${(n * 100).toFixed(n === 1 ? 0 : 1)}%`} />
               <Bars title="Average tokens" sub="Lower is better" a={tp.avg_tokens} b={plain.avg_tokens} fmt={kTokens} />
               <Bars title="Average time" sub="Lower is better" a={tp.avg_duration_s} b={plain.avg_duration_s} fmt={minutes} />
               <Bars title="Reproducing test files" sub="Proof that ships with the fix" a={tp.new_tests} b={plain.new_tests} fmt={String} />
@@ -92,10 +104,10 @@ export default function Results() {
                   <tr>
                     <th scope="col">Incident</th>
                     <th scope="col">Language</th>
-                    <th scope="col">TracePilot: fixed</th>
+                    <th scope="col">TracePilot: correct</th>
                     <th scope="col">Time</th>
                     <th scope="col">Tokens</th>
-                    <th scope="col">Plain agent: fixed</th>
+                    <th scope="col">Plain agent: correct</th>
                     <th scope="col">Time</th>
                     <th scope="col">Tokens</th>
                   </tr>
@@ -130,8 +142,7 @@ export default function Results() {
               </table>
             </div>
             <p className={s.footnote}>
-              Fixed = the patch passes hidden tests on a fresh copy. Tokens include the reviewer for TracePilot. TracePilot averages about {estimateCost(tp.avg_tokens)} per
-              investigation. The plain agent&apos;s one miss changed code during an incident caused by an expired API key; raw runs are in{" "}
+              Correct outcome means passing the case acceptance criteria; Refunds scores diagnosis without an application patch, not verified provider recovery. Tokens include the reviewer for TracePilot; mixed-provider totals are not measured dollar cost. The plain agent&apos;s one miss changed code during an incident caused by an expired API key; raw runs are in{" "}
               <code className={s.inlineCode}>eval/comparison.json</code>.
             </p>
           </section>

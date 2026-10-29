@@ -83,8 +83,14 @@ def ensure_image() -> None:
 
 
 def detect_kind(source: Path) -> str:
-    """"maven" for a Java project with a pom.xml, otherwise "python"."""
-    return "maven" if (source / "pom.xml").is_file() else "python"
+    """Detect supported projects before building images or calling a model."""
+    if (source / "pom.xml").is_file():
+        return "maven"
+    unsupported_root = any((source / name).is_file() for name in ("package.json", "go.mod", "Cargo.toml", "build.gradle", "build.gradle.kts"))
+    python_root = any((source / name).is_file() for name in ("pyproject.toml", "setup.py", "requirements.txt", "pytest.ini")) or any((source / "tests").glob("test_*.py"))
+    if (not unsupported_root or python_root) and any(p.is_file() and not is_generated(p.relative_to(source)) for p in source.rglob("*.py")):
+        return "python"
+    raise ValueError("Unsupported project: TracePilot supports Python with pytest or Java with Maven (pom.xml). Upload the service folder; Node, Go, Gradle and other build systems are not supported.")
 
 
 def _build(tag: str, files: dict[str, Path | str], dockerfile: str, what: str) -> str:

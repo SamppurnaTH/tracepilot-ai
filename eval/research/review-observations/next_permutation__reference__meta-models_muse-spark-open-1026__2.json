@@ -1,0 +1,65 @@
+{
+  "case": "next_permutation",
+  "kind": "reference",
+  "reviewer": "meta-models/muse-spark-open-1026",
+  "repeat": 2,
+  "label_correct_patch": true,
+  "error": null,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "assert [3, 1, 2, 4] == [3, 4, 1, 2]",
+          "assert [3, 1, 5, 2, 6] == [3, 6, 1, 2, 5]"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -3,29 +3,20 @@\n     for i in range(len(perm) - 2, -1, -1):\n         if perm[i] < perm[i + 1]:\n             for j in range(len(perm) - 1, i, -1):\n-                if perm[j] < perm[i]:\n+                if perm[i] < perm[j]:\n                     next_perm = list(perm)\n                     next_perm[i], next_perm[j] = perm[j], perm[i]\n                     next_perm[i + 1:] = reversed(next_perm[i + 1:])\n                     return next_perm\n \n-\n-\n \"\"\"\n-Next Permutation\n-next-perm\n-\n-\n-Input:\n-    perm: A list of unique ints\n-\n-Precondition:\n-    perm is not sorted in reverse order\n-\n-Output:\n-    The lexicographically next permutation of the elements of perm\n-\n-Example:\n-    >>> next_permutation([3, 2, 4, 1])\n-    [3, 4, 1, 2]\n+def next_permutation(perm):\n+    for i in range(len(perm) - 2, -1, -1):\n+        if perm[i] < perm[i + 1]:\n+            for j in range(len(perm) - 1, i, -1):\n+                if perm[j] > perm[i]:\n+                    next_perm = list(perm)\n+                    next_perm[i], next_perm[j] = perm[j], perm[i]\n+                    next_perm[i + 1:] = reversed(next_perm[i + 1:])\n+                    return next_perm\n \"\"\"\n",
+  "files": {
+    "program.py": "\ndef next_permutation(perm):\n    for i in range(len(perm) - 2, -1, -1):\n        if perm[i] < perm[i + 1]:\n            for j in range(len(perm) - 1, i, -1):\n                if perm[i] < perm[j]:\n                    next_perm = list(perm)\n                    next_perm[i], next_perm[j] = perm[j], perm[i]\n                    next_perm[i + 1:] = reversed(next_perm[i + 1:])\n                    return next_perm\n\n\"\"\"\ndef next_permutation(perm):\n    for i in range(len(perm) - 2, -1, -1):\n        if perm[i] < perm[i + 1]:\n            for j in range(len(perm) - 1, i, -1):\n                if perm[j] > perm[i]:\n                    next_perm = list(perm)\n                    next_perm[i], next_perm[j] = perm[j], perm[i]\n                    next_perm[i + 1:] = reversed(next_perm[i + 1:])\n                    return next_perm\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "concerns",
+    "confidence": "medium",
+    "summary": "Comparator fix from perm[j] < perm[i] to perm[j] > perm[i] (perm[i] < perm[j]) is the correct root-cause for next_permutation and public tests now pass. However patch deletes the contract docstring and replaces it with a dead duplicate function inside a trailing triple-quoted string, which is not merge-ready and needs cleanup.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "weak",
+        "note": "Incident is plausible and tests show failure/passing, but evidence lists only bare assert equalities without inputs, outputs, or linkage to documented Example, so disagreement is asserted not demonstrated."
+      }
+    ],
+    "risks": [
+      "Deletes contractual docstring (Input/Precondition/Output/Example) so spec is lost",
+      "Adds dead duplicate implementation as trailing string literal serving no purpose and confusing maintenance",
+      "Leaves implicit None return for precondition-violating or edge inputs with no explicit handling (inherited, but unaddressed)"
+    ],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 4011,
+    "duration_s": 10.8
+  },
+  "wrong": true
+}

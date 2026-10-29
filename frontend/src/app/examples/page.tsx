@@ -9,7 +9,7 @@ import { EmptyState, SkeletonCards } from "@/components/ScreenState";
 import { AppShell } from "@/components/AppShell";
 import { cx } from "@/components/bits";
 import { Icon, type IconName } from "@/components/icons";
-import { startLiveRun, type RecordingIndexEntry } from "@/lib/api";
+import { recordingFallback, startLiveRun, type RecordingIndexEntry } from "@/lib/api";
 import { publicTicket } from "@/lib/report";
 import { kTokens, minutes, useData } from "@/lib/useData";
 
@@ -22,6 +22,7 @@ const ICONS: Record<string, [IconName, string]> = {
   checkout: ["image", s.iconBlue],
   shipping: ["clock", s.iconGreen],
   shipspace: ["layers", s.iconViolet],
+  "wrap-review": ["shieldCheck", s.iconAmber],
 };
 
 const PRIORITY: Record<string, number> = { checkout: 0, refunds: 1 };
@@ -30,7 +31,8 @@ const FILTERS: [string, (e: RecordingIndexEntry) => boolean][] = [
   ["All", () => true],
   ["Python", (e) => (e.scenario.language ?? "python") === "python"],
   ["Java", (e) => e.scenario.language === "java"],
-  ["Bug fix", (e) => e.verified],
+  ["Bug fix", (e) => e.verified && e.review !== "concerns" && e.review !== "reject"],
+  ["Review required", (e) => e.outcome === "needs_review" || e.review === "concerns" || e.review === "reject"],
   ["No code change", (e) => e.outcome === "no_code_change"],
   ["Screenshot", (e) => Boolean(e.scenario.screenshots?.length)],
 ];
@@ -47,12 +49,15 @@ export default function Examples() {
   const test = FILTERS.find(([name]) => name === filter)![1];
 
   const runLive = async (id: string) => {
+    if (!live) { router.push(area(`/app/run?id=${id}&replay=1&fallback=unavailable`)); return; }
     setError(null);
     setStarting(id);
     try {
       const runId = await startLiveRun(id);
       router.push(area(`/app/run?live=${runId}`));
     } catch (err) {
+      const fallback = recordingFallback(err);
+      if (fallback) { router.push(area(`/app/run?id=${id}&replay=1&fallback=${fallback}`)); return; }
       setError(err instanceof Error ? err.message : String(err));
       setStarting(null);
     }
@@ -68,6 +73,7 @@ export default function Examples() {
           <p className={s.pageText}>
             Every card is a real, unedited investigation. View it step by step, or{live ? " run it live on the connected backend." : " run it live once a backend is connected."}
           </p>
+          <p className={s.footnote}>Start here: Refunds shows honest abstention; Checkout proves a fix from screenshot evidence. Python/pytest and Java/Maven only. Live Python examples usually take 2–4 minutes; recordings remain available when capacity is full.</p>
         </div>
         {user?.role !== "viewer" && <Link href="/app/investigate" className={cx(s.btn, s.btnPrimary)}>
           <Icon name="sparkle" size={16} /> New investigation
@@ -89,7 +95,7 @@ export default function Examples() {
         {shown?.map((e) => {
           const [icon, tone] = ICONS[e.scenario.id] ?? ["file", s.iconViolet];
           const [service, ...rest] = e.scenario.title.split(":");
-          const result = e.outcome === "no_code_change" ? ["No code change needed", s.sevPass] : e.verified ? ["Fix verified", s.sevPass] : ["Not verified", s.sevCritical];
+          const result = e.outcome === "no_code_change" ? ["No code change needed", s.sevPass] : e.outcome === "needs_review" || e.review === "concerns" || e.review === "reject" ? ["Review required", s.sevCritical] : e.verified ? ["Fix verified", s.sevPass] : ["Not verified", s.sevCritical];
           const lang = e.scenario.language === "java" ? "Java" : "Python";
           return (
             <article key={e.scenario.id} className={cx(s.scenarioCard, e.scenario.id === "checkout" && s.featuredScenario)}>
@@ -98,7 +104,7 @@ export default function Examples() {
               </span>
               <div className={s.scenarioBody}>
                 <div className={s.scenarioTop}>
-                  <div><h2 className={s.scenarioTitle}>{service}</h2>{e.scenario.id === "checkout" && <span className={s.recommended}>RECOMMENDED FIRST RUN</span>}</div>
+                  <div><h2 className={s.scenarioTitle}>{service}</h2>{["checkout", "refunds"].includes(e.scenario.id) && <span className={s.recommended}>START HERE · {e.scenario.id === "refunds" ? "HONEST ABSTENTION" : "SCREENSHOT TO FIX"}</span>}</div>
                   <span className={cx(s.tag, s.sevAccent)}>{lang}</span>
                 </div>
                 <p className={s.scenarioText}>{rest.join(":").trim() || publicTicket(e.scenario.incident).split("\n")[0]}</p>
@@ -112,7 +118,7 @@ export default function Examples() {
                   <button
                     type="button"
                     className={cx(s.btn, s.btnSm, s.btnPrimary)}
-                    disabled={user?.role === "viewer" || !live || !e.scenario.live || starting !== null}
+                    disabled={user?.role === "viewer" || !e.scenario.live || starting !== null}
                     title={user?.role === "viewer" ? "Your workspace access is read-only" : !e.scenario.live ? "A benchmark run on an external project: replay only" : live ? undefined : "Needs a TracePilot backend"}
                     onClick={() => runLive(e.scenario.id)}
                   >

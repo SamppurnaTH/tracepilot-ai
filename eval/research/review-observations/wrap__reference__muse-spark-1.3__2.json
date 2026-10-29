@@ -1,0 +1,64 @@
+{
+  "case": "wrap",
+  "kind": "reference",
+  "reviewer": "muse-spark-1.3",
+  "repeat": 2,
+  "label_correct_patch": true,
+  "error": null,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "AssertionError: assert ['The leaves ...ound as', ...] == ['The leaves ...ound as', ...]",
+          "AssertionError: assert ['The leaves ...the sea', ...] == ['The leaves ...the sea', ...]"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -1,3 +1,4 @@\n+\n def wrap(text, cols):\n     lines = []\n     while len(text) > cols:\n@@ -7,22 +8,6 @@\n         line, text = text[:end], text[end:]\n         lines.append(line)\n \n+    lines.append(text)\n     return lines\n \n-\"\"\"\n-Wrap Text\n-\n-Given a long string and a column width, break the string on spaces into a list of lines such that each line is no longer than the column width.\n-\n-Input:\n-    text: The starting text.\n-    cols: The target column width, i.e. the maximum length of any single line after wrapping.\n-\n-Precondition:\n-    cols > 0.\n-\n-Output:\n-    An ordered list of strings, each no longer than the column width, such that the concatenation of the strings returns the original text,\n-and such that no word in the original text is broken into two parts unless necessary.  The original amount of spaces are preserved (e.g. spaces\n-at the start or end of each line aren't trimmed.),Wrapping Text\n-\"\"\"\n",
+  "files": {
+    "program.py": "\ndef wrap(text, cols):\n    lines = []\n    while len(text) > cols:\n        end = text.rfind(' ', 0, cols + 1)\n        if end == -1:\n            end = cols\n        line, text = text[:end], text[end:]\n        lines.append(line)\n\n    lines.append(text)\n    return lines\n\n"
+  },
+  "opinion": {
+    "verdict": "concerns",
+    "confidence": "high",
+    "summary": "Patch correctly restores the dropped tail so concatenation preserves the original text, but it deletes the contract docstring and leaves a pre-existing hang when the split point is 0. Do not merge as-is; preserve the spec and guard the zero-progress split.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "weak",
+        "note": "Truncated AssertionErrors show list mismatch in contract tests but hide actual vs expected and which clause was violated, so disagreement is plausible but not proven by cited text alone."
+      }
+    ],
+    "risks": [
+      "Infinite loop survives: if remainder starts with space and len>cols, rfind returns 0, line is empty and text never shrinks.",
+      "Patch deletes the Wrap Text contract docstring instead of moving it into the function, removing the specification from the file."
+    ],
+    "provider": "meta",
+    "model": "muse-spark-1.3",
+    "tokens": 10317,
+    "duration_s": 33.2
+  },
+  "wrong": true
+}

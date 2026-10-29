@@ -1,0 +1,47 @@
+{
+  "id": "wrap__muse-spark-1.1__tracepilot__2",
+  "case": "wrap",
+  "model": "muse-spark-1.1",
+  "condition": "tracepilot",
+  "repeat": 2,
+  "started_utc": "2026-10-29T13:50:40Z",
+  "error": null,
+  "harness_sha256_lf": {
+    "agent.py": "f04d24b7dd340f4061cea37e17232167af6aa1267995152d55af9d7812c572d6",
+    "baseline.py": "a14283f2aeedce71e6cd6258a96b1dcb1539f2eddbc7f4d2b5fffe449b26ffc9",
+    "tools.py": "fdfd8d7919b521b6ebf0ea7a4ab584d83b4a51e8d8434b362f2e7b0aaf644bac",
+    "sandbox.py": "0fd5bdea08b90766b6b130a879b3c061aa7a42d690186e4a68b4f68053061d70",
+    "reviewer.py": "273fb0e7561dd6104f33ee1ec9ec2d8fe9a8443bf1874cce867096b1fabce529"
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -2,11 +2,11 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n-\n+    lines.append(text)\n     return lines\n \n \"\"\"\n--- /dev/null\n+++ b/tests/test_regression_missing_last_chunk.py\n@@ -0,0 +1,21 @@\n+from program import wrap\n+\n+def test_short_text_returns_itself():\n+    assert wrap(\"hello\", 10) == [\"hello\"]\n+\n+def test_remainder_must_be_included():\n+    text = \"abc def ghi jkl\"\n+    cols = 5\n+    result = wrap(text, cols)\n+    # concatenation must equal original\n+    assert \"\".join(result) == text\n+    # last chunk present\n+    assert result[-1] == \" jkl\" or result[-1] == \"jkl\" or \"jkl\" in result[-1]\n+    assert len(result) >= 1\n+\n+def test_expected_last_item_present_case0():\n+    # trimmed version of case_0 last chunk check\n+    text = \"The leaves did not stir on the trees, grasshoppers chirruped, and the monotonous hollow sound of the sea rising up\"\n+    cols = 50\n+    result = wrap(text, cols)\n+    assert \"\".join(result) == text\n",
+  "claimed_fixed": true,
+  "usage": {
+    "input_tokens": 65224,
+    "output_tokens": 29500,
+    "cached_tokens": 44832,
+    "model_calls": 15,
+    "tool_calls": 14,
+    "by_phase": {
+      "investigate": 74802,
+      "fix": 15586,
+      "report": 4336
+    }
+  },
+  "reviewer_tokens": 6908,
+  "duration_s": 349.6,
+  "outcome": "fixed",
+  "review_verdict": "approve",
+  "heldout_pass": true,
+  "visible_pass": true,
+  "heldout_tests": {
+    "tests/test_heldout.py::test_contract[case_0]": "passed",
+    "tests/test_heldout.py::test_contract[case_1]": "passed",
+    "tests/test_heldout.py::test_contract[case_2]": "passed"
+  },
+  "heldout_reasons": {},
+  "visible_tests": {
+    "tests/test_public.py::test_contract[case_0]": "passed",
+    "tests/test_public.py::test_contract[case_1]": "passed"
+  },
+  "false_success": false
+}

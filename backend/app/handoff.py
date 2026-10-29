@@ -5,6 +5,9 @@ in the browser (frontend/src/lib/report.ts).
 """
 
 
+from .reviewer import requires_review
+
+
 def _tally(t: dict) -> str:
     total = sum(t.values())
     return f"{t.get('passed', 0)}/{total} passing"
@@ -14,7 +17,8 @@ def status_line(report: dict) -> str:
     if report.get("outcome") == "no_code_change":
         return "No code change needed: the root cause is outside the code"
     v = report["verification"]
-    line = f"{'Fix verified' if v['verified'] else 'Not verified'} (tests {_tally(v['before'])} -> {_tally(v['after'])}, {len(v['regressions'])} regressions)"
+    label = "Tests verified; review required" if v["verified"] and requires_review(report.get("second_opinion")) else "Fix verified" if v["verified"] else "Not verified"
+    line = f"{label} (tests {_tally(v['before'])} -> {_tally(v['after'])}, {len(v['regressions'])} regressions)"
     review = report.get("second_opinion")
     if review:
         line += f"; independent review: {review['verdict']}"
@@ -33,11 +37,16 @@ def markdown_report(report: dict, title: str) -> str:
             out += ["**Evidence:**", *[f"- {e}" for e in issue["evidence"]], ""]
         out += [f"**Fix:** {issue['fix']}", ""]
     if report.get("diff"):
+        stats = patch_stats(report["diff"])
+        out += ["## Patch scope", "", f"{stats['files']} files, +{stats['added']} / -{stats['removed']} lines (tests included). Size is descriptive, not proof of minimality.", ""]
         out += ["## Patch", "", "```diff", report["diff"].rstrip(), "```", ""]
     v = report["verification"]
     out += ["## Verification", "", f"Before: {_tally(v['before'])}. After: {_tally(v['after'])}.", ""]
     out += [f"- fixed: `{t}`" for t in v["fixed"]] + [f"- regression: `{t}`" for t in v["regressions"]]
     out += [f"- still failing: `{t}`" for t in v["still_failing"]] + [""]
+    out += ["**Scope:** " + report.get("verification_scope", "Recorded test suite only; untested production behavior is not verified."), ""]
+    if report.get("excluded_tests"):
+        out += ["**Excluded infrastructure test classes:** " + ", ".join(report["excluded_tests"]), ""]
     review = report.get("second_opinion")
     if review and review.get("verdict") != "unavailable":
         out += ["## Independent review", "", f"{review['model']}: **{review['verdict']}** ({review['confidence']} confidence). {review['summary']}", ""]
@@ -48,10 +57,19 @@ def markdown_report(report: dict, title: str) -> str:
     return "\n".join(out) + "\n"
 
 
+def patch_stats(diff: str) -> dict:
+    lines = diff.splitlines()
+    return {"files": sum(line.startswith("+++ b/") for line in lines),
+            "added": sum(line.startswith("+") and not line.startswith("+++") for line in lines),
+            "removed": sum(line.startswith("-") and not line.startswith("---") for line in lines)}
+
+
 def pr_description(report: dict) -> str:
     issues = (report.get("findings") or {}).get("issues", [])
     title = "Fix: " + "; ".join(i["title"] for i in issues) if issues else "Fix incident"
     out = [title, "", "## What was wrong", ""]
+    if requires_review(report.get("second_opinion")):
+        out[2:2] = ["**Review required:** resolve the reviewer's objections before applying or merging this patch.", ""]
     out += [f"- **{i['title']}** ({i['severity']} {i['category']}): {i['root_cause']}" for i in issues]
     out += ["", "## What changed", ""] + [f"- {i['fix']}" for i in issues]
     v = report["verification"]

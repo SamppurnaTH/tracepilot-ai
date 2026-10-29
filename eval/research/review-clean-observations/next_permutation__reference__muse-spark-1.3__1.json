@@ -1,0 +1,63 @@
+{
+  "case": "next_permutation",
+  "kind": "reference",
+  "reviewer": "muse-spark-1.3",
+  "repeat": 1,
+  "label_correct_patch": true,
+  "error": null,
+  "reference_format": "minimal_active_upstream_fix",
+  "public_evidence_valid": true,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "assert [3, 1, 2, 4] == [3, 4, 1, 2]",
+          "assert [3, 1, 5, 2, 6] == [3, 6, 1, 2, 5]"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -3,7 +3,7 @@\n     for i in range(len(perm) - 2, -1, -1):\n         if perm[i] < perm[i + 1]:\n             for j in range(len(perm) - 1, i, -1):\n-                if perm[j] < perm[i]:\n+                if perm[i] < perm[j]:\n                     next_perm = list(perm)\n                     next_perm[i], next_perm[j] = perm[j], perm[i]\n                     next_perm[i + 1:] = reversed(next_perm[i + 1:])\n",
+  "files": {
+    "program.py": "\ndef next_permutation(perm):\n    for i in range(len(perm) - 2, -1, -1):\n        if perm[i] < perm[i + 1]:\n            for j in range(len(perm) - 1, i, -1):\n                if perm[i] < perm[j]:\n                    next_perm = list(perm)\n                    next_perm[i], next_perm[j] = perm[j], perm[i]\n                    next_perm[i + 1:] = reversed(next_perm[i + 1:])\n                    return next_perm\n\n\n\n\"\"\"\nNext Permutation\nnext-perm\n\n\nInput:\n    perm: A list of unique ints\n\nPrecondition:\n    perm is not sorted in reverse order\n\nOutput:\n    The lexicographically next permutation of the elements of perm\n\nExample:\n    >>> next_permutation([3, 2, 4, 1])\n    [3, 4, 1, 2]\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "approve",
+    "confidence": "high",
+    "summary": "Patch flips the inverted successor test to the correct perm[i] < perm[j], restoring standard next-permutation logic. The cited failing outputs match the buggy behavior and contradict the docstring example, and the minimal fix resolves both without adding new issues.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "Buggy outputs [3,1,2,4] vs expected [3,4,1,2] for input [3,2,4,1] follow directly from inverted < comparison, confirming contract violation."
+      }
+    ],
+    "risks": [],
+    "provider": "meta",
+    "model": "muse-spark-1.3",
+    "tokens": 2812,
+    "duration_s": 8.2
+  },
+  "wrong": false
+}

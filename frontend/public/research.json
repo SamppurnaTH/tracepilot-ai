@@ -1,0 +1,1004 @@
+{
+  "complete": true,
+  "repair_matrix_complete": true,
+  "score_audits": 96,
+  "scoring_corrections": 1,
+  "pilot_reviewer_observations": 48,
+  "clean_reviewer_observations": 48,
+  "reviewer_discovery": {
+    "case": "wrap",
+    "source": "Reviewer-raised counterexample; not part of the frozen repair oracle",
+    "input": {
+      "text": " abcdef",
+      "cols": 3
+    },
+    "control": {
+      "exit_code": 0,
+      "stdout": "['abc', 'def']\n",
+      "stderr": ""
+    },
+    "counterexample": {
+      "exit_code": -1,
+      "stdout": "",
+      "stderr": "timed out after 3s",
+      "timed_out": true
+    },
+    "reference": "exact upstream executable fix, original contract retained",
+    "interpretation": "An oracle-accepted reference can still violate its documented contract. Its reviewer nonapproval is not automatically a false positive.",
+    "loop_state": {
+      "end": 0,
+      "next_text": " abcdef",
+      "advances": false
+    }
+  },
+  "posthoc_reviewer_triage": {
+    "meta-models/muse-spark-open-1026": {
+      "known_bad_approved": {
+        "count": 0,
+        "total": 14,
+        "rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.2153
+        ]
+      },
+      "other_references_approved": {
+        "count": 10,
+        "total": 10,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7225,
+          1.0
+        ]
+      },
+      "qualification": "Post-hoc secondary triage after verifying wrap's hang; not a replacement for the pre-specified functional-oracle labels or a proof all other references are defect-free."
+    },
+    "muse-spark-1.3": {
+      "known_bad_approved": {
+        "count": 0,
+        "total": 14,
+        "rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.2153
+        ]
+      },
+      "other_references_approved": {
+        "count": 10,
+        "total": 10,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7225,
+          1.0
+        ]
+      },
+      "qualification": "Post-hoc secondary triage after verifying wrap's hang; not a replacement for the pre-specified functional-oracle labels or a proof all other references are defect-free."
+    }
+  },
+  "posthoc_wrap_checks": {
+    "plain": {
+      "passes": 4,
+      "total": 4,
+      "timeouts": 0,
+      "errors": 0
+    },
+    "plain_brief": {
+      "passes": 3,
+      "total": 4,
+      "timeouts": 1,
+      "errors": 0
+    },
+    "tracepilot": {
+      "passes": 4,
+      "total": 4,
+      "timeouts": 0,
+      "errors": 0
+    },
+    "tracepilot_no_brief": {
+      "passes": 2,
+      "total": 4,
+      "timeouts": 2,
+      "errors": 0
+    }
+  },
+  "reviewer_label_qualification": "Correct-patch label means the external oracle accepts behavior; nonapproval may be a legitimate merge-readiness/coverage concern, not a reasoning error. Raw-module pilot retained separately; main calibration uses minimal references preserving contract docs.",
+  "repair_observations": 96,
+  "expected_repair_observations": 96,
+  "groups": {
+    "muse-spark-1.1/plain": {
+      "completed": 12,
+      "expected": 12,
+      "success": {
+        "count": 12,
+        "total": 12,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7575,
+          1
+        ]
+      },
+      "false_success": 0,
+      "scoring_unavailable": 0,
+      "errors": 0,
+      "mean_total_tokens": 17929,
+      "mean_cached_input_tokens": 11021,
+      "mean_uncached_input_tokens": 1415,
+      "mean_investigator_output_tokens": 5492,
+      "mean_reviewer_tokens": 0,
+      "mean_tokens_by_phase": {
+        "agent": 17929
+      },
+      "mean_duration_s": 103.3
+    },
+    "muse-spark-1.1/plain_brief": {
+      "completed": 12,
+      "expected": 12,
+      "success": {
+        "count": 12,
+        "total": 12,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7575,
+          1
+        ]
+      },
+      "false_success": 0,
+      "scoring_unavailable": 0,
+      "errors": 0,
+      "mean_total_tokens": 14082,
+      "mean_cached_input_tokens": 8302,
+      "mean_uncached_input_tokens": 1557,
+      "mean_investigator_output_tokens": 4222,
+      "mean_reviewer_tokens": 0,
+      "mean_tokens_by_phase": {
+        "agent": 14082
+      },
+      "mean_duration_s": 280.1
+    },
+    "muse-spark-1.1/tracepilot": {
+      "completed": 12,
+      "expected": 12,
+      "success": {
+        "count": 12,
+        "total": 12,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7575,
+          1
+        ]
+      },
+      "false_success": 0,
+      "scoring_unavailable": 0,
+      "errors": 0,
+      "mean_total_tokens": 45869,
+      "mean_cached_input_tokens": 25049,
+      "mean_uncached_input_tokens": 7422,
+      "mean_investigator_output_tokens": 10165,
+      "mean_reviewer_tokens": 3232,
+      "mean_tokens_by_phase": {
+        "fix": 14016,
+        "investigate": 25136,
+        "report": 3485
+      },
+      "mean_duration_s": 160.9
+    },
+    "muse-spark-1.1/tracepilot_no_brief": {
+      "completed": 12,
+      "expected": 12,
+      "success": {
+        "count": 12,
+        "total": 12,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7575,
+          1
+        ]
+      },
+      "false_success": 0,
+      "scoring_unavailable": 0,
+      "errors": 0,
+      "mean_total_tokens": 50830,
+      "mean_cached_input_tokens": 28592,
+      "mean_uncached_input_tokens": 7004,
+      "mean_investigator_output_tokens": 10926,
+      "mean_reviewer_tokens": 4307,
+      "mean_tokens_by_phase": {
+        "fix": 17822,
+        "investigate": 25072,
+        "report": 3629
+      },
+      "mean_duration_s": 172.1
+    },
+    "muse-spark-1.3/plain": {
+      "completed": 12,
+      "expected": 12,
+      "success": {
+        "count": 12,
+        "total": 12,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7575,
+          1
+        ]
+      },
+      "false_success": 0,
+      "scoring_unavailable": 0,
+      "errors": 0,
+      "mean_total_tokens": 21603,
+      "mean_cached_input_tokens": 7217,
+      "mean_uncached_input_tokens": 5642,
+      "mean_investigator_output_tokens": 8744,
+      "mean_reviewer_tokens": 0,
+      "mean_tokens_by_phase": {
+        "agent": 21603
+      },
+      "mean_duration_s": 99.3
+    },
+    "muse-spark-1.3/plain_brief": {
+      "completed": 12,
+      "expected": 12,
+      "success": {
+        "count": 12,
+        "total": 12,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7575,
+          1
+        ]
+      },
+      "false_success": 0,
+      "scoring_unavailable": 0,
+      "errors": 0,
+      "mean_total_tokens": 18658,
+      "mean_cached_input_tokens": 7340,
+      "mean_uncached_input_tokens": 6609,
+      "mean_investigator_output_tokens": 4709,
+      "mean_reviewer_tokens": 0,
+      "mean_tokens_by_phase": {
+        "agent": 18658
+      },
+      "mean_duration_s": 88.7
+    },
+    "muse-spark-1.3/tracepilot": {
+      "completed": 12,
+      "expected": 12,
+      "success": {
+        "count": 11,
+        "total": 12,
+        "rate": 0.9166666666666666,
+        "wilson_95": [
+          0.6461,
+          0.9851
+        ]
+      },
+      "false_success": 0,
+      "scoring_unavailable": 0,
+      "errors": 1,
+      "mean_total_tokens": 38394,
+      "mean_cached_input_tokens": 10626,
+      "mean_uncached_input_tokens": 17898,
+      "mean_investigator_output_tokens": 6330,
+      "mean_reviewer_tokens": 3540,
+      "mean_tokens_by_phase": {
+        "fix": 13065,
+        "investigate": 18444,
+        "report": 3346
+      },
+      "mean_duration_s": 138.1
+    },
+    "muse-spark-1.3/tracepilot_no_brief": {
+      "completed": 12,
+      "expected": 12,
+      "success": {
+        "count": 12,
+        "total": 12,
+        "rate": 1.0,
+        "wilson_95": [
+          0.7575,
+          1
+        ]
+      },
+      "false_success": 0,
+      "scoring_unavailable": 0,
+      "errors": 0,
+      "mean_total_tokens": 41860,
+      "mean_cached_input_tokens": 18253,
+      "mean_uncached_input_tokens": 11884,
+      "mean_investigator_output_tokens": 6977,
+      "mean_reviewer_tokens": 4747,
+      "mean_tokens_by_phase": {
+        "fix": 13873,
+        "investigate": 19046,
+        "report": 4195
+      },
+      "mean_duration_s": 154.0
+    }
+  },
+  "contrasts": {
+    "muse-spark-1.1/plain_brief-vs-plain/all": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "plain_brief",
+      "control": "plain",
+      "successful_pairs_only": false,
+      "effects": {
+        "tokens": {
+          "effect": 0.21457256535157843,
+          "cluster_bootstrap_95": [
+            0.13402230702458362,
+            0.2970489541192335
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": -1.7116811874798321,
+          "cluster_bootstrap_95": [
+            -4.917017987633501,
+            0.3272019464720195
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.1/plain_brief-vs-plain/matched-success": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "plain_brief",
+      "control": "plain",
+      "successful_pairs_only": true,
+      "effects": {
+        "tokens": {
+          "effect": 0.21457256535157843,
+          "cluster_bootstrap_95": [
+            0.13402230702458362,
+            0.2970489541192335
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": -1.7116811874798321,
+          "cluster_bootstrap_95": [
+            -4.917017987633501,
+            0.3272019464720195
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.1/tracepilot-vs-tracepilot_no_brief/all": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "tracepilot_no_brief",
+      "successful_pairs_only": false,
+      "effects": {
+        "tokens": {
+          "effect": 0.09758900642013524,
+          "cluster_bootstrap_95": [
+            -0.0181240940545091,
+            0.18386080575216457
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": 0.06488475692426898,
+          "cluster_bootstrap_95": [
+            0.0064662140316843475,
+            0.1022522908281237
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.1/tracepilot-vs-tracepilot_no_brief/matched-success": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "tracepilot_no_brief",
+      "successful_pairs_only": true,
+      "effects": {
+        "tokens": {
+          "effect": 0.09758900642013524,
+          "cluster_bootstrap_95": [
+            -0.0181240940545091,
+            0.18386080575216457
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": 0.06488475692426898,
+          "cluster_bootstrap_95": [
+            0.0064662140316843475,
+            0.1022522908281237
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.1/tracepilot-vs-plain_brief/all": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "plain_brief",
+      "successful_pairs_only": false,
+      "effects": {
+        "tokens": {
+          "effect": -2.2573736536868267,
+          "cluster_bootstrap_95": [
+            -2.717965542768692,
+            -1.9521918570048684
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": 0.4254774796215862,
+          "cluster_bootstrap_95": [
+            -1.5232172470978442,
+            0.7805226842086446
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.1/tracepilot-vs-plain_brief/matched-success": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "plain_brief",
+      "successful_pairs_only": true,
+      "effects": {
+        "tokens": {
+          "effect": -2.2573736536868267,
+          "cluster_bootstrap_95": [
+            -2.717965542768692,
+            -1.9521918570048684
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": 0.4254774796215862,
+          "cluster_bootstrap_95": [
+            -1.5232172470978442,
+            0.7805226842086446
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.1/tracepilot-vs-plain/all": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "plain",
+      "successful_pairs_only": false,
+      "effects": {
+        "tokens": {
+          "effect": -1.5584306325066004,
+          "cluster_bootstrap_95": [
+            -1.8682156445837061,
+            -1.248682550130173
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": -0.557921910293643,
+          "cluster_bootstrap_95": [
+            -0.8258784549655596,
+            -0.30289237997357255
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.1/tracepilot-vs-plain/matched-success": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "plain",
+      "successful_pairs_only": true,
+      "effects": {
+        "tokens": {
+          "effect": -1.5584306325066004,
+          "cluster_bootstrap_95": [
+            -1.8682156445837061,
+            -1.248682550130173
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": -0.557921910293643,
+          "cluster_bootstrap_95": [
+            -0.8258784549655596,
+            -0.30289237997357255
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.3/plain_brief-vs-plain/all": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "plain_brief",
+      "control": "plain",
+      "successful_pairs_only": false,
+      "effects": {
+        "tokens": {
+          "effect": 0.13632804212394156,
+          "cluster_bootstrap_95": [
+            -0.26335860431128966,
+            0.2820778927775741
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": 0.10698103708675966,
+          "cluster_bootstrap_95": [
+            -0.19326344399145823,
+            0.27922162726916544
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.3/plain_brief-vs-plain/matched-success": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "plain_brief",
+      "control": "plain",
+      "successful_pairs_only": true,
+      "effects": {
+        "tokens": {
+          "effect": 0.13632804212394156,
+          "cluster_bootstrap_95": [
+            -0.26335860431128966,
+            0.2820778927775741
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": 0.10698103708675966,
+          "cluster_bootstrap_95": [
+            -0.19326344399145823,
+            0.27922162726916544
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.3/tracepilot-vs-tracepilot_no_brief/all": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "tracepilot_no_brief",
+      "successful_pairs_only": false,
+      "effects": {
+        "tokens": {
+          "effect": 0.08280678284619947,
+          "cluster_bootstrap_95": [
+            -0.1009043818317017,
+            0.23927801619929123
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": 0.10353819519584506,
+          "cluster_bootstrap_95": [
+            -0.05017587419822078,
+            0.27052460221603736
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": -0.08333333333333333,
+          "cluster_bootstrap_95": [
+            -0.25,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.3/tracepilot-vs-tracepilot_no_brief/matched-success": {
+      "pairs": 11,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "tracepilot_no_brief",
+      "successful_pairs_only": true,
+      "effects": {
+        "tokens": {
+          "effect": 0.039877872138379566,
+          "cluster_bootstrap_95": [
+            -0.12894411494291003,
+            0.16551542073656178
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": 0.04562013114386587,
+          "cluster_bootstrap_95": [
+            -0.07996382208980646,
+            0.16383126233267553
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.3/tracepilot-vs-plain_brief/all": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "plain_brief",
+      "successful_pairs_only": false,
+      "effects": {
+        "tokens": {
+          "effect": -1.057804139458851,
+          "cluster_bootstrap_95": [
+            -2.1881562861114365,
+            -0.6246254389651946
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": -0.5569106454946915,
+          "cluster_bootstrap_95": [
+            -0.938085702843412,
+            -0.3270998415213946
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": -0.08333333333333333,
+          "cluster_bootstrap_95": [
+            -0.25,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.3/tracepilot-vs-plain_brief/matched-success": {
+      "pairs": 11,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "plain_brief",
+      "successful_pairs_only": true,
+      "effects": {
+        "tokens": {
+          "effect": -1.1562993525396732,
+          "cluster_bootstrap_95": [
+            -2.535647287811666,
+            -0.670130320213675
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": -0.6104596179307735,
+          "cluster_bootstrap_95": [
+            -1.081916764361079,
+            -0.34454387990762125
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.3/tracepilot-vs-plain/all": {
+      "pairs": 12,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "plain",
+      "successful_pairs_only": false,
+      "effects": {
+        "tokens": {
+          "effect": -0.7772677300518833,
+          "cluster_bootstrap_95": [
+            -1.5393266745223362,
+            -0.3259846110512503
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": -0.39035072998825293,
+          "cluster_bootstrap_95": [
+            -0.7943355670754835,
+            -0.08400426702599528
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": -0.08333333333333333,
+          "cluster_bootstrap_95": [
+            -0.25,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    },
+    "muse-spark-1.3/tracepilot-vs-plain/matched-success": {
+      "pairs": 11,
+      "case_clusters": 6,
+      "treatment": "tracepilot",
+      "control": "plain",
+      "successful_pairs_only": true,
+      "effects": {
+        "tokens": {
+          "effect": -0.8500629241590167,
+          "cluster_bootstrap_95": [
+            -1.8372157076066076,
+            -0.3501628162137629
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "duration_s": {
+          "effect": -0.4190833333333335,
+          "cluster_bootstrap_95": [
+            -0.8946747114375653,
+            -0.09852868242684742
+          ],
+          "meaning": "fraction saved by treatment vs control"
+        },
+        "success": {
+          "effect": 0.0,
+          "cluster_bootstrap_95": [
+            0.0,
+            0.0
+          ],
+          "meaning": "treatment minus control success rate"
+        }
+      }
+    }
+  },
+  "reviewers": {
+    "meta-models/muse-spark-open-1026": {
+      "attempts": 24,
+      "unavailable": 0,
+      "unsafe_approval": {
+        "count": 0,
+        "total": 12,
+        "rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.2425
+        ]
+      },
+      "correct_nonapproval": {
+        "count": 2,
+        "total": 12,
+        "rate": 0.16666666666666666,
+        "wilson_95": [
+          0.047,
+          0.448
+        ]
+      },
+      "reference_hard_rejects": 1,
+      "reference_concerns": 1,
+      "verdicts": {
+        "reject": 13,
+        "approve": 10,
+        "concerns": 1
+      }
+    },
+    "muse-spark-1.3": {
+      "attempts": 24,
+      "unavailable": 0,
+      "unsafe_approval": {
+        "count": 0,
+        "total": 12,
+        "rate": 0.0,
+        "wilson_95": [
+          0.0,
+          0.2425
+        ]
+      },
+      "correct_nonapproval": {
+        "count": 2,
+        "total": 12,
+        "rate": 0.16666666666666666,
+        "wilson_95": [
+          0.047,
+          0.448
+        ]
+      },
+      "reference_hard_rejects": 0,
+      "reference_concerns": 2,
+      "verdicts": {
+        "reject": 12,
+        "approve": 10,
+        "concerns": 2
+      }
+    }
+  },
+  "reviewer_agreement": {
+    "paired_observations": 24,
+    "same_verdict": 23,
+    "both_wrong": 2,
+    "either_wrong": 2,
+    "interpretation": "Observed joint functional-label disagreements, not proof of independent blind spots or wrong merge decisions. No error correlation coefficient when a reviewer has zero error variance."
+  },
+  "model_interaction": {
+    "matched_quartets": 12,
+    "case_clusters": 6,
+    "interpretation": "Earlier-version harness benefit minus newer-version benefit; earlier does not mean smaller. Token effect averages within-pair fractional savings, unlike the ratio-of-means primary contrast.",
+    "success_benefit_difference": {
+      "effect": 0.08333333333333333,
+      "cluster_bootstrap_95": [
+        0.0,
+        0.25
+      ]
+    },
+    "fractional_token_saving_difference": {
+      "effect": -0.4480142719870676,
+      "cluster_bootstrap_95": [
+        -1.0780322591810398,
+        0.10035348153442684
+      ]
+    }
+  },
+  "generated_attacks": {
+    "attempted": 6,
+    "eligible": 6,
+    "errors": 0
+  },
+  "manifest": {
+    "version": 1,
+    "frozen_at_utc": "2026-10-29T11:41:40Z",
+    "upstream": "https://github.com/jkoppel/QuixBugs",
+    "revision": "4257f44b0ff1181dedaedee6a447e133219fcebf",
+    "cases": [
+      "lis",
+      "max_sublist_sum",
+      "next_permutation",
+      "powerset",
+      "rpn_eval",
+      "wrap"
+    ],
+    "models": [
+      "muse-spark-1.1",
+      "muse-spark-1.3"
+    ],
+    "conditions": [
+      "plain",
+      "plain_brief",
+      "tracepilot",
+      "tracepilot_no_brief"
+    ],
+    "repeats": 2,
+    "visible_split": "first 2 JSON lines in upstream order",
+    "heldout_split": "all remaining JSON lines",
+    "seed": 20261029,
+    "max_parallel": 2,
+    "token_budget_per_investigation": 80000,
+    "isolation": "docker",
+    "files_sha256_lf": {
+      "bench/quixbugs/correct_python_programs/lis.py": "f2f14efdb6b419591d565882734ce05c40cdd3b203b45b5727d2838338063a61",
+      "bench/quixbugs/correct_python_programs/max_sublist_sum.py": "2f2b119d49fbbe641707020b6e7cbb637affeffe9ae3ca653cccd5a3bee8d798",
+      "bench/quixbugs/correct_python_programs/next_permutation.py": "93bbb04ed299c44c202ab2eca2aa68318b5ee94fdcb6ce5a3977f24c7ed67957",
+      "bench/quixbugs/correct_python_programs/powerset.py": "b53f71a04fec20cbd20c5f0edd64ec1c49796b693677d46b3e7e02b5e3aaf46e",
+      "bench/quixbugs/correct_python_programs/rpn_eval.py": "a5f9ec92795e5703653039bfb6b08e8a1298c18ea89a842d3c67e7bc67a2030e",
+      "bench/quixbugs/correct_python_programs/wrap.py": "19dba14cdf9fe3380abf4dd3b2d5726f38bbd4af39e0f19e725f9f3bdd236bc6",
+      "bench/quixbugs/json_testcases/lis.json": "f611c35d10ec78f9a6e9d7f5ac7c6a9074c652f142b3a2302588c912b8617974",
+      "bench/quixbugs/json_testcases/max_sublist_sum.json": "87970bc353d75cdc34f25d96715f4c4859dca57becd96cf398dd0a475dd819bf",
+      "bench/quixbugs/json_testcases/next_permutation.json": "1c2b6c46b6f9620eb41d1eabb02dd21e8d3d30541951ca51aa1d648404ffb68d",
+      "bench/quixbugs/json_testcases/powerset.json": "99b3a5af3674fdb4acc0f54921cc388a86999264f5ec03276b1f1eea5463e8c5",
+      "bench/quixbugs/json_testcases/rpn_eval.json": "03fbb45a22f12fd6924331301b1afd8738e6dff1bc76e3fb0d185047c4678b67",
+      "bench/quixbugs/json_testcases/wrap.json": "f00a3304de78155d46f44634f5435d229a8a220f03b2eeade38495af9b587549",
+      "bench/quixbugs/legal_notes.txt": "f0d3a9e4cfb92dbd29a38f7c9045d5d3d4c74c92f905ecf414f9c9b4e917ea93",
+      "bench/quixbugs/LICENSE": "3bb03003929be645f6557a66fcb9820f527df7ce2b51b491405d233cb191d517",
+      "bench/quixbugs/python_programs/lis.py": "fe9e751f62674299be95f5026c30c778ec331eb449caaa9a13f6b2908e44a016",
+      "bench/quixbugs/python_programs/max_sublist_sum.py": "aab26d9f3984f177adcff110fe72de97e54c5f85ad476c38e49c949a873d85b5",
+      "bench/quixbugs/python_programs/next_permutation.py": "14ffc36c80bf3bba8db91b7e0fa6be14a8011130ddeaccf33ed62638eac1b25b",
+      "bench/quixbugs/python_programs/powerset.py": "3e3deb045ed61fbe82725cd7e7b0fb4d00f411f87f0f91358109ec0204c61ae9",
+      "bench/quixbugs/python_programs/rpn_eval.py": "4a473b1beaa9eb8155fcb079917e390d0584d8ebdfc6d6d8c88069609854194a",
+      "bench/quixbugs/python_programs/wrap.py": "0dc3363df6fc8fffb025e5f0aa1902c8bd680ba564df4cdf9b350c4f8c1586f7"
+    },
+    "limits": [
+      "External-source authorship, not independently administered or novel to training.",
+      "Small algorithmic functions, not production SRE coverage.",
+      "An earlier model is not proven smaller or weaker.",
+      "No population or statistical-significance claim; publish null/negative outcomes too."
+    ]
+  },
+  "limitations": [
+    "External-source authorship, not independently administered or novel to training.",
+    "Small algorithmic functions, not production SRE coverage.",
+    "An earlier model is not proven smaller or weaker.",
+    "No population or statistical-significance claim; publish null/negative outcomes too."
+  ],
+  "bootstrap": "10,000 incident-cluster resamples; seed 20261029. Up to six case clusters; exact counts are reported per contrast in JSON. Exploratory only."
+}

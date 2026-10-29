@@ -1,6 +1,6 @@
 # Build log
 
-Everything below was built during the hackathon building period (Oct 27 – Nov 4, 2026). Times are IST.
+TracePilot's work below was built during the hackathon building period (Oct 27 – Nov 4, 2026). Times are IST. ShipSpace itself is the author's pre-existing public project; only the planted bug, TracePilot investigation and evaluation are new. Existing libraries/frameworks are reused dependencies, not newly authored hackathon work.
 
 ## Oct 27
 
@@ -300,3 +300,22 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - Summaries are requested with `reasoning: {summary: "auto"}`. Measured side by side, this costs no extra tokens: the model reasons either way.
 - The activity log shows the notes as quoted lines between the tool calls, and while a run is live the outcome card shows "Muse Spark is thinking" with the latest one.
 - Checked live on the hosted backend (Docker): Orders API went from 3/5 to 5/5 tests, verified and approved by Muse Spark Open, in 61K tokens and 1.7 minutes, with 6 notes from "Fixing your order totals and privacy reports — tracing the 500s and cross-user reads" to "Edits applied — now verifying the fixes hold".
+
+**Judge evidence and demo hardening (Oct 29):**
+
+- Read the organizer Official Rules and mapped evidence to Impact (30%), Meta AI tooling (25%), Technical execution (20%) and Demo (25%). Meta remains the investigator and reviewer; no competing-vendor result is implied.
+- Added labelled automatic recording fallback for backend/capacity/start failures, current-phase and timing guidance, Refunds and Checkout starter labels, and early unsupported-project refusals.
+- Added report patch-size/scope notes, named infrastructure exclusions, assertion reasons in the reproduction view, and a configurable private Meta reviewer endpoint (not a claim of a demonstrated fully private deployment).
+- Published deterministic Wilson intervals, exploratory incident-cluster bootstrap intervals, separate reviewer error rates, source hashes, authored-fixture provenance and unrun-study limitations. Original comparison observations remain unchanged.
+- One real Meta-model adversarial-log run in Docker: payload present in the evidence brief, 3/5 to 5/5 tests, reviewer approval, zero suspicious tool attempts detected, 136.6 seconds; saved in eval/security-probe.json outside the comparison.
+- Added a copyable manual GitHub Actions investigation workflow, judge Q&A, honest failure/abstention case studies, threat model and a 90-second presentation script. No installed GitHub App, fabricated retry recording or contest ranking claim.
+
+- Recorded a separate real Meta/Docker no-reproduction boundary case: deliberately under-specified synthetic invoice incident, no confirmed root cause, empty diff and verified=false, 72.4 seconds. Preserved outside the comparison benchmark.
+
+**Research closure and a post-study review safeguard:**
+
+- Completed 96 locally pre-specified external-source repair trials (six pinned QuixBugs algorithms, two Meta versions, four configurations, two repetitions), with separate audits for all outcomes. 95 passed the frozen oracle; one Meta API 500 was retained as an end-to-end failure. No model trial was rerun for a better score.
+- Completed a separate 16-trial Orders/Inventory ablation, all passing the original hidden oracles. The brief reduced tokens 28.4% in plain and 37.4% in TracePilot; full TracePilot used 31.5% more than equally briefed plain. The original 31% is not a universal gain.
+- Preserved 48 raw-reference pilot reviews and a separately frozen 48-review minimal-reference follow-up. Both cold Meta reviewers rejected 12/12 model-generated gaming observations and approved 10/12 oracle-accepted references; both flagged wrap, whose remaining loop was confirmed with a bounded Docker counterexample.
+- Archived the 14 measured application modules with source fingerprints before changing software behavior. Current product marks unresolved concerns/rejection as needs_review and blocks --apply/CI success even when tests pass. Unit/CLI checks and deterministic replay of the unchanged recorded failure validate this separate safeguard.
+- Published real wrap-review replay, per-trial CSVs, paired case-cluster analyses, source provenance, independent-replication instructions, and a question-by-question research closure report. Changed historical 13/13 wording to correct outcomes because it includes abstention diagnoses, not 13 code patches.

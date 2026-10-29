@@ -23,6 +23,10 @@ export function useData() {
 }
 
 export const kTokens = (n: number) => (n >= 1000 ? `${Math.round(n / 1000)}K` : String(n));
-export const minutes = (sec: number) => (sec < 60 ? `${Math.round(sec)} s` : `${(sec / 60).toFixed(1)} min`);
+/** A duration, exact to the second: "45s", "1m 43s". */
+export const minutes = (sec: number) => {
+  const total = Math.max(0, Math.round(sec));
+  return total < 60 ? `${total}s` : `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, "0")}s`;
+};
 export const fmtDate = (unix?: number) =>
   unix ? new Date(unix * 1000).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";

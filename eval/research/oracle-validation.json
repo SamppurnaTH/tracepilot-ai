@@ -1,0 +1,231 @@
+{
+  "lis": {
+    "buggy": {
+      "heldout_pass": false,
+      "visible_pass": true,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "passed",
+        "tests/test_heldout.py::test_contract[case_1]": "passed",
+        "tests/test_heldout.py::test_contract[case_2]": "passed",
+        "tests/test_heldout.py::test_contract[case_3]": "passed",
+        "tests/test_heldout.py::test_contract[case_4]": "passed",
+        "tests/test_heldout.py::test_contract[case_5]": "passed",
+        "tests/test_heldout.py::test_contract[case_6]": "failed",
+        "tests/test_heldout.py::test_contract[case_7]": "failed",
+        "tests/test_heldout.py::test_contract[case_8]": "failed",
+        "tests/test_heldout.py::test_contract[case_9]": "failed"
+      },
+      "heldout_reasons": {
+        "tests/test_heldout.py::test_contract[case_6]": "assert 2 == 3",
+        "tests/test_heldout.py::test_contract[case_7]": "assert 5 == 6",
+        "tests/test_heldout.py::test_contract[case_8]": "assert 1 == 3",
+        "tests/test_heldout.py::test_contract[case_9]": "assert 3 == 4"
+      },
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      }
+    },
+    "reference": {
+      "heldout_pass": true,
+      "visible_pass": true,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "passed",
+        "tests/test_heldout.py::test_contract[case_1]": "passed",
+        "tests/test_heldout.py::test_contract[case_2]": "passed",
+        "tests/test_heldout.py::test_contract[case_3]": "passed",
+        "tests/test_heldout.py::test_contract[case_4]": "passed",
+        "tests/test_heldout.py::test_contract[case_5]": "passed",
+        "tests/test_heldout.py::test_contract[case_6]": "passed",
+        "tests/test_heldout.py::test_contract[case_7]": "passed",
+        "tests/test_heldout.py::test_contract[case_8]": "passed",
+        "tests/test_heldout.py::test_contract[case_9]": "passed"
+      },
+      "heldout_reasons": {},
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      }
+    }
+  },
+  "max_sublist_sum": {
+    "buggy": {
+      "heldout_pass": false,
+      "visible_pass": false,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "passed",
+        "tests/test_heldout.py::test_contract[case_2]": "passed",
+        "tests/test_heldout.py::test_contract[case_1]": "failed",
+        "tests/test_heldout.py::test_contract[case_3]": "failed"
+      },
+      "heldout_reasons": {
+        "tests/test_heldout.py::test_contract[case_1]": "assert 13 == 19",
+        "tests/test_heldout.py::test_contract[case_3]": "assert 2 == 6"
+      },
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "failed",
+        "tests/test_public.py::test_contract[case_1]": "failed"
+      }
+    },
+    "reference": {
+      "heldout_pass": true,
+      "visible_pass": true,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "passed",
+        "tests/test_heldout.py::test_contract[case_1]": "passed",
+        "tests/test_heldout.py::test_contract[case_2]": "passed",
+        "tests/test_heldout.py::test_contract[case_3]": "passed"
+      },
+      "heldout_reasons": {},
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      }
+    }
+  },
+  "next_permutation": {
+    "buggy": {
+      "heldout_pass": false,
+      "visible_pass": false,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "failed",
+        "tests/test_heldout.py::test_contract[case_1]": "failed",
+        "tests/test_heldout.py::test_contract[case_2]": "failed",
+        "tests/test_heldout.py::test_contract[case_3]": "failed",
+        "tests/test_heldout.py::test_contract[case_4]": "failed",
+        "tests/test_heldout.py::test_contract[case_5]": "failed"
+      },
+      "heldout_reasons": {
+        "tests/test_heldout.py::test_contract[case_0]": "assert [3, 2, 5, 6] == [3, 6, 2, 5]",
+        "tests/test_heldout.py::test_contract[case_1]": "assert [1, 9, 7, 4, 5] == [4, 5, 1, 9, 7]",
+        "tests/test_heldout.py::test_contract[case_2]": "assert [4, 1, 5, 7, 8] == [4, 7, 1, 5, 8]",
+        "tests/test_heldout.py::test_contract[case_3]": "assert [9, 5, 1, 2, 6] == [9, 5, 6, 1, 2]",
+        "tests/test_heldout.py::test_contract[case_4]": "assert None == [44, 5, 1, 9, 7]",
+        "tests/test_heldout.py::test_contract[case_5]": "assert None == [3, 5, 4]"
+      },
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "failed",
+        "tests/test_public.py::test_contract[case_1]": "failed"
+      }
+    },
+    "reference": {
+      "heldout_pass": true,
+      "visible_pass": true,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "passed",
+        "tests/test_heldout.py::test_contract[case_1]": "passed",
+        "tests/test_heldout.py::test_contract[case_2]": "passed",
+        "tests/test_heldout.py::test_contract[case_3]": "passed",
+        "tests/test_heldout.py::test_contract[case_4]": "passed",
+        "tests/test_heldout.py::test_contract[case_5]": "passed"
+      },
+      "heldout_reasons": {},
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      }
+    }
+  },
+  "powerset": {
+    "buggy": {
+      "heldout_pass": false,
+      "visible_pass": false,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_1]": "passed",
+        "tests/test_heldout.py::test_contract[case_0]": "failed",
+        "tests/test_heldout.py::test_contract[case_2]": "failed"
+      },
+      "heldout_reasons": {
+        "tests/test_heldout.py::test_contract[case_0]": "AssertionError: assert [['a']] == [[], ['a']]",
+        "tests/test_heldout.py::test_contract[case_2]": "AssertionError: assert [['x', 'df', 'z', 'm']] == [[], ['m'], [...f', 'm'], ...]"
+      },
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "failed",
+        "tests/test_public.py::test_contract[case_1]": "failed"
+      }
+    },
+    "reference": {
+      "heldout_pass": true,
+      "visible_pass": true,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "passed",
+        "tests/test_heldout.py::test_contract[case_1]": "passed",
+        "tests/test_heldout.py::test_contract[case_2]": "passed"
+      },
+      "heldout_reasons": {},
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      }
+    }
+  },
+  "rpn_eval": {
+    "buggy": {
+      "heldout_pass": false,
+      "visible_pass": false,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_1]": "passed",
+        "tests/test_heldout.py::test_contract[case_2]": "passed",
+        "tests/test_heldout.py::test_contract[case_0]": "failed",
+        "tests/test_heldout.py::test_contract[case_3]": "failed"
+      },
+      "heldout_reasons": {
+        "tests/test_heldout.py::test_contract[case_0]": "AssertionError: assert -8.0 == 8.0",
+        "tests/test_heldout.py::test_contract[case_3]": "AssertionError: assert -14.0 == 14.0"
+      },
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_1]": "passed",
+        "tests/test_public.py::test_contract[case_0]": "failed"
+      }
+    },
+    "reference": {
+      "heldout_pass": true,
+      "visible_pass": true,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "passed",
+        "tests/test_heldout.py::test_contract[case_1]": "passed",
+        "tests/test_heldout.py::test_contract[case_2]": "passed",
+        "tests/test_heldout.py::test_contract[case_3]": "passed"
+      },
+      "heldout_reasons": {},
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      }
+    }
+  },
+  "wrap": {
+    "buggy": {
+      "heldout_pass": false,
+      "visible_pass": false,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "failed",
+        "tests/test_heldout.py::test_contract[case_1]": "failed",
+        "tests/test_heldout.py::test_contract[case_2]": "failed"
+      },
+      "heldout_reasons": {
+        "tests/test_heldout.py::test_contract[case_0]": "AssertionError: assert ['The leaves ...haps, a', ...] == ['The leaves ...haps, a', ...]",
+        "tests/test_heldout.py::test_contract[case_1]": "AssertionError: assert ['The leaves ...es hid,', ...] == ['The leaves ...es hid,', ...]",
+        "tests/test_heldout.py::test_contract[case_2]": "AssertionError: assert ['The leaves ...rld when one'] == ['The leaves ...hen one', ...]"
+      },
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "failed",
+        "tests/test_public.py::test_contract[case_1]": "failed"
+      }
+    },
+    "reference": {
+      "heldout_pass": true,
+      "visible_pass": true,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "passed",
+        "tests/test_heldout.py::test_contract[case_1]": "passed",
+        "tests/test_heldout.py::test_contract[case_2]": "passed"
+      },
+      "heldout_reasons": {},
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      }
+    }
+  }
+}

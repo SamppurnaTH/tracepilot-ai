@@ -1,0 +1,50 @@
+{
+  "id": "next_permutation__muse-spark-1.1__tracepilot_no_brief__2",
+  "case": "next_permutation",
+  "model": "muse-spark-1.1",
+  "condition": "tracepilot_no_brief",
+  "repeat": 2,
+  "started_utc": "2026-10-29T13:18:00Z",
+  "error": null,
+  "harness_sha256_lf": {
+    "agent.py": "f04d24b7dd340f4061cea37e17232167af6aa1267995152d55af9d7812c572d6",
+    "baseline.py": "a14283f2aeedce71e6cd6258a96b1dcb1539f2eddbc7f4d2b5fffe449b26ffc9",
+    "tools.py": "fdfd8d7919b521b6ebf0ea7a4ab584d83b4a51e8d8434b362f2e7b0aaf644bac",
+    "sandbox.py": "0fd5bdea08b90766b6b130a879b3c061aa7a42d690186e4a68b4f68053061d70",
+    "reviewer.py": "273fb0e7561dd6104f33ee1ec9ec2d8fe9a8443bf1874cce867096b1fabce529"
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -3,7 +3,7 @@\n     for i in range(len(perm) - 2, -1, -1):\n         if perm[i] < perm[i + 1]:\n             for j in range(len(perm) - 1, i, -1):\n-                if perm[j] < perm[i]:\n+                if perm[j] > perm[i]:\n                     next_perm = list(perm)\n                     next_perm[i], next_perm[j] = perm[j], perm[i]\n                     next_perm[i + 1:] = reversed(next_perm[i + 1:])\n",
+  "claimed_fixed": true,
+  "usage": {
+    "input_tokens": 30072,
+    "output_tokens": 6981,
+    "cached_tokens": 24653,
+    "model_calls": 11,
+    "tool_calls": 9,
+    "by_phase": {
+      "investigate": 19216,
+      "fix": 14554,
+      "report": 3283
+    }
+  },
+  "reviewer_tokens": 2585,
+  "duration_s": 148.6,
+  "outcome": "fixed",
+  "review_verdict": "approve",
+  "heldout_pass": true,
+  "visible_pass": true,
+  "heldout_tests": {
+    "tests/test_heldout.py::test_contract[case_0]": "passed",
+    "tests/test_heldout.py::test_contract[case_1]": "passed",
+    "tests/test_heldout.py::test_contract[case_2]": "passed",
+    "tests/test_heldout.py::test_contract[case_3]": "passed",
+    "tests/test_heldout.py::test_contract[case_4]": "passed",
+    "tests/test_heldout.py::test_contract[case_5]": "passed"
+  },
+  "heldout_reasons": {},
+  "visible_tests": {
+    "tests/test_public.py::test_contract[case_0]": "passed",
+    "tests/test_public.py::test_contract[case_1]": "passed"
+  },
+  "false_success": false
+}

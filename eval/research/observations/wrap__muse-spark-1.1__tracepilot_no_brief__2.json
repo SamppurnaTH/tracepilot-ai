@@ -1,0 +1,47 @@
+{
+  "id": "wrap__muse-spark-1.1__tracepilot_no_brief__2",
+  "case": "wrap",
+  "model": "muse-spark-1.1",
+  "condition": "tracepilot_no_brief",
+  "repeat": 2,
+  "started_utc": "2026-10-29T13:58:53Z",
+  "error": null,
+  "harness_sha256_lf": {
+    "agent.py": "f04d24b7dd340f4061cea37e17232167af6aa1267995152d55af9d7812c572d6",
+    "baseline.py": "a14283f2aeedce71e6cd6258a96b1dcb1539f2eddbc7f4d2b5fffe449b26ffc9",
+    "tools.py": "fdfd8d7919b521b6ebf0ea7a4ab584d83b4a51e8d8434b362f2e7b0aaf644bac",
+    "sandbox.py": "0fd5bdea08b90766b6b130a879b3c061aa7a42d690186e4a68b4f68053061d70",
+    "reviewer.py": "273fb0e7561dd6104f33ee1ec9ec2d8fe9a8443bf1874cce867096b1fabce529"
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -4,9 +4,16 @@\n         end = text.rfind(' ', 0, cols + 1)\n         if end == -1:\n             end = cols\n+        elif end == 0:\n+            # rfind returning 0 would produce an empty line and identical\n+            # remaining text (text[:0]=='' and text[0:]==text), causing an\n+            # infinite loop for inputs with a leading space. Advancing by one\n+            # preserves concatenation and avoids empty lines.\n+            end = 1\n         line, text = text[:end], text[end:]\n         lines.append(line)\n-\n+    if text:\n+        lines.append(text)\n     return lines\n \n \"\"\"\n",
+  "claimed_fixed": true,
+  "usage": {
+    "input_tokens": 63395,
+    "output_tokens": 25185,
+    "cached_tokens": 45344,
+    "model_calls": 14,
+    "tool_calls": 15,
+    "by_phase": {
+      "investigate": 39302,
+      "fix": 45556,
+      "report": 3722
+    }
+  },
+  "reviewer_tokens": 5071,
+  "duration_s": 267.3,
+  "outcome": "fixed",
+  "review_verdict": "approve",
+  "heldout_pass": true,
+  "visible_pass": true,
+  "heldout_tests": {
+    "tests/test_heldout.py::test_contract[case_0]": "passed",
+    "tests/test_heldout.py::test_contract[case_1]": "passed",
+    "tests/test_heldout.py::test_contract[case_2]": "passed"
+  },
+  "heldout_reasons": {},
+  "visible_tests": {
+    "tests/test_public.py::test_contract[case_0]": "passed",
+    "tests/test_public.py::test_contract[case_1]": "passed"
+  },
+  "false_success": false
+}

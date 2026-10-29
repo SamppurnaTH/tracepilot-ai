@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { streamRun } from "./api";
+import { recordingFallback, streamRun } from "./api";
 import { initialState, reduce, type Recording, type RunEvent, type RunState } from "./run";
 
 type Action = { type: "event"; event: RunEvent } | { type: "events"; events: RunEvent[] } | { type: "reset" };
@@ -54,6 +54,7 @@ export function useRun() {
         runId,
         (event) => dispatch({ type: "event", event }),
         () => (close.current = null),
+        (error) => dispatch({ type: "event", event: { seq: Number.MAX_SAFE_INTEGER, type: "error", recordingFallback: recordingFallback(error) !== null, message: `Live connection interrupted: ${error instanceof Error ? error.message : "unavailable"}. The server may still be running; check My runs before starting another investigation.` } }),
       );
     },
     [reset],

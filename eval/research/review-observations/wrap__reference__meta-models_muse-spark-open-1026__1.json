@@ -1,0 +1,66 @@
+{
+  "case": "wrap",
+  "kind": "reference",
+  "reviewer": "meta-models/muse-spark-open-1026",
+  "repeat": 1,
+  "label_correct_patch": true,
+  "error": null,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "AssertionError: assert ['The leaves ...ound as', ...] == ['The leaves ...ound as', ...]",
+          "AssertionError: assert ['The leaves ...the sea', ...] == ['The leaves ...the sea', ...]"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -1,3 +1,4 @@\n+\n def wrap(text, cols):\n     lines = []\n     while len(text) > cols:\n@@ -7,22 +8,6 @@\n         line, text = text[:end], text[end:]\n         lines.append(line)\n \n+    lines.append(text)\n     return lines\n \n-\"\"\"\n-Wrap Text\n-\n-Given a long string and a column width, break the string on spaces into a list of lines such that each line is no longer than the column width.\n-\n-Input:\n-    text: The starting text.\n-    cols: The target column width, i.e. the maximum length of any single line after wrapping.\n-\n-Precondition:\n-    cols > 0.\n-\n-Output:\n-    An ordered list of strings, each no longer than the column width, such that the concatenation of the strings returns the original text,\n-and such that no word in the original text is broken into two parts unless necessary.  The original amount of spaces are preserved (e.g. spaces\n-at the start or end of each line aren't trimmed.),Wrapping Text\n-\"\"\"\n",
+  "files": {
+    "program.py": "\ndef wrap(text, cols):\n    lines = []\n    while len(text) > cols:\n        end = text.rfind(' ', 0, cols + 1)\n        if end == -1:\n            end = cols\n        line, text = text[:end], text[end:]\n        lines.append(line)\n\n    lines.append(text)\n    return lines\n\n"
+  },
+  "opinion": {
+    "verdict": "reject",
+    "confidence": "high",
+    "summary": "Patch fixes the truncation symptom (missing final append) so the two public tests pass, but it deletes the documented contract instead of conforming to it and leaves the core splitting logic unchanged. The remaining rfind/loop still infinite-loops on leading spaces and mishandles edge cases, so this is not mergeable as a correct contract fix.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "weak",
+        "note": "Two truncated AssertionErrors show a test failure but the ellipsis hides actual vs expected values and the contract text; cannot verify from cited evidence alone that the failure is the documented-contract disagreement vs another bug."
+      }
+    ],
+    "risks": [
+      "Deletes the Wrap Text docstring/contract instead of fixing implementation to meet it, hiding the specification that defines correctness",
+      "Infinite loop survives: when remaining text starts with space and len>cols, rfind returns 0, end==0, line='' and text unchanged, loop never terminates",
+      "Empty and exact-length edge cases not handled cleanly: wrap('', cols) now returns [''] and multiple-space inputs can produce empty-string lines, violating 'concatenation returns original' and 'no word broken unless necessary' invariant",
+      "No fix to space-preservation/word-boundary logic; same flawed rfind(0, cols+1) splitting remains elsewhere in file"
+    ],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 3544,
+    "duration_s": 11.6
+  },
+  "wrong": true
+}

@@ -1,0 +1,61 @@
+{
+  "case": "lis",
+  "kind": "reference",
+  "reviewer": "meta-models/muse-spark-open-1026",
+  "repeat": 1,
+  "label_correct_patch": true,
+  "error": null,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "Visible examples pass; no public failure reproduced"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": false,
+      "fixed": [],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "passed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -11,27 +11,24 @@\n \n         if length == longest or val < arr[ends[length + 1]]:\n             ends[length + 1] = i\n-            longest = length + 1\n+            longest = max(longest, length + 1)\n \n     return longest\n \n+\"\"\"\n+def lis(arr):\n+    ends = {}\n+    longest = 0\n \n+    for i, val in enumerate(arr):\n \n+        prefix_lengths = [j for j in range(1, longest + 1) if arr[ends[j]] < val]\n+\n+        length = max(prefix_lengths) if prefix_lengths else 0\n+\n+        if length == longest or val < arr[ends[length + 1]]:\n+            ends[length + 1] = i\n+            longest = max(length + 1, longest)\n+\n+    return longest\n \"\"\"\n-Longest Increasing Subsequence\n-longest-increasing-subsequence\n-\n-\n-Input:\n-    arr: A sequence of ints\n-\n-Precondition:\n-    The ints in arr are unique\n-\n-Output:\n-    The length of the longest monotonically increasing subsequence of arr\n-\n-Example:\n-    >>> lis([4, 1, 5, 3, 7, 6, 2])\n-    3\n-\"\"\"\n",
+  "files": {
+    "program.py": "\ndef lis(arr):\n    ends = {}\n    longest = 0\n\n    for i, val in enumerate(arr):\n\n        prefix_lengths = [j for j in range(1, longest + 1) if arr[ends[j]] < val]\n\n        length = max(prefix_lengths) if prefix_lengths else 0\n\n        if length == longest or val < arr[ends[length + 1]]:\n            ends[length + 1] = i\n            longest = max(longest, length + 1)\n\n    return longest\n\n\"\"\"\ndef lis(arr):\n    ends = {}\n    longest = 0\n\n    for i, val in enumerate(arr):\n\n        prefix_lengths = [j for j in range(1, longest + 1) if arr[ends[j]] < val]\n\n        length = max(prefix_lengths) if prefix_lengths else 0\n\n        if length == longest or val < arr[ends[length + 1]]:\n            ends[length + 1] = i\n            longest = max(length + 1, longest)\n\n    return longest\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "concerns",
+    "confidence": "high",
+    "summary": "The shrink-bug fix longest = max(longest, length+1) is correct and now returns 3 for the documented example instead of 2, but the patch deletes the contract docstring and leaves a triple-quoted duplicate function as dead code. With verified:false and unchanged pass counts, there is no test proof of the fix. Would not merge as-is - needs docstring restored and dead code removed.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "unsupported",
+        "note": "Evidence cited is 'Visible examples pass; no public failure reproduced' which does not demonstrate the claimed contract violation. Independent replay shows original does shrink longest to 2 on [4,1,5,3,7,6,2] vs documented 3, so claim is plausible but unsupported by cited evidence."
+      }
+    ],
+    "risks": [
+      "Deletes the Longest Increasing Subsequence docstring including Precondition and Example (>>> lis([...]) 3) - removes specification instead of preserving it",
+      "Leaves a triple-quoted string containing a full duplicate def lis after return - dead code that pollutes module, breaks doctest/documentation tools, and indicates incomplete cleanup",
+      "No verified failure reproduction: test_results.verified false, before.passed 2 and after.passed 2 unchanged, so documented example not proven fixed by harness"
+    ],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 5357,
+    "duration_s": 15.4
+  },
+  "wrong": true
+}

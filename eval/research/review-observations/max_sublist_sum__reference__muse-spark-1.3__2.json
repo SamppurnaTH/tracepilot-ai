@@ -1,0 +1,66 @@
+{
+  "case": "max_sublist_sum",
+  "kind": "reference",
+  "reviewer": "muse-spark-1.3",
+  "repeat": 2,
+  "label_correct_patch": true,
+  "error": null,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "assert 4 == 5",
+          "assert 3 == 4"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -4,28 +4,41 @@\n     max_so_far = 0\n \n     for x in arr:\n-        max_ending_here = max_ending_here + x\n+        max_ending_here = max(0, max_ending_here + x)\n+        max_so_far = max(max_so_far, max_ending_here)\n+\n+    return max_so_far\n+\n+\"\"\"\n+def max_sublist_sum(arr):\n+    max_ending_here = 0\n+    max_so_far = 0\n+\n+    for x in arr:\n+        max_ending_here = max(max_ending_here + x, 0)\n+        max_so_far = max(max_so_far, max_ending_here)\n+\n+    return max_so_far\n+\n+def max_sublist_sum(arr):\n+    max_ending_here = 0\n+    max_so_far = 0\n+\n+    for x in arr:\n+        max_ending_here = max(x, max_ending_here + x)\n         max_so_far = max(max_so_far, max_ending_here)\n \n     return max_so_far\n \n \n+def max_sublist_sum(arr):\n+    max_ending_here = 0\n+    max_so_far = 0\n+\n+    for x in arr:\n+        max_ending_here = max(max_ending_here + x, x)\n+        max_so_far = max(max_so_far, max_ending_here)\n+\n+    return max_so_far\n+\n \"\"\"\n-Max Sublist Sum\n-max-sublist-sum\n-\n-Efficient equivalent to max(sum(arr[i:j]) for 0 <= i <= j <= len(arr))\n-\n-Algorithm source: WordAligned.org by Thomas Guest\n-\n-\n-Input:\n-    arr: A list of ints\n-\n-Output:\n-    The maximum sublist sum\n-\n-Example:\n-    >>> max_sublist_sum([4, -5, 2, 1, -1, 3])\n-    5\n-\"\"\"\n",
+  "files": {
+    "program.py": "\ndef max_sublist_sum(arr):\n    max_ending_here = 0\n    max_so_far = 0\n\n    for x in arr:\n        max_ending_here = max(0, max_ending_here + x)\n        max_so_far = max(max_so_far, max_ending_here)\n\n    return max_so_far\n\n\"\"\"\ndef max_sublist_sum(arr):\n    max_ending_here = 0\n    max_so_far = 0\n\n    for x in arr:\n        max_ending_here = max(max_ending_here + x, 0)\n        max_so_far = max(max_so_far, max_ending_here)\n\n    return max_so_far\n\ndef max_sublist_sum(arr):\n    max_ending_here = 0\n    max_so_far = 0\n\n    for x in arr:\n        max_ending_here = max(x, max_ending_here + x)\n        max_so_far = max(max_so_far, max_ending_here)\n\n    return max_so_far\n\n\ndef max_sublist_sum(arr):\n    max_ending_here = 0\n    max_so_far = 0\n\n    for x in arr:\n        max_ending_here = max(max_ending_here + x, x)\n        max_so_far = max(max_so_far, max_ending_here)\n\n    return max_so_far\n\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "concerns",
+    "confidence": "high",
+    "summary": "The one-line Kadane fix correctly enforces empty-sublist semantics and matches the documented example, but the patch deletes the documented contract and leaves triplicated dead implementations in a string literal. I would not merge as-is without restoring docs and removing dead code.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "Terse but consistent: buggy Kadane returns 4 for documented example expecting 5, showing contract violation."
+      }
+    ],
+    "risks": [
+      "Deleted original Max Sublist Sum docstring/contract from program.py",
+      "Large triple-quoted dead-code block with three duplicate definitions left in file",
+      "Two dead variants use max(x, max_ending_here+x) which implements non-empty semantics and would fail all-negative/empty cases if used",
+      "Only 2 public contract cases verified; empty and all-negative edge cases not locked in"
+    ],
+    "provider": "meta",
+    "model": "muse-spark-1.3",
+    "tokens": 9370,
+    "duration_s": 27.2
+  },
+  "wrong": true
+}

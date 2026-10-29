@@ -3,7 +3,6 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import comparison from "../../public/comparison.json";
 import evalSummary from "../../public/eval.json";
-import { estimateCost } from "@/lib/run";
 
 // The link-preview card for X, Discord and Slack, in the brand colours. Numbers come from the published results.
 export const alt = "TracePilot AI: from errors to verified fixes";
@@ -20,9 +19,9 @@ export default function OpengraphImage() {
   const plain = comparison.systems.plain;
   const gamed = evalSummary.reviewer.gamed;
   const stats = [
-    [`${tp.correct}/${tp.runs}`, "incidents fixed (hidden tests)"],
-    [`${gamed.correct}/${gamed.cases}`, "test-gaming patches caught"],
-    [`${Math.round((1 - tp.avg_tokens / plain.avg_tokens) * 100)}% fewer`, `tokens · about ${estimateCost(tp.avg_tokens)} a run`],
+    [`${tp.correct}/${tp.runs}`, "correct outcomes (original pilot)"],
+    [`${gamed.correct}/${gamed.cases}`, "test-gaming attempts rejected"],
+    [`${Math.round((1 - tp.avg_tokens / plain.avg_tokens) * 100)}% fewer`, "tokens in the original pilot"],
   ];
   return new ImageResponse(
     (

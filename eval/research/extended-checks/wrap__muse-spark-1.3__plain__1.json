@@ -1,0 +1,13 @@
+{
+  "id": "wrap__muse-spark-1.3__plain__1",
+  "model": "muse-spark-1.3",
+  "condition": "plain",
+  "repeat": 1,
+  "posthoc": true,
+  "passes": true,
+  "timed_out": false,
+  "error": null,
+  "exit_code": 0,
+  "stdout": "contract invariants passed\n",
+  "stderr": ""
+}

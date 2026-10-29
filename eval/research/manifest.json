@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "frozen_at_utc": "2026-10-29T11:41:40Z",
+  "upstream": "https://github.com/jkoppel/QuixBugs",
+  "revision": "4257f44b0ff1181dedaedee6a447e133219fcebf",
+  "cases": [
+    "lis",
+    "max_sublist_sum",
+    "next_permutation",
+    "powerset",
+    "rpn_eval",
+    "wrap"
+  ],
+  "models": [
+    "muse-spark-1.1",
+    "muse-spark-1.3"
+  ],
+  "conditions": [
+    "plain",
+    "plain_brief",
+    "tracepilot",
+    "tracepilot_no_brief"
+  ],
+  "repeats": 2,
+  "visible_split": "first 2 JSON lines in upstream order",
+  "heldout_split": "all remaining JSON lines",
+  "seed": 20261029,
+  "max_parallel": 2,
+  "token_budget_per_investigation": 80000,
+  "isolation": "docker",
+  "files_sha256_lf": {
+    "bench/quixbugs/correct_python_programs/lis.py": "f2f14efdb6b419591d565882734ce05c40cdd3b203b45b5727d2838338063a61",
+    "bench/quixbugs/correct_python_programs/max_sublist_sum.py": "2f2b119d49fbbe641707020b6e7cbb637affeffe9ae3ca653cccd5a3bee8d798",
+    "bench/quixbugs/correct_python_programs/next_permutation.py": "93bbb04ed299c44c202ab2eca2aa68318b5ee94fdcb6ce5a3977f24c7ed67957",
+    "bench/quixbugs/correct_python_programs/powerset.py": "b53f71a04fec20cbd20c5f0edd64ec1c49796b693677d46b3e7e02b5e3aaf46e",
+    "bench/quixbugs/correct_python_programs/rpn_eval.py": "a5f9ec92795e5703653039bfb6b08e8a1298c18ea89a842d3c67e7bc67a2030e",
+    "bench/quixbugs/correct_python_programs/wrap.py": "19dba14cdf9fe3380abf4dd3b2d5726f38bbd4af39e0f19e725f9f3bdd236bc6",
+    "bench/quixbugs/json_testcases/lis.json": "f611c35d10ec78f9a6e9d7f5ac7c6a9074c652f142b3a2302588c912b8617974",
+    "bench/quixbugs/json_testcases/max_sublist_sum.json": "87970bc353d75cdc34f25d96715f4c4859dca57becd96cf398dd0a475dd819bf",
+    "bench/quixbugs/json_testcases/next_permutation.json": "1c2b6c46b6f9620eb41d1eabb02dd21e8d3d30541951ca51aa1d648404ffb68d",
+    "bench/quixbugs/json_testcases/powerset.json": "99b3a5af3674fdb4acc0f54921cc388a86999264f5ec03276b1f1eea5463e8c5",
+    "bench/quixbugs/json_testcases/rpn_eval.json": "03fbb45a22f12fd6924331301b1afd8738e6dff1bc76e3fb0d185047c4678b67",
+    "bench/quixbugs/json_testcases/wrap.json": "f00a3304de78155d46f44634f5435d229a8a220f03b2eeade38495af9b587549",
+    "bench/quixbugs/legal_notes.txt": "f0d3a9e4cfb92dbd29a38f7c9045d5d3d4c74c92f905ecf414f9c9b4e917ea93",
+    "bench/quixbugs/LICENSE": "3bb03003929be645f6557a66fcb9820f527df7ce2b51b491405d233cb191d517",
+    "bench/quixbugs/python_programs/lis.py": "fe9e751f62674299be95f5026c30c778ec331eb449caaa9a13f6b2908e44a016",
+    "bench/quixbugs/python_programs/max_sublist_sum.py": "aab26d9f3984f177adcff110fe72de97e54c5f85ad476c38e49c949a873d85b5",
+    "bench/quixbugs/python_programs/next_permutation.py": "14ffc36c80bf3bba8db91b7e0fa6be14a8011130ddeaccf33ed62638eac1b25b",
+    "bench/quixbugs/python_programs/powerset.py": "3e3deb045ed61fbe82725cd7e7b0fb4d00f411f87f0f91358109ec0204c61ae9",
+    "bench/quixbugs/python_programs/rpn_eval.py": "4a473b1beaa9eb8155fcb079917e390d0584d8ebdfc6d6d8c88069609854194a",
+    "bench/quixbugs/python_programs/wrap.py": "0dc3363df6fc8fffb025e5f0aa1902c8bd680ba564df4cdf9b350c4f8c1586f7"
+  },
+  "limits": [
+    "External-source authorship, not independently administered or novel to training.",
+    "Small algorithmic functions, not production SRE coverage.",
+    "An earlier model is not proven smaller or weaker.",
+    "No population or statistical-significance claim; publish null/negative outcomes too."
+  ]
+}

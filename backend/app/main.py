@@ -21,7 +21,7 @@ from pydantic import BaseModel
 from .admin import current_user, router as admin_router, workspace_router, workspace_user, workspace_writer
 from .agent import Cancelled, Investigation
 from .cli import detect_app
-from .reviewer import Reviewer
+from .reviewer import Reviewer, requires_review
 from .config import REPO_ROOT, get_settings
 from .sandbox import Sandbox, detect_kind, docker_available, ensure_image, project_image
 from .uploads import UploadError, clone_repo, extract_zip, save_attachment, workdir
@@ -57,7 +57,7 @@ class Run:
             "provider": self.provider,
             "status": self.status,
             "title": self.title,
-            "outcome": (self.report or {}).get("outcome"),
+            "outcome": "needs_review" if requires_review((self.report or {}).get("second_opinion")) and verification.get("verified") else (self.report or {}).get("outcome"),
             "started_at": self.started_at,
             "events": len(self.events),
             "verified": verification.get("verified"),
@@ -112,6 +112,8 @@ class RunManager:
         try:
             investigation = build()
             investigation.should_stop = run.stop.is_set
+            # Time spent preparing (such as building a project's sandbox image) counts toward the run's duration.
+            investigation.started_at = run.started_at
             report = investigation.run()
             report.pop("events", None)  # already in run.events
             status = "completed"
@@ -259,7 +261,11 @@ async def start_custom_investigation(
     except UploadError as exc:
         shutil.rmtree(base, ignore_errors=True)
         raise HTTPException(400, str(exc)) from exc
-    kind = detect_kind(root)
+    try:
+        kind = detect_kind(root)
+    except ValueError as exc:
+        shutil.rmtree(base, ignore_errors=True)
+        raise HTTPException(400, str(exc)) from exc
     scope = [t.strip() for t in (tests or "").split(",") if t.strip()] or None
 
     def build(run: Run):
@@ -342,7 +348,7 @@ def list_saved_runs(user: dict | None = Depends(optional_user)) -> list[dict]:
         runs.append({
             "name": path.stem,
             **{k: data.get(k) for k in ("scenario", "provider", "status", "verified", "title", "started_at")},
-            "outcome": report.get("outcome"),
+            "outcome": "needs_review" if requires_review(report.get("second_opinion")) and (report.get("verification") or {}).get("verified") else report.get("outcome"),
             "duration_s": report.get("duration_s"),
             "tokens": (usage.get("input_tokens") or 0) + (usage.get("output_tokens") or 0),
         })  # fmt: skip

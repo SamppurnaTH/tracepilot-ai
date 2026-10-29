@@ -1,0 +1,67 @@
+{
+  "case": "wrap",
+  "kind": "reference",
+  "reviewer": "muse-spark-1.3",
+  "repeat": 1,
+  "label_correct_patch": true,
+  "error": null,
+  "reference_format": "minimal_active_upstream_fix",
+  "public_evidence_valid": true,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "AssertionError: assert ['The leaves ...ound as', ...] == ['The leaves ...ound as', ...]",
+          "AssertionError: assert ['The leaves ...the sea', ...] == ['The leaves ...the sea', ...]"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -1,3 +1,4 @@\n+\n def wrap(text, cols):\n     lines = []\n     while len(text) > cols:\n@@ -7,6 +8,7 @@\n         line, text = text[:end], text[end:]\n         lines.append(line)\n \n+    lines.append(text)\n     return lines\n \n \"\"\"\n",
+  "files": {
+    "program.py": "\ndef wrap(text, cols):\n    lines = []\n    while len(text) > cols:\n        end = text.rfind(' ', 0, cols + 1)\n        if end == -1:\n            end = cols\n        line, text = text[:end], text[end:]\n        lines.append(line)\n\n    lines.append(text)\n    return lines\n\n\"\"\"\nWrap Text\n\nGiven a long string and a column width, break the string on spaces into a list of lines such that each line is no longer than the column width.\n\nInput:\n    text: The starting text.\n    cols: The target column width, i.e. the maximum length of any single line after wrapping.\n\nPrecondition:\n    cols > 0.\n\nOutput:\n    An ordered list of strings, each no longer than the column width, such that the concatenation of the strings returns the original text,\nand such that no word in the original text is broken into two parts unless necessary.  The original amount of spaces are preserved (e.g. spaces\nat the start or end of each line aren't trimmed.),Wrapping Text\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "concerns",
+    "confidence": "high",
+    "summary": "Patch fixes the dropped trailing remainder and makes the two public contract tests pass, but does not fully satisfy the documented contract. The space-break logic can hang with zero progress when the remainder starts with a space and has no other space in the window, so it should not be merged as a complete fix.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "weak",
+        "note": "Truncated AssertionErrors show contract mismatch but hide the actual diff, so missing-tail root cause does not follow from cited evidence alone; it is only made plausible retrospectively by the fix passing."
+      }
+    ],
+    "risks": [
+      "Infinite loop / hang when end==0: e.g. text starting with space followed by long word with cols small, rfind returns 0, line='' and text unchanged, loop never progresses.",
+      "Long-word handling after a space-break still violates contract guarantees (all lines <= cols and termination) despite public tests passing.",
+      "Empty-string edge now returns [''] instead of [] while concatenation holds, contract ambiguous and untested."
+    ],
+    "provider": "meta",
+    "model": "muse-spark-1.3",
+    "tokens": 11116,
+    "duration_s": 36.1
+  },
+  "wrong": true
+}

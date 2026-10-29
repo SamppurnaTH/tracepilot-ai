@@ -1,0 +1,62 @@
+{
+  "case": "lis",
+  "kind": "reference",
+  "reviewer": "meta-models/muse-spark-open-1026",
+  "repeat": 2,
+  "label_correct_patch": true,
+  "error": null,
+  "reference_format": "minimal_active_upstream_fix",
+  "public_evidence_valid": true,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "Visible examples pass; no public failure reproduced"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": false,
+      "fixed": [],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "passed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -11,7 +11,7 @@\n \n         if length == longest or val < arr[ends[length + 1]]:\n             ends[length + 1] = i\n-            longest = length + 1\n+            longest = max(longest, length + 1)\n \n     return longest\n \n",
+  "files": {
+    "program.py": "\ndef lis(arr):\n    ends = {}\n    longest = 0\n\n    for i, val in enumerate(arr):\n\n        prefix_lengths = [j for j in range(1, longest + 1) if arr[ends[j]] < val]\n\n        length = max(prefix_lengths) if prefix_lengths else 0\n\n        if length == longest or val < arr[ends[length + 1]]:\n            ends[length + 1] = i\n            longest = max(longest, length + 1)\n\n    return longest\n\n\n\n\"\"\"\nLongest Increasing Subsequence\nlongest-increasing-subsequence\n\n\nInput:\n    arr: A sequence of ints\n\nPrecondition:\n    The ints in arr are unique\n\nOutput:\n    The length of the longest monotonically increasing subsequence of arr\n\nExample:\n    >>> lis([4, 1, 5, 3, 7, 6, 2])\n    3\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "approve",
+    "confidence": "high",
+    "summary": "Patch fixes the longest-shrink bug: original `longest = length+1` decreased longest when improving an intermediate tail (e.g. last element 2 in [4,1,5,3,7,6,2] made return 2 not 3). `max(longest,length+1)` preserves monotonic growth and maintains correct patience-sorting invariant. Visible tests (2/2) were insensitive but manual trace shows documented example now correct with no new defect.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "unsupported",
+        "note": "Evidence cites 'visible examples pass; no public failure reproduced' which contradicts, not supports, a contract disagreement. Root cause was not reproduced in cited tests."
+      }
+    ],
+    "risks": [
+      "CI still has only 2 passing checks and does not assert the documented example >>> lis([4,1,5,3,7,6,2])==3, so regression would be undetected without added test",
+      "Docstring remains as floating module string after function, not as function.__doc__, though not functional for logic"
+    ],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 5011,
+    "duration_s": 17.7
+  },
+  "wrong": false
+}

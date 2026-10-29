@@ -7,7 +7,6 @@ import { Footer } from "@/components/Footer";
 import { Logo, Wordmark } from "@/components/bits";
 import { Icon, type IconName } from "@/components/icons";
 import { WorkflowOverview } from "@/components/WorkflowOverview";
-import { estimateCost } from "@/lib/run";
 import { kTokens, minutes, useData } from "@/lib/useData";
 
 export default function Landing() {
@@ -16,10 +15,10 @@ export default function Landing() {
   const plain = comparison?.systems.plain;
   const stats: [IconName, string, string][] = tp && plain
     ? [
-        ["checkCircle", `${Math.round((tp.correct / tp.runs) * 100)}%`, `${tp.correct}/${tp.runs} incidents fixed (hidden tests)`],
-        ["layers", `${Math.round((1 - tp.avg_tokens / plain.avg_tokens) * 100)}%`, `fewer tokens (avg ${kTokens(tp.avg_tokens)} vs ${kTokens(plain.avg_tokens)})`],
-        ["bolt", `${Math.round((1 - tp.avg_duration_s / plain.avg_duration_s) * 100)}%`, `less time (avg ${minutes(tp.avg_duration_s)} vs ${minutes(plain.avg_duration_s)})`],
-        ["receipt", estimateCost(tp.avg_tokens), "average cost per investigation (est.)"],
+        ["checkCircle", `${Math.round((tp.correct / tp.runs) * 100)}%`, `${tp.correct}/${tp.runs} correct outcomes (original pilot)`],
+        ["layers", `${Math.round((1 - tp.avg_tokens / plain.avg_tokens) * 100)}%`, `fewer tokens in the original pilot (avg ${kTokens(tp.avg_tokens)} vs ${kTokens(plain.avg_tokens)})`],
+        ["bolt", `${Math.round((1 - tp.avg_duration_s / plain.avg_duration_s) * 100)}%`, `less time in the original pilot (avg ${minutes(tp.avg_duration_s)} vs ${minutes(plain.avg_duration_s)})`],
+        ["eye", "2 models", "Meta investigator + cold reviewer"],
       ]
     : [];
   return (
@@ -53,7 +52,7 @@ export default function Landing() {
                 From Errors to <span className={s.gradient}>Verified Fixes</span>
               </h1>
               <p className={s.lede}>
-                TracePilot AI automatically investigates application issues, finds the root cause, generates a fix, verifies it with tests, and tells you exactly what to do.
+                The AI debugger that proves its fix with a failing test, a verified patch, and a separate AI review—or honestly says “no code change needed.” Proof, not patches.
               </p>
               <div className={s.heroActions}>
                 <Link href="/app/run?id=checkout&replay=1" className={s.cta}>

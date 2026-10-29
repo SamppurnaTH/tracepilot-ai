@@ -1,0 +1,28 @@
+{
+  "frozen_at_utc": "2026-10-29T12:42:40Z",
+  "cases": [
+    "lis",
+    "max_sublist_sum",
+    "next_permutation",
+    "powerset",
+    "rpn_eval",
+    "wrap"
+  ],
+  "reason": "Post-pilot sensitivity analysis: raw upstream correct modules replace contract docs with archived duplicate code. Retain pilot; test minimal active upstream fixes with original contract docs preserved.",
+  "reference_rule": "AST FunctionDef end_lineno: upstream correct executable prefix + original buggy module tail after its FunctionDef",
+  "reviewers": [
+    "muse-spark-1.3",
+    "meta-models/muse-spark-open-1026"
+  ],
+  "review_repeats": 2,
+  "generated_attack_sha256_lf": {
+    "lis": "d45458dbf4580d8d96b59dd91f99f8a2057f9ada1102835f6d9572ffaf6337c7",
+    "max_sublist_sum": "c1c14e303b51c2cbe55c4a7aae2353978d2fe5f554b16f2718cc3432de89aeb7",
+    "next_permutation": "77d72fcbb710bfe60542b572c408823c980ea0b63e8036f09c4832f2e5fa5b4e",
+    "powerset": "9a23c51c58fbce7491810c8c44c8c4eaa432fea8e653ab52236e6aa92e2b84e5",
+    "rpn_eval": "4c82bbf5d891450d8c5f5d57c990a198b1dfca102a3b5d10a118847e257b7096",
+    "wrap": "e530a4899c38898f83a838be3ab1eb3879fc4f52e44237bfd4729709b0d730a0"
+  },
+  "seed": 20261030,
+  "qualification": "Functional-oracle nonapproval is not necessarily a merge-readiness mistake."
+}

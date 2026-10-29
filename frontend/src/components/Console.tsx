@@ -5,12 +5,12 @@ import s from "./console.module.css";
 import { CopyButton, cx } from "./bits";
 import { Icon, type IconName } from "./icons";
 import { downloadText, markdownReport, prDescription, publicTicket } from "@/lib/report";
-import { estimateCost, formatTally, shortTest, type Outcome, type RunState, type ScenarioSummary, type TimelineItem } from "@/lib/run";
+import { estimateCost, formatTally, needsReview, shortTest, type Outcome, type RunState, type ScenarioSummary, type TimelineItem } from "@/lib/run";
+import { minutes } from "@/lib/useData";
 
 const kTokens = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10_000 ? 0 : 1)}K` : String(n));
 const passing = (tally?: Record<string, number>) => formatTally(tally).replace(" passing", "");
 const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
-const minutes = (sec: number) => (sec < 60 ? `${Math.round(sec)} s` : `${(sec / 60).toFixed(1)} min`);
 
 function tallyOf(tests: Record<string, Outcome>): Record<string, number> {
   const t: Record<string, number> = {};
@@ -191,7 +191,8 @@ export function OutcomeCard({ state }: { state: RunState }) {
     );
   }
   const noCode = r.outcome === "no_code_change";
-  const ok = state.verification?.verified;
+  const reviewRequired = needsReview(state);
+  const ok = state.verification?.verified && !reviewRequired;
   const issues = r.findings.issues;
   return (
     <div className={s.outcome}>
@@ -200,7 +201,7 @@ export function OutcomeCard({ state }: { state: RunState }) {
           <Icon name={noCode || ok ? "check" : "minusCircle"} size={20} />
         </span>
         <div>
-          <p className={cx(s.outcomeTitle, noCode || ok ? s.good : s.bad)}>{noCode ? "Root cause found" : ok ? "Fix verified" : "Not verified"}</p>
+          <p className={cx(s.outcomeTitle, noCode || ok ? s.good : s.bad)}>{noCode ? "Root cause found" : reviewRequired ? "Review required" : ok ? "Fix verified" : "Not verified"}</p>
           <p className={s.outcomeSub}>
             {noCode ? "No code change needed" : state.verification ? `Tests ${passing(state.verification.before)} → ${passing(state.verification.after)}` : ""}
           </p>
@@ -293,6 +294,8 @@ export function ReproTests({ state, files }: { state: RunState; files: FileDiff[
     return (
       <div className={s.stack}>
         <p className={s.muted}>Written by the agent and kept only because each test failed on the original code. They ship with the patch.</p>
+        <p className={s.muted}>Check that these assertion failures match the incident. Fail→pass alone does not prove a test failed for the right reason.</p>
+        {Object.entries(state.regressionReasons ?? {}).map(([test, reason]) => <div className={s.card} key={test}><strong className="mono">{test}</strong><pre className={s.pre}>{reason}</pre></div>)}
         <DiffBlock files={tests} />
       </div>
     );
@@ -330,6 +333,7 @@ export function TestResults({ state }: { state: RunState }) {
   );
   return (
     <div className={s.stack}>
+      {state.excludedTests?.length ? <p className={s.muted}>Outside verification: {state.excludedTests.length} infrastructure test classes excluded ({state.excludedTests.join(", ")}).</p> : null}
       <div className={s.gauge}>
         <div>
           <p className={s.gaugeLabel}>Before</p>
@@ -407,7 +411,23 @@ export function Review({ state }: { state: RunState }) {
 
 const VERDICT = { approve: "Approved", concerns: "Concerns raised", reject: "Rejected", unavailable: "Unavailable" };
 
-export function Summary({ scenario, state, files }: { scenario: ScenarioSummary; state: RunState; files: FileDiff[] }) {
+/**
+ * Seconds since the run started, ticking every second while it is live. It counts on from the newest event's own
+ * time, so a browser clock that differs from the server's can't skew it.
+ */
+export function useElapsed(state: RunState, live: boolean): number {
+  const [anchor, setAnchor] = useState({ elapsed: state.elapsed, at: 0 });
+  const [now, setNow] = useState(0);
+  useEffect(() => setAnchor({ elapsed: state.elapsed, at: Date.now() }), [state.elapsed]);
+  useEffect(() => {
+    if (!live) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [live]);
+  return live && anchor.at && now > anchor.at ? anchor.elapsed + (now - anchor.at) / 1000 : state.elapsed;
+}
+
+export function Summary({ scenario, state, files, elapsed }: { scenario: ScenarioSummary; state: RunState; files: FileDiff[]; elapsed?: number }) {
   const r = state.report;
   const usage = r?.usage;
   const tokens = usage ? usage.input_tokens + usage.output_tokens : undefined;
@@ -418,19 +438,19 @@ export function Summary({ scenario, state, files }: { scenario: ScenarioSummary;
   const newTests = files.filter((f) => f.isNew && isTestPath(f.path)).length;
   const confirmed = state.hypotheses.filter((h) => h.status === "confirmed");
   const status = state.phase === "done" ? "Completed" : state.phase === "failed" ? (state.error === "Stopped by the user" ? "Stopped" : "Failed") : "Running";
-  const outcome = !r ? "…" : noCode ? "No code change needed" : state.verification?.verified ? "Fix verified" : "Not verified";
+  const outcome = !r ? "…" : noCode ? "No code change needed" : needsReview(state) ? "Review required" : state.verification?.verified ? "Fix verified" : "Not verified";
   const rows: [string, React.ReactNode, string?][] = [
     ["Status", status, state.phase === "done" ? s.good : state.phase === "failed" ? s.bad : s.accent],
-    ["Outcome", outcome, !r ? undefined : noCode || state.verification?.verified ? s.good : s.bad],
+    ["Outcome", outcome, !r ? undefined : noCode || (state.verification?.verified && !needsReview(state)) ? s.good : s.bad],
     ["Root cause", r?.findings.issues[0]?.title ?? confirmed[0]?.claim ?? "…"],
     ["Hypotheses", `${confirmed.length} of ${state.hypotheses.length} confirmed`],
     ["Checks run", String(state.toolCalls)],
     ["Tests written", newTests ? `${newTests} file${newTests > 1 ? "s" : ""}` : "None"],
     ["Code changes", code.length ? `${code.length} file${code.length > 1 ? "s" : ""}, +${added} −${removed}` : r ? "None" : "…"],
     ["Second opinion", state.secondOpinion ? VERDICT[state.secondOpinion.verdict] : r ? "Not needed" : "…", state.secondOpinion?.verdict === "approve" ? s.good : undefined],
-    ["Execution time", r ? minutes(r.duration_s) : clock(state.elapsed)],
+    ["Execution time", minutes(r ? r.duration_s : (elapsed ?? state.elapsed))],
     ["Tokens used", tokens ? tokens.toLocaleString() : "…"],
-    ["Est. cost", tokens ? estimateCost(tokens) : "…"],
+    ["Est. investigator cost", tokens ? `${estimateCost(tokens)} (reviewer/hosting excluded)` : "…"],
   ];
   return (
     <aside className={s.summary} aria-labelledby="summary-title">
@@ -488,6 +508,7 @@ export function Console({
   const [tab, setTab] = useState("progress");
   const files = splitDiff(state.diff || "");
   const r = state.report;
+  const elapsed = useElapsed(state, !recorded && !r && state.phase !== "done" && state.phase !== "failed");
   const tokens = r ? r.usage.input_tokens + r.usage.output_tokens : undefined;
   const [service, ...rest] = scenario.title.split(":");
   const date = startedAt ? new Date(startedAt * 1000).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) : null;
@@ -519,7 +540,7 @@ export function Console({
         </div>
         <div className={s.headMeta}>
           <span>
-            <Icon name="clock" size={15} /> {r ? minutes(r.duration_s) : clock(state.elapsed)}
+            <Icon name="clock" size={15} /> {minutes(r ? r.duration_s : elapsed)}
           </span>
           {tokens && (
             <span>
@@ -535,6 +556,7 @@ export function Console({
         </div>
       </header>
       <Stepper state={state} />
+      {!recorded && !r && state.phase !== "failed" && <div className={s.controls} role="status"><strong>Now: {({ starting: "preparing the isolated sandbox", investigate: "checking hypotheses and reproducing the incident", fix: "patching the sandbox and running tests", review: "reviewing the patch in a separate model context", report: "assembling the evidence report", done: "complete", failed: "stopped" })[state.phase]}</strong><span>Elapsed {clock(elapsed)} · Typical Python demo: 2–4 minutes; Java and custom projects can take longer. {elapsed > 240 ? "This run is taking longer than typical; you can stop it or open a recorded example." : "This is an estimate, not a countdown."}</span></div>}
       {controls && <div className={s.controls}>{controls}</div>}
       <div className={s.body}>
         <div className={s.main}>
@@ -565,7 +587,7 @@ export function Console({
             {tab === "review" && <Review state={state} />}
           </div>
         </div>
-        <Summary scenario={scenario} state={state} files={files} />
+        <Summary scenario={scenario} state={state} files={files} elapsed={elapsed} />
       </div>
     </section>
   );

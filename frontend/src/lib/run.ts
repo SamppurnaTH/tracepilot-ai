@@ -58,7 +58,34 @@ export interface SecondOpinion {
   error?: string;
 }
 
+// Where a run's time went, in seconds. Recorded by the agent from runs made after Oct 29.
+export interface Timing {
+  prepare_s: number; // before the run starts: queueing, and building an uploaded project's sandbox image
+  sandbox_s: number; // starting the sandbox, replaying traffic, the baseline test run
+  model_s: number; // waiting for Muse Spark
+  tools_s: number; // the agent's tool calls (reads, requests, its own test runs)
+  verify_s: number; // the harness's verification test runs
+  review_s: number; // Muse Spark Open's review
+  by_phase: Record<string, number>; // wall-clock time per phase
+}
+
+/** The time breakdown worth showing: the larger parts first, anything under half a second left out. */
+export function timeParts(t?: Timing): [string, number][] {
+  if (!t) return [];
+  const parts: [string, number][] = [
+    ["Muse Spark", t.model_s],
+    ["Reviewer", t.review_s],
+    ["Tools", t.tools_s],
+    ["Verification tests", t.verify_s],
+    ["Sandbox setup", t.sandbox_s],
+    ["Preparation", t.prepare_s],
+  ];
+  return parts.filter(([, sec]) => sec >= 0.5).sort((a, b) => b[1] - a[1]);
+}
+
 export interface Report {
+  excluded_tests?: string[];
+  verification_scope?: string;
   incident: string;
   model: string;
   isolation: string;
@@ -70,6 +97,7 @@ export interface Report {
   // "fixed" | "not_verified" | "no_code_change" (the cause is outside the code) | "no_root_cause"
   outcome?: string;
   usage: Usage;
+  timing?: Timing;
   duration_s: number;
 }
 
@@ -101,6 +129,11 @@ export interface Recording {
   events: RunEvent[];
 }
 
+export function needsReview(state: { secondOpinion?: SecondOpinion; report?: Report }): boolean {
+  const verdict = state.secondOpinion?.verdict ?? state.report?.second_opinion?.verdict;
+  return state.report?.outcome === "needs_review" || verdict === "concerns" || verdict === "reject";
+}
+
 export type Phase = "starting" | "investigate" | "fix" | "review" | "report" | "done" | "failed";
 
 // The stages of a run, in order, as shown in the progress stepper.
@@ -128,11 +161,14 @@ export interface RunState {
   diff: string;
   report?: Report;
   error?: string;
+  allowRecordingFallback?: boolean;
   toolCalls: number;
   timeline: TimelineItem[];
   reached: Stage[];
   brief?: string;
   regressionTests: string[]; // tests the agent wrote that reproduce a bug
+  regressionReasons?: Record<string, string>;
+  excludedTests?: string[];
   images: string[]; // screenshots given to the model as evidence
   incident?: string;
   reviewRetries: number;
@@ -299,6 +335,7 @@ export function reduce(state: RunState, e: RunEvent): RunState {
     case "regression_test": {
       const tests = Object.keys((e.tests ?? {}) as Record<string, Outcome>);
       if (e.accepted) {
+        s.regressionReasons = { ...s.regressionReasons, ...((e.reasons ?? {}) as Record<string, string>) };
         s.regressionTests = [...s.regressionTests.filter((t) => !t.startsWith(e.path as string)), ...tests];
         s.baseline = { ...(s.baseline ?? {}), ...Object.fromEntries(tests.map((t) => [t, "failed" as Outcome])) };
         add({ kind: "resolve", title: "Reproducing test kept", detail: `${tests.length} new test${tests.length === 1 ? "" : "s"} fail on the current code`, tone: "signal" });
@@ -307,6 +344,10 @@ export function reduce(state: RunState, e: RunEvent): RunState {
       }
       break;
     }
+    case "excluded_tests":
+      s.excludedTests = (e.classes ?? []) as string[];
+      add({ kind: "alert", title: `${s.excludedTests.length} infrastructure test classes excluded`, detail: `${s.excludedTests.join(", ")}: ${e.reason}`, tone: "neutral" });
+      break;
     case "review_retry":
       s.reviewRetries += 1;
       add({ kind: "alert", title: "Reviewer objections sent back", detail: "one more fix round with the reviewer's risks", tone: "bad" });
@@ -334,6 +375,7 @@ export function reduce(state: RunState, e: RunEvent): RunState {
       break;
     case "error":
       s.error = e.message as string;
+      s.allowRecordingFallback = e.recordingFallback !== false;
       s.phase = "failed";
       add({ kind: "alert", title: "Investigation failed", detail: s.error, tone: "bad" });
       break;

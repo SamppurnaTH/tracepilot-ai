@@ -1,0 +1,22 @@
+{
+  "orders": {
+    "heldout_pass": true,
+    "score_error": null,
+    "heldout_tests": {
+      "tests/test_service_oracle.py::test_ownership_is_enforced_for_every_order": "passed",
+      "tests/test_service_oracle.py::test_owners_can_still_read_their_orders": "passed",
+      "tests/test_service_oracle.py::test_total_without_coupon_is_correct": "passed"
+    },
+    "heldout_reasons": {}
+  },
+  "inventory": {
+    "heldout_pass": true,
+    "score_error": null,
+    "heldout_tests": {
+      "tests/test_service_oracle.py::test_negative_quantity_never_adds_stock": "passed",
+      "tests/test_service_oracle.py::test_zero_quantity_is_rejected": "passed",
+      "tests/test_service_oracle.py::test_cancel_twice_returns_stock_once": "passed"
+    },
+    "heldout_reasons": {}
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "wrap__muse-spark-1.1__plain_brief__1",
+  "model": "muse-spark-1.1",
+  "condition": "plain_brief",
+  "repeat": 1,
+  "posthoc": true,
+  "passes": false,
+  "timed_out": true,
+  "error": null,
+  "exit_code": -1,
+  "stdout": "",
+  "stderr": "timed out after 3s"
+}

@@ -1,0 +1,63 @@
+{
+  "case": "max_sublist_sum",
+  "kind": "reference",
+  "reviewer": "muse-spark-1.3",
+  "repeat": 2,
+  "label_correct_patch": true,
+  "error": null,
+  "reference_format": "minimal_active_upstream_fix",
+  "public_evidence_valid": true,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "assert 4 == 5",
+          "assert 3 == 4"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -4,7 +4,7 @@\n     max_so_far = 0\n \n     for x in arr:\n-        max_ending_here = max_ending_here + x\n+        max_ending_here = max(0, max_ending_here + x)\n         max_so_far = max(max_so_far, max_ending_here)\n \n     return max_so_far\n",
+  "files": {
+    "program.py": "\ndef max_sublist_sum(arr):\n    max_ending_here = 0\n    max_so_far = 0\n\n    for x in arr:\n        max_ending_here = max(0, max_ending_here + x)\n        max_so_far = max(max_so_far, max_ending_here)\n\n    return max_so_far\n\n\n\"\"\"\nMax Sublist Sum\nmax-sublist-sum\n\nEfficient equivalent to max(sum(arr[i:j]) for 0 <= i <= j <= len(arr))\n\nAlgorithm source: WordAligned.org by Thomas Guest\n\n\nInput:\n    arr: A list of ints\n\nOutput:\n    The maximum sublist sum\n\nExample:\n    >>> max_sublist_sum([4, -5, 2, 1, -1, 3])\n    5\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "approve",
+    "confidence": "high",
+    "summary": "Patch restores Kadane reset max(0, ...) matching the documented empty-subarray-allowed spec max(sum(arr[i:j])). Buggy code computed max prefix sum, returning 4 for the doc example expecting 5; fixed code returns 5 and passes both contract tests.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "Original code lacks reset and computes max prefix, not max sublist. Doc example [4,-5,2,1,-1,3] expects 5 but buggy yields 4, matching assert 4==5; second assert 3==4 fits same pattern."
+      }
+    ],
+    "risks": [],
+    "provider": "meta",
+    "model": "muse-spark-1.3",
+    "tokens": 3569,
+    "duration_s": 11.7
+  },
+  "wrong": false
+}

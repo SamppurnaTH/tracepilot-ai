@@ -23,8 +23,9 @@ interface Row {
   source: string;
 }
 
-function status(verified?: boolean | null, outcome?: string | null, raw?: string): [string, string] {
+function status(verified?: boolean | null, outcome?: string | null, raw?: string, review?: string | null): [string, string] {
   if (outcome === "no_code_change") return ["No code change", s.sevPass];
+  if (outcome === "needs_review" || review === "concerns" || review === "reject") return ["Review required", s.sevCritical];
   if (raw === "cancelled") return ["Stopped", s.sevLow];
   if (raw === "failed") return ["Failed", s.sevCritical];
   if (raw === "running") return ["Running", s.sevAccent];
@@ -50,7 +51,7 @@ export default function Runs() {
       return { key: r.name, title: r.title || known || r.scenario, status: label, tone, duration: r.duration_s, tokens: r.tokens, date: r.started_at, href: `/app/run?saved=${encodeURIComponent(r.name)}`, source: "This backend" };
     }),
     ...(index ?? []).map((e) => {
-      const [label, tone] = status(e.verified, e.outcome);
+      const [label, tone] = status(e.verified, e.outcome, undefined, e.review);
       return { key: e.scenario.id, title: e.scenario.title, status: label, tone, duration: e.duration_s, tokens: e.tokens, date: e.started_at, href: `/app/run?id=${e.scenario.id}`, source: "Recorded" };
     }),
   ];

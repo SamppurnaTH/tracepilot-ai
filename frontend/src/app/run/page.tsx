@@ -1,8 +1,8 @@
 "use client";
 
 import { useAuth } from "@/components/AuthProvider";
-import Link from "@/components/AreaLink";
-import { useSearchParams } from "next/navigation";
+import Link, { useAreaPath } from "@/components/AreaLink";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import s from "@/components/app.module.css";
 import { EmptyState, SkeletonCards } from "@/components/ScreenState";
@@ -18,11 +18,15 @@ import { useData } from "@/lib/useData";
 
 function RunPage() {
   const params = useSearchParams();
+  const router = useRouter();
+  const area = useAreaPath();
   const { user } = useAuth();
   const id = params.get("id");
   const liveId = params.get("live");
   const saved = params.get("saved");
   const replay = params.get("replay") === "1";
+  const fallback = params.get("fallback");
+  const noFallback = params.get("noFallback") === "1";
   const { index, live } = useData();
   const run = useRun();
   const [scenario, setScenario] = useState<ScenarioSummary | null>(null);
@@ -61,6 +65,12 @@ function RunPage() {
   const view = scenario ? { ...scenario, incident: scenario.incident || state.incident || "" } : null;
   const done = state.phase === "done" && !run.replaying;
   const running = run.mode === "live" && state.phase !== "done" && state.phase !== "failed";
+
+  useEffect(() => {
+    if (!noFallback && state.allowRecordingFallback !== false && liveId && state.phase === "failed" && state.error !== "Stopped by the user" && scenario && index?.some((entry) => entry.scenario.id === scenario.id)) {
+      router.replace(area(`/app/run?id=${encodeURIComponent(scenario.id)}&replay=1&fallback=interrupted&sourceRun=${encodeURIComponent(liveId)}`));
+    }
+  }, [noFallback, liveId, state.phase, state.error, state.allowRecordingFallback, scenario, index, router, area]);
 
   const stop = async () => {
     if (!liveId) return;
@@ -129,6 +139,7 @@ function RunPage() {
         </div>
       </div>
       {error && <EmptyState icon="minusCircle" title="Investigation unavailable" text={error} href="/app/examples" action="Browse scenarios" />}
+      {id && fallback && <div className={s.panel} role="status"><strong>{fallback === "capacity" ? "Live queue full or daily limit reached" : fallback === "interrupted" ? "Live investigation failed or its connection was interrupted" : "Live backend unavailable"}</strong><p className={s.pageText}>We opened the recorded investigation automatically. This is a recording of a previous run, not a new live result. A timed-out start or interrupted connection may still have a server run; this page does not retry it.</p>{params.get("sourceRun") && <Link className={s.btn} href={`/app/run?live=${encodeURIComponent(params.get("sourceRun")!)}&noFallback=1`}>Inspect original live run</Link>}</div>}
       {!view && !error && (id || liveId || saved) && <SkeletonCards count={2} />}
       {view && (done && state.report ? <RunResult scenario={view} state={state} startedAt={run.startedAt} /> : <Console scenario={view} state={state} startedAt={run.startedAt} controls={controls} recorded={run.mode === "replay"} />)}
       {!id && !liveId && !saved && <EmptyState icon="search" title="Every fix starts with an investigation" text="Choose an example to explore the workflow, or connect your own project." href="/app/examples" action="Explore scenarios" />}

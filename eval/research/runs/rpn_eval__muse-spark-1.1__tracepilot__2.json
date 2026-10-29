@@ -1,0 +1,525 @@
+{
+  "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+  "provider": "meta",
+  "model": "muse-spark-1.1",
+  "isolation": "docker",
+  "hypotheses": [
+    {
+      "id": "H1",
+      "claim": "RPN evaluator pops operands in correct order but applies them as (top, second) instead of (second, top), reversing non-commutative ops.",
+      "symptom": "test_contract[case_0] assert 0.25 == 4.0 for [3.0,5.0,'+',2.0,'/']",
+      "next_check": "Trace execution and run existing tests",
+      "status": "confirmed",
+      "evidence": [
+        "program.py:17 a = stack.pop() (right operand)",
+        "program.py:18 b = stack.pop() (left operand)",
+        "program.py:20 op(token, a, b) applies right op left",
+        "tests/test_public.py:7 failing assertion assert 0.25 == 4.0 for [[3.0,5.0,'+',2.0,'/']]"
+      ],
+      "reason": "First pop is right operand, second pop is left operand; code passes them as (a=right,b=left) to op which does a op b, reversing non-commutative operations. 8/2 becomes 2/8=0.25, matching observed failure.",
+      "fix_in": "code"
+    }
+  ],
+  "findings": {
+    "issues": [
+      {
+        "category": "reliability",
+        "evidence": [
+          "program.py:17 a = stack.pop() (right operand)",
+          "program.py:18 b = stack.pop() (left operand)",
+          "program.py:20 op(token, a, b) applies right op left",
+          "tests/test_public.py:7 failing assertion assert 0.25 == 4.0 for [[3.0,5.0,'+',2.0,'/']]"
+        ],
+        "fix": "Changed program.py:20 from op(token, a, b) to op(token, b, a). Patch swaps operand order so second pop b left and first pop a right are applied as b op a.",
+        "hypothesis_ids": [
+          "H1"
+        ],
+        "root_cause": "RPN evaluator pops operands in correct order but applies them as (top, second) instead of (second, top), reversing non-commutative ops.",
+        "severity": "medium",
+        "title": "RPN evaluator reverses operand order on non-commutative operations"
+      }
+    ],
+    "summary": "The function's behavior disagrees with its documented contract and supplied examples. Investigation confirmed H1: H1 claim - RPN evaluator pops operands in correct order but applies them as (top, second) instead of (second, top), reversing non-commutative ops. Symptom: test_contract[case_0] assert 0.25 == 4.0 for [3.0,5.0,'+',2.0,'/']. Reason: First pop is right operand, second pop is left operand; code passes them as (a=right,b=left) to op which does a op b, reversing non-commutative operations. 8/2 becomes 2/8=0.25, matching observed failure. Fix applied in patch changing op(token, a, b) to op(token, b, a). Verification verified=true, fixed tests/test_public.py::test_contract[case_0], no still_failing and no regressions. Independent review verdict approve: Patch fixes root cause by swapping to op(b,a) where b is second pop (left operand). Example [3,5,'+',2,'/'] now correctly computes 8/2=4.0 instead of 2/8=0.25. No new issues introduced and public tests pass. Risks []"
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -17,7 +17,7 @@\n             a = stack.pop()\n             b = stack.pop()\n             stack.append(\n-                op(token, a, b)\n+                op(token, b, a)\n             )\n \n     return stack.pop()\n",
+  "excluded_tests": [],
+  "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+  "verification": {
+    "verified": true,
+    "fixed": [
+      "tests/test_public.py::test_contract[case_0]"
+    ],
+    "still_failing": [],
+    "regressions": [],
+    "missing": [],
+    "before": {
+      "passed": 1,
+      "failed": 1
+    },
+    "after": {
+      "passed": 2
+    }
+  },
+  "outcome": "fixed",
+  "second_opinion": {
+    "verdict": "approve",
+    "confidence": "high",
+    "summary": "Patch fixes root cause by swapping to op(b,a) where b is second pop (left operand). Example [3,5,'+',2,'/'] now correctly computes 8/2=4.0 instead of 2/8=0.25. No new issues introduced and public tests pass.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "Evidence lines show a=right, b=left but op called as a op b; observed 0.25 is exactly 2/8, confirming reversal for non-commutative division."
+      }
+    ],
+    "risks": [],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 2863,
+    "duration_s": 6.5
+  },
+  "usage": {
+    "input_tokens": 32650,
+    "output_tokens": 7601,
+    "cached_tokens": 27213,
+    "model_calls": 11,
+    "tool_calls": 9,
+    "by_phase": {
+      "investigate": 17341,
+      "fix": 19484,
+      "report": 3426
+    }
+  },
+  "timing": {
+    "prepare_s": 0.0,
+    "sandbox_s": 1.87,
+    "model_s": 115.96,
+    "tools_s": 2.16,
+    "verify_s": 1.28,
+    "review_s": 6.53,
+    "by_phase": {
+      "investigate": 46.16,
+      "fix": 62.89,
+      "review": 6.57,
+      "report": 10.37
+    }
+  },
+  "duration_s": 127.9,
+  "events": [
+    {
+      "seq": 1,
+      "t": 0.98,
+      "type": "start",
+      "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+      "provider": "meta",
+      "model": "muse-spark-1.1",
+      "isolation": "docker"
+    },
+    {
+      "seq": 2,
+      "t": 1.86,
+      "type": "baseline",
+      "tests": {
+        "tests/test_public.py::test_contract[case_1]": "passed",
+        "tests/test_public.py::test_contract[case_0]": "failed"
+      },
+      "tally": {
+        "passed": 1,
+        "failed": 1
+      }
+    },
+    {
+      "seq": 3,
+      "t": 1.87,
+      "type": "brief",
+      "text": "Workspace files: program.py, tests/test_public.py\nTests: 1 passed, 1 failing\n  FAILING tests/test_public.py::test_contract[case_0]: AssertionError: assert 0.25 == 4.0",
+      "supplied_to_model": true
+    },
+    {
+      "seq": 4,
+      "t": 1.87,
+      "type": "phase",
+      "phase": "investigate"
+    },
+    {
+      "seq": 5,
+      "t": 3.27,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 6,
+      "t": 3.27,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"program.py\", \"lines\": \"1-43 of 43\", \"content\": \"   1  \\n   2  def rpn_eval(tokens):\\n   3      def op(symbol, a, b):\\n   4          return {\\n   5              '+': lambda a, b: a + b,\\n   6              '-': lambda a, b: a - b,\\n   7              '*': lambda a, b: a * b,\\n   8              '/': lambda a, b: a / b\\n   9          }[symbol](a, b)\\n  10  \\n  11      stack = []\\n  12  \\n  13      for token in tokens:\\n  14          if isinstance(token, float):\\n  15              stack.append(token)\\n  16          else:\\n  17              a = stack.pop()\\n  18              b = stack.pop()\\n  19              stack.append(\\n  20                  op(token, a, b)\\n  21              )\\n  22  \\n  23      return stack.pop()\\n  24  \\n  25  \\n  26  \\n  27  \\\"\\\"\\\"\\n  28  Reverse Polish Notation\\n  29  \\n  30  Four-function calculator with input given in Reverse Polish Notation (RPN).\\n  31  \\n  32  Input:\\n  33      A list of values and operators encoded as floats and strings\\n  34  \\n  35  Precondition:\\n  36      all(\\n  37          isinstance(token, float) or token in ('+', '-', '*', '/') for token in tokens\\n  38      )\\n  39  \\n  40  Example:\\n  41      >>> rpn_eval([3.0, 5.0, '+', 2.0, '/'])\\n  42      4.0\\n  43  \\\"\\\"\\\"\"}"
+    },
+    {
+      "seq": 7,
+      "t": 3.27,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "tests/test_public.py"
+      }
+    },
+    {
+      "seq": 8,
+      "t": 3.28,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"tests/test_public.py\", \"lines\": \"1-7 of 7\", \"content\": \"   1  import json\\n   2  import pytest\\n   3  from program import rpn_eval as function\\n   4  CASES = json.loads('[[[[3.0, 5.0, \\\"+\\\", 2.0, \\\"/\\\"]], 4.0], [[[2.0, 2.0, \\\"+\\\"]], 4.0]]')\\n   5  @pytest.mark.parametrize(\\\"arguments,expected\\\", CASES, ids=[\\\"case_%d\\\" % i for i in range(len(CASES))])\\n   6  def test_contract(arguments, expected):\\n   7      assert function(*arguments) == expected\"}"
+    },
+    {
+      "seq": 9,
+      "t": 16.78,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Debugging RPN evaluation by checking operand order and division logic against the documented example. Correcting the operand order by swapping the two popped values before applying the operator."
+    },
+    {
+      "seq": 10,
+      "t": 16.78,
+      "type": "hypothesis",
+      "id": "H1",
+      "claim": "RPN evaluator pops operands in correct order but applies them as (top, second) instead of (second, top), reversing non-commutative ops.",
+      "symptom": "test_contract[case_0] assert 0.25 == 4.0 for [3.0,5.0,'+',2.0,'/']",
+      "next_check": "Trace execution and run existing tests",
+      "status": "open",
+      "evidence": [],
+      "reason": "",
+      "fix_in": "code"
+    },
+    {
+      "seq": 11,
+      "t": 31.78,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Diagnosing RPN evaluator operand order bug causing division to compute top-of-stack divided by next value."
+    },
+    {
+      "seq": 12,
+      "t": 31.78,
+      "type": "tool_call",
+      "tool": "run_tests",
+      "args": {}
+    },
+    {
+      "seq": 13,
+      "t": 33.02,
+      "type": "tool_result",
+      "tool": "run_tests",
+      "preview": "{\"exit_code\": 1, \"summary\": \"1 failed, 1 passed in 0.12s\", \"output\": \"F.                                                                       [100%]\\n=================================== FAILURES ===================================\\n____________________________ test_contract[case_0] _____________________________\\ntests/test_public.py:7: in test_contract\\n    assert function(*arguments) == expected\\nE   AssertionError: assert 0.25 == 4.0\\nE    +  where 0.25 = function(*[[3.0, 5.0, '+', 2.0, '/']])\\n=========================== short test summary info ============================\\nFAILED tests/test_public.py::test_contract[case_0] - AssertionError: assert 0...\\n1 failed, 1 passed in 0.12s\\n\"}"
+    },
+    {
+      "seq": 14,
+      "t": 42.98,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Analyzing RPN operand order bug and correcting stack pop sequence for left and right operands. Confirming the operand order hypothesis and noting existing test coverage satisfies the regression requirement."
+    },
+    {
+      "seq": 15,
+      "t": 42.98,
+      "type": "hypothesis_update",
+      "id": "H1",
+      "claim": "RPN evaluator pops operands in correct order but applies them as (top, second) instead of (second, top), reversing non-commutative ops.",
+      "symptom": "test_contract[case_0] assert 0.25 == 4.0 for [3.0,5.0,'+',2.0,'/']",
+      "next_check": "Trace execution and run existing tests",
+      "status": "confirmed",
+      "evidence": [
+        "program.py:17 a = stack.pop() (right operand)",
+        "program.py:18 b = stack.pop() (left operand)",
+        "program.py:20 op(token, a, b) applies right op left",
+        "tests/test_public.py:7 failing assertion assert 0.25 == 4.0 for [[3.0,5.0,'+',2.0,'/']]"
+      ],
+      "reason": "First pop is right operand, second pop is left operand; code passes them as (a=right,b=left) to op which does a op b, reversing non-commutative operations. 8/2 becomes 2/8=0.25, matching observed failure.",
+      "fix_in": "code"
+    },
+    {
+      "seq": 16,
+      "t": 44.95,
+      "type": "recovered",
+      "reason": "the server lost the conversation; replaying it from the local transcript"
+    },
+    {
+      "seq": 17,
+      "t": 48.03,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Diagnosing an RPN operand order bug causing a failed test and correcting the stack evaluation logic. Finalizing the root-cause summary without modifying code per the investigation-phase constraint."
+    },
+    {
+      "seq": 18,
+      "t": 48.03,
+      "type": "message",
+      "phase": "investigate",
+      "text": "Root cause confirmed (H1): operand order reversed in RPN evaluation.\n\n- In `program.py:17-20`, `a = stack.pop()` is the right operand and `b = stack.pop()` is the left operand, but `op(token, a, b)` evaluates as right OP left.\n- For `[3.0, 5.0, '+', 2.0, '/']`, this computes `(3+5)=8` then `2/8=0.25` instead of `8/2=4.0`, matching the failure `assert 0.25 == 4.0` in `tests/test_public.py::test_contract[case_0]`.\n- Fix: swap to `op(token, b, a)` in code."
+    },
+    {
+      "seq": 19,
+      "t": 48.03,
+      "type": "phase",
+      "phase": "fix"
+    },
+    {
+      "seq": 20,
+      "t": 57.21,
+      "type": "tool_call",
+      "tool": "edit_file",
+      "args": {
+        "path": "program.py",
+        "old": "              a = stack.pop()\n              b = stack.pop()\n              stack.append(\n                  op(token, a, b)\n              )",
+        "new": "              a = stack.pop()\n              b = stack.pop()\n              stack.append(\n                  op(token, b, a)\n              )"
+      }
+    },
+    {
+      "seq": 21,
+      "t": 57.21,
+      "type": "tool_result",
+      "tool": "edit_file",
+      "preview": "{\"error\": \"old text must match exactly once in program.py: not found\"}"
+    },
+    {
+      "seq": 22,
+      "t": 72.94,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 23,
+      "t": 72.94,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"program.py\", \"lines\": \"1-43 of 43\", \"content\": \"   1  \\n   2  def rpn_eval(tokens):\\n   3      def op(symbol, a, b):\\n   4          return {\\n   5              '+': lambda a, b: a + b,\\n   6              '-': lambda a, b: a - b,\\n   7              '*': lambda a, b: a * b,\\n   8              '/': lambda a, b: a / b\\n   9          }[symbol](a, b)\\n  10  \\n  11      stack = []\\n  12  \\n  13      for token in tokens:\\n  14          if isinstance(token, float):\\n  15              stack.append(token)\\n  16          else:\\n  17              a = stack.pop()\\n  18              b = stack.pop()\\n  19              stack.append(\\n  20                  op(token, a, b)\\n  21              )\\n  22  \\n  23      return stack.pop()\\n  24  \\n  25  \\n  26  \\n  27  \\\"\\\"\\\"\\n  28  Reverse Polish Notation\\n  29  \\n  30  Four-function calculator with input given in Reverse Polish Notation (RPN).\\n  31  \\n  32  Input:\\n  33      A list of values and operators encoded as floats and strings\\n  34  \\n  35  Precondition:\\n  36      all(\\n  37          isinstance(token, float) or token in ('+', '-', '*', '/') for token in tokens\\n  38      )\\n  39  \\n  40  Example:\\n  41      >>> rpn_eval([3.0, 5.0, '+', 2.0, '/'])\\n  42      4.0\\n  43  \\\"\\\"\\\"\"}"
+    },
+    {
+      "seq": 24,
+      "t": 86.36,
+      "type": "thinking",
+      "phase": "fix",
+      "text": "Counting indentation levels from file lines to reproduce exact whitespace for code output."
+    },
+    {
+      "seq": 25,
+      "t": 86.36,
+      "type": "tool_call",
+      "tool": "edit_file",
+      "args": {
+        "path": "program.py",
+        "old": "                op(token, a, b)",
+        "new": "                op(token, b, a)"
+      }
+    },
+    {
+      "seq": 26,
+      "t": 86.37,
+      "type": "tool_result",
+      "tool": "edit_file",
+      "preview": "{\"edited\": \"program.py\"}"
+    },
+    {
+      "seq": 27,
+      "t": 86.38,
+      "type": "patch",
+      "path": "program.py",
+      "diff": "--- a/program.py\n+++ b/program.py\n@@ -17,7 +17,7 @@\n             a = stack.pop()\n             b = stack.pop()\n             stack.append(\n-                op(token, a, b)\n+                op(token, b, a)\n             )\n \n     return stack.pop()\n"
+    },
+    {
+      "seq": 28,
+      "t": 94.19,
+      "type": "tool_call",
+      "tool": "run_tests",
+      "args": {}
+    },
+    {
+      "seq": 29,
+      "t": 95.06,
+      "type": "tool_result",
+      "tool": "run_tests",
+      "preview": "{\"exit_code\": 0, \"summary\": \"2 passed in 0.03s\"}"
+    },
+    {
+      "seq": 30,
+      "t": 109.63,
+      "type": "message",
+      "phase": "fix",
+      "text": "Fixed operand order in `program.py:20`: changed `op(token, a, b)` to `op(token, b, a)`. `a` is the right operand (first pop) and `b` is the left operand (second pop), so the operation must be `b op a`. This corrects `8/2=4.0` instead of `2/8=0.25`.\n\nTests: 2 passed."
+    },
+    {
+      "seq": 31,
+      "t": 110.92,
+      "type": "verification",
+      "attempt": 1,
+      "tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      },
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "passed": 1,
+        "failed": 1
+      },
+      "after": {
+        "passed": 2
+      }
+    },
+    {
+      "seq": 32,
+      "t": 110.92,
+      "type": "phase",
+      "phase": "review"
+    },
+    {
+      "seq": 33,
+      "t": 117.49,
+      "type": "second_opinion",
+      "verdict": "approve",
+      "confidence": "high",
+      "summary": "Patch fixes root cause by swapping to op(b,a) where b is second pop (left operand). Example [3,5,'+',2,'/'] now correctly computes 8/2=4.0 instead of 2/8=0.25. No new issues introduced and public tests pass.",
+      "hypotheses": [
+        {
+          "id": "H1",
+          "assessment": "supported",
+          "note": "Evidence lines show a=right, b=left but op called as a op b; observed 0.25 is exactly 2/8, confirming reversal for non-commutative division."
+        }
+      ],
+      "risks": [],
+      "provider": "baseten",
+      "model": "meta-models/muse-spark-open-1026",
+      "tokens": 2863,
+      "duration_s": 6.5
+    },
+    {
+      "seq": 34,
+      "t": 117.5,
+      "type": "phase",
+      "phase": "report"
+    },
+    {
+      "seq": 35,
+      "t": 127.87,
+      "type": "report",
+      "report": {
+        "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+        "provider": "meta",
+        "model": "muse-spark-1.1",
+        "isolation": "docker",
+        "hypotheses": [
+          {
+            "id": "H1",
+            "claim": "RPN evaluator pops operands in correct order but applies them as (top, second) instead of (second, top), reversing non-commutative ops.",
+            "symptom": "test_contract[case_0] assert 0.25 == 4.0 for [3.0,5.0,'+',2.0,'/']",
+            "next_check": "Trace execution and run existing tests",
+            "status": "confirmed",
+            "evidence": [
+              "program.py:17 a = stack.pop() (right operand)",
+              "program.py:18 b = stack.pop() (left operand)",
+              "program.py:20 op(token, a, b) applies right op left",
+              "tests/test_public.py:7 failing assertion assert 0.25 == 4.0 for [[3.0,5.0,'+',2.0,'/']]"
+            ],
+            "reason": "First pop is right operand, second pop is left operand; code passes them as (a=right,b=left) to op which does a op b, reversing non-commutative operations. 8/2 becomes 2/8=0.25, matching observed failure.",
+            "fix_in": "code"
+          }
+        ],
+        "findings": {
+          "issues": [
+            {
+              "category": "reliability",
+              "evidence": [
+                "program.py:17 a = stack.pop() (right operand)",
+                "program.py:18 b = stack.pop() (left operand)",
+                "program.py:20 op(token, a, b) applies right op left",
+                "tests/test_public.py:7 failing assertion assert 0.25 == 4.0 for [[3.0,5.0,'+',2.0,'/']]"
+              ],
+              "fix": "Changed program.py:20 from op(token, a, b) to op(token, b, a). Patch swaps operand order so second pop b left and first pop a right are applied as b op a.",
+              "hypothesis_ids": [
+                "H1"
+              ],
+              "root_cause": "RPN evaluator pops operands in correct order but applies them as (top, second) instead of (second, top), reversing non-commutative ops.",
+              "severity": "medium",
+              "title": "RPN evaluator reverses operand order on non-commutative operations"
+            }
+          ],
+          "summary": "The function's behavior disagrees with its documented contract and supplied examples. Investigation confirmed H1: H1 claim - RPN evaluator pops operands in correct order but applies them as (top, second) instead of (second, top), reversing non-commutative ops. Symptom: test_contract[case_0] assert 0.25 == 4.0 for [3.0,5.0,'+',2.0,'/']. Reason: First pop is right operand, second pop is left operand; code passes them as (a=right,b=left) to op which does a op b, reversing non-commutative operations. 8/2 becomes 2/8=0.25, matching observed failure. Fix applied in patch changing op(token, a, b) to op(token, b, a). Verification verified=true, fixed tests/test_public.py::test_contract[case_0], no still_failing and no regressions. Independent review verdict approve: Patch fixes root cause by swapping to op(b,a) where b is second pop (left operand). Example [3,5,'+',2,'/'] now correctly computes 8/2=4.0 instead of 2/8=0.25. No new issues introduced and public tests pass. Risks []"
+        },
+        "diff": "--- a/program.py\n+++ b/program.py\n@@ -17,7 +17,7 @@\n             a = stack.pop()\n             b = stack.pop()\n             stack.append(\n-                op(token, a, b)\n+                op(token, b, a)\n             )\n \n     return stack.pop()\n",
+        "excluded_tests": [],
+        "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+        "verification": {
+          "verified": true,
+          "fixed": [
+            "tests/test_public.py::test_contract[case_0]"
+          ],
+          "still_failing": [],
+          "regressions": [],
+          "missing": [],
+          "before": {
+            "passed": 1,
+            "failed": 1
+          },
+          "after": {
+            "passed": 2
+          }
+        },
+        "outcome": "fixed",
+        "second_opinion": {
+          "verdict": "approve",
+          "confidence": "high",
+          "summary": "Patch fixes root cause by swapping to op(b,a) where b is second pop (left operand). Example [3,5,'+',2,'/'] now correctly computes 8/2=4.0 instead of 2/8=0.25. No new issues introduced and public tests pass.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "assessment": "supported",
+              "note": "Evidence lines show a=right, b=left but op called as a op b; observed 0.25 is exactly 2/8, confirming reversal for non-commutative division."
+            }
+          ],
+          "risks": [],
+          "provider": "baseten",
+          "model": "meta-models/muse-spark-open-1026",
+          "tokens": 2863,
+          "duration_s": 6.5
+        },
+        "usage": {
+          "input_tokens": 32650,
+          "output_tokens": 7601,
+          "cached_tokens": 27213,
+          "model_calls": 11,
+          "tool_calls": 9,
+          "by_phase": {
+            "investigate": 17341,
+            "fix": 19484,
+            "report": 3426
+          }
+        },
+        "timing": {
+          "prepare_s": 0.0,
+          "sandbox_s": 1.87,
+          "model_s": 115.96,
+          "tools_s": 2.16,
+          "verify_s": 1.28,
+          "review_s": 6.53,
+          "by_phase": {
+            "investigate": 46.16,
+            "fix": 62.89,
+            "review": 6.57,
+            "report": 10.37
+          }
+        },
+        "duration_s": 127.9
+      }
+    }
+  ]
+}

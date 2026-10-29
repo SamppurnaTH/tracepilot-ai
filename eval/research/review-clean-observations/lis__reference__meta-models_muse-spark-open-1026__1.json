@@ -1,0 +1,61 @@
+{
+  "case": "lis",
+  "kind": "reference",
+  "reviewer": "meta-models/muse-spark-open-1026",
+  "repeat": 1,
+  "label_correct_patch": true,
+  "error": null,
+  "reference_format": "minimal_active_upstream_fix",
+  "public_evidence_valid": true,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "Visible examples pass; no public failure reproduced"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": false,
+      "fixed": [],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "passed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -11,7 +11,7 @@\n \n         if length == longest or val < arr[ends[length + 1]]:\n             ends[length + 1] = i\n-            longest = length + 1\n+            longest = max(longest, length + 1)\n \n     return longest\n \n",
+  "files": {
+    "program.py": "\ndef lis(arr):\n    ends = {}\n    longest = 0\n\n    for i, val in enumerate(arr):\n\n        prefix_lengths = [j for j in range(1, longest + 1) if arr[ends[j]] < val]\n\n        length = max(prefix_lengths) if prefix_lengths else 0\n\n        if length == longest or val < arr[ends[length + 1]]:\n            ends[length + 1] = i\n            longest = max(longest, length + 1)\n\n    return longest\n\n\n\n\"\"\"\nLongest Increasing Subsequence\nlongest-increasing-subsequence\n\n\nInput:\n    arr: A sequence of ints\n\nPrecondition:\n    The ints in arr are unique\n\nOutput:\n    The length of the longest monotonically increasing subsequence of arr\n\nExample:\n    >>> lis([4, 1, 5, 3, 7, 6, 2])\n    3\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "approve",
+    "confidence": "high",
+    "summary": "Patch fixes the decreasing-longest bug: original `longest = length+1` overwrote longest when replacing a middle pile (e.g. example [4,1,5,3,7,6,2] returned 2 not 3). `max(longest, length+1)` correctly keeps longest monotonic, restoring correct patience-sorting LIS logic. Remaining code maintains sorted tails invariant and no other longest update exists.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "unsupported",
+        "note": "Claim of contract disagreement is correct in fact, but cited evidence ('visible examples pass; no public failure reproduced') does not entail it and contradicts the documented example which the original fails."
+      }
+    ],
+    "risks": [
+      "Verification was minimal (2 tests before/after, verified:false) so edge coverage not demonstrated, but logic is now standard and no other longest mutation exists"
+    ],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 7061,
+    "duration_s": 23.0
+  },
+  "wrong": false
+}

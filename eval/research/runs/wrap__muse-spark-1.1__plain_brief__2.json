@@ -1,0 +1,169 @@
+{
+  "claimed_fixed": true,
+  "summary": "Fixed `wrap` to correctly implement its documented contract: added the final remaining chunk after the loop, and avoided an infinite loop when the only space found is at position 0 (e.g. leading space preserved from previous split) by treating `end <= 0` as \"no breakable space\", forcing a hard break at `cols`.\n\nRESULT: FIXED",
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -2,11 +2,12 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n-\n+    if text:\n+        lines.append(text)\n     return lines\n \n \"\"\"\n",
+  "visible_tests": {
+    "verified": true,
+    "fixed": [
+      "tests/test_public.py::test_contract[case_0]",
+      "tests/test_public.py::test_contract[case_1]"
+    ],
+    "still_failing": [],
+    "regressions": [],
+    "missing": [],
+    "before": {
+      "failed": 2
+    },
+    "after": {
+      "passed": 2
+    }
+  },
+  "usage": {
+    "input_tokens": 13673,
+    "output_tokens": 8998,
+    "cached_tokens": 13109,
+    "model_calls": 5,
+    "tool_calls": 5,
+    "by_phase": {
+      "agent": 22671
+    }
+  },
+  "duration_s": 103.0,
+  "events": [
+    {
+      "seq": 1,
+      "t": 16.77,
+      "type": "start",
+      "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+      "model": "muse-spark-1.1",
+      "isolation": "docker",
+      "system": "plain"
+    },
+    {
+      "seq": 2,
+      "t": 17.69,
+      "type": "phase",
+      "phase": "agent"
+    },
+    {
+      "seq": 3,
+      "t": 20.56,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 4,
+      "t": 20.56,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"program.py\", \"lines\": \"1-28 of 28\", \"content\": \"   1  def wrap(text, cols):\\n   2      lines = []\\n   3      while len(text) > cols:\\n   4          end = text.rfind(' ', 0, cols + 1)\\n   5          if end == -1:\\n   6              end = cols\\n   7          line, text = text[:end], text[end:]\\n   8          lines.append(line)\\n   9  \\n  10      return lines\\n  11  \\n  12  \\\"\\\"\\\"\\n  13  Wrap Text\\n  14  \\n  15  Given a long string and a column width, break the string on spaces into a list of lines such that each line is no longer than the column width.\\n  16  \\n  17  Input:\\n  18      text: The starting text.\\n  19      cols: The target column width, i.e. the maximum length of any single line after wrapping.\\n  20  \\n  21  Precondition:\\n  22      cols > 0.\\n  23  \\n  24  Output:\\n  25      An ordered list of strings, each no longer than the column width, such that the concatenation of the strings returns the original text,\\n  26  and such that no word in the original text is broken into two parts unless necessary.  The original amount of spaces are preserved (e.g. spaces\\n  27  at the start or end of each line aren't trimmed.),Wrapping Text\\n  28  \\\"\\\"\\\"\"}"
+    },
+    {
+      "seq": 5,
+      "t": 20.56,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "tests/test_public.py"
+      }
+    },
+    {
+      "seq": 6,
+      "t": 20.56,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"tests/test_public.py\", \"lines\": \"1-7 of 7\", \"content\": \"   1  import json\\n   2  import pytest\\n   3  from program import wrap as function\\n   4  CASES = json.loads('[[[\\\"The leaves did not stir on the trees, grasshoppers chirruped, and the monotonous hollow sound of the sea rising up from below, spoke of the peace, of the eternal sleep awaiting us. So it must have sounded when there was no Yalta, no Oreanda here; so it sounds now, and it will sound as indifferently and monotonously when we are all no more. And in this constancy, in this complete indifference to the life and death of each of us, there lies hid, perhaps, a pledge of our eternal salvation, of the unceasing movement of life upon earth, of unceasing progress towards perfection. Sitting beside a young woman who in the dawn seemed so lovely, soothed and spellbound in these magical surroundings - the sea, mountains, clouds, the open sky - Gurov thought how in reality everything is beautiful in this world when one reflects: everything except what we think or do ourselves when we forget our human dignity and the higher aims of our existence.\\\", 50], [\\\"The leaves did not stir on the trees, grasshoppers\\\", \\\" chirruped, and the monotonous hollow sound of the\\\", \\\" sea rising up from below, spoke of the peace, of\\\", \\\" the eternal sleep awaiting us. So it must have\\\", \\\" sounded when there was no Yalta, no Oreanda here;\\\", \\\" so it sounds now, and it will sound as\\\", \\\" indifferently and monotonously when we are all no\\\", \\\" more. And in this constancy, in this complete\\\", \\\" indifference to the life and death of each of us,\\\", \\\" there lies hid, perhaps, a pledge of our eternal\\\", \\\" salvation, of the unceasing movement of life upon\\\", \\\" earth, of unceasing progress towards perfection.\\\", \\\" Sitting beside a young woman who in the dawn\\\", \\\" seemed so lovely, soothed and spellbound in these\\\", \\\" magical surroundings - the sea, mountains,\\\", \\\" clouds, the open sky - Gurov thought how in\\\", \\\" real"
+    },
+    {
+      "seq": 7,
+      "t": 47.74,
+      "type": "thinking",
+      "phase": "agent",
+      "text": "Analyzing the text wrapping function for contract violations and fixing the space handling and word break logic. Fixing the loop to append the remaining substring and return it when the input fits within the column limit. Extending the fix to handle empty remainder, leading spaces, and no-space splits without infinite loops. Adding guards against leading-space splits and empty remainder to prevent infinite loops. Verifying edge cases for the final chunk append and space-search boundary. Resolving the leading-space empty-line and infinite-loop edge by adjusting the split boundary."
+    },
+    {
+      "seq": 8,
+      "t": 47.75,
+      "type": "tool_call",
+      "tool": "edit_file",
+      "args": {
+        "path": "program.py",
+        "old": "def wrap(text, cols):\n    lines = []\n    while len(text) > cols:\n        end = text.rfind(' ', 0, cols + 1)\n        if end == -1:\n            end = cols\n        line, text = text[:end], text[end:]\n        lines.append(line)\n\n    return lines",
+        "new": "def wrap(text, cols):\n    lines = []\n    while len(text) > cols:\n        end = text.rfind(' ', 0, cols + 1)\n        if end <= 0:\n            end = cols\n        line, text = text[:end], text[end:]\n        lines.append(line)\n    if text:\n        lines.append(text)\n    return lines"
+      }
+    },
+    {
+      "seq": 9,
+      "t": 47.75,
+      "type": "tool_result",
+      "tool": "edit_file",
+      "preview": "{\"edited\": \"program.py\"}"
+    },
+    {
+      "seq": 10,
+      "t": 47.75,
+      "type": "patch",
+      "path": "program.py",
+      "diff": "--- a/program.py\n+++ b/program.py\n@@ -2,11 +2,12 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n-\n+    if text:\n+        lines.append(text)\n     return lines\n \n \"\"\"\n"
+    },
+    {
+      "seq": 11,
+      "t": 65.42,
+      "type": "thinking",
+      "phase": "agent",
+      "text": "Analyzing a text wrapping function implementation and identifying bugs in line splitting and remainder handling. Addressing edge cases for leading spaces and empty lines in the wrap boundary logic. Adjusting the wrap boundary to handle exact-length input and prevent infinite loops on leading spaces. Verifying the space-handling fix against edge cases and existing test expectations."
+    },
+    {
+      "seq": 12,
+      "t": 65.42,
+      "type": "tool_call",
+      "tool": "run_tests",
+      "args": {}
+    },
+    {
+      "seq": 13,
+      "t": 66.25,
+      "type": "tool_result",
+      "tool": "run_tests",
+      "preview": "{\"exit_code\": 0, \"summary\": \"2 passed in 0.03s\"}"
+    },
+    {
+      "seq": 14,
+      "t": 83.75,
+      "type": "thinking",
+      "phase": "agent",
+      "text": "Handling text chunking edge cases for remaining content and leading-space line breaks. Refining the chunking logic to prevent empty lines from leading spaces at position zero. Guarding against zero-position breaks to avoid infinite loops and preserving leading spaces in chunks."
+    },
+    {
+      "seq": 15,
+      "t": 83.75,
+      "type": "tool_call",
+      "tool": "show_diff",
+      "args": {}
+    },
+    {
+      "seq": 16,
+      "t": 83.75,
+      "type": "tool_result",
+      "tool": "show_diff",
+      "preview": "{\"diff\": \"--- a/program.py\\n+++ b/program.py\\n@@ -2,11 +2,12 @@\\n     lines = []\\n     while len(text) > cols:\\n         end = text.rfind(' ', 0, cols + 1)\\n-        if end == -1:\\n+        if end <= 0:\\n             end = cols\\n         line, text = text[:end], text[end:]\\n         lines.append(line)\\n-\\n+    if text:\\n+        lines.append(text)\\n     return lines\\n \\n \\\"\\\"\\\"\\n\"}"
+    },
+    {
+      "seq": 17,
+      "t": 118.15,
+      "type": "thinking",
+      "phase": "agent",
+      "text": "Analyzing a text wrapping function bug where remaining text is not returned and space-at-start edge case is mishandled. Clarifying the leading-space handling to preserve concatenation without producing empty lines."
+    },
+    {
+      "seq": 18,
+      "t": 118.15,
+      "type": "message",
+      "phase": "agent",
+      "text": "Fixed `wrap` to correctly implement its documented contract: added the final remaining chunk after the loop, and avoided an infinite loop when the only space found is at position 0 (e.g. leading space preserved from previous split) by treating `end <= 0` as \"no breakable space\", forcing a hard break at `cols`.\n\nRESULT: FIXED"
+    }
+  ]
+}

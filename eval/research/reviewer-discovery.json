@@ -1,0 +1,26 @@
+{
+  "case": "wrap",
+  "source": "Reviewer-raised counterexample; not part of the frozen repair oracle",
+  "input": {
+    "text": " abcdef",
+    "cols": 3
+  },
+  "control": {
+    "exit_code": 0,
+    "stdout": "['abc', 'def']\n",
+    "stderr": ""
+  },
+  "counterexample": {
+    "exit_code": -1,
+    "stdout": "",
+    "stderr": "timed out after 3s",
+    "timed_out": true
+  },
+  "reference": "exact upstream executable fix, original contract retained",
+  "interpretation": "An oracle-accepted reference can still violate its documented contract. Its reviewer nonapproval is not automatically a false positive.",
+  "loop_state": {
+    "end": 0,
+    "next_text": " abcdef",
+    "advances": false
+  }
+}

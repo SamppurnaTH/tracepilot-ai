@@ -17,7 +17,7 @@ from pathlib import Path
 
 from .agent import Investigation
 from .handoff import markdown_report, pr_description
-from .reviewer import Reviewer
+from .reviewer import Reviewer, requires_review
 from .sandbox import detect_kind, docker_available, project_image
 
 SKIP_DIRS = {"tests", "test", "venv", "node_modules", "build", "dist", "__pycache__", "tracepilot-out"}
@@ -110,7 +110,11 @@ def investigate(args: argparse.Namespace) -> int:
             print(f"error: log file not found: {log}", file=sys.stderr)
             return 2
 
-    kind = detect_kind(repo)
+    try:
+        kind = detect_kind(repo)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     app = None if args.app == "none" or kind == "maven" else (args.app or detect_app(repo))
     print(f"Project:  {repo} ({'Java/Maven, JUnit' if kind == 'maven' else 'Python, pytest'})")
     print(f"HTTP app: {app or 'none (requests disabled)'}")
@@ -146,14 +150,17 @@ def investigate(args: argparse.Namespace) -> int:
     if report.get("outcome") == "no_code_change":
         print("NO CODE CHANGE NEEDED: the root cause is outside the code (see report.md for what to change)")
     else:
-        print(f"{'FIX VERIFIED' if v['verified'] else 'NOT VERIFIED'}: tests {v['before']} -> {v['after']}, reviewer: {review}")
+        label = "TESTS VERIFIED; REVIEW REQUIRED" if requires_review(report.get("second_opinion")) and v["verified"] else "FIX VERIFIED" if v["verified"] else "NOT VERIFIED"
+        print(f"{label}: tests {v['before']} -> {v['after']}, reviewer: {review}")
     for issue in report["findings"].get("issues", []):
         print(f"  [{issue['severity']}/{issue['category']}] {issue['title']}")
     print(f"Cost: {u['model_calls']} model calls, {u['input_tokens'] + u['output_tokens']:,} tokens, {report['duration_s']} s")
     print(f"Hand-off: {out}  (report.md, pr.md{', fix.patch' if report['diff'] else ''})")
 
     if report["diff"] and args.apply:
-        if not v["verified"]:
+        if requires_review(report.get("second_opinion")):
+            print("Not applying: resolve the reviewer's concerns or rejection before applying this patch.")
+        elif not v["verified"]:
             print("Not applying: the patch was not verified.")
         else:
             patch = out / "fix.patch"
@@ -165,7 +172,7 @@ def investigate(args: argparse.Namespace) -> int:
                 print("Applied fix.patch to your working tree. Review it with `git diff`.")
     elif report["diff"]:
         print(f"To apply:  cd \"{repo}\" && git apply \"{out / 'fix.patch'}\"")
-    return 0 if v["verified"] or report.get("outcome") == "no_code_change" else 1
+    return 0 if (v["verified"] and not requires_review(report.get("second_opinion"))) or report.get("outcome") == "no_code_change" else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -184,7 +191,7 @@ def main(argv: list[str] | None = None) -> int:
     inv.add_argument("--test-args", help="Java: extra -D properties for the test run, e.g. \"-Dspring.profiles.active=test\"")
     inv.add_argument("--isolation", default="auto", choices=["auto", "docker", "process"])
     inv.add_argument("--no-review", action="store_true", help="skip the Muse Spark Open second opinion")
-    inv.add_argument("--apply", action="store_true", help="apply the patch with git apply, only if it was verified")
+    inv.add_argument("--apply", action="store_true", help="apply only if tests verify and no reviewer concerns/rejection remain")
     argv = list(sys.argv[1:] if argv is None else argv)
     if "--test-args" in argv[:-1]:  # its value starts with "-D", which argparse would read as another option
         i = argv.index("--test-args")

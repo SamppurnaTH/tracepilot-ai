@@ -1,0 +1,34 @@
+{
+  "id": "inventory__muse-spark-1.3__tracepilot_no_brief__2",
+  "case": "inventory",
+  "model": "muse-spark-1.3",
+  "condition": "tracepilot_no_brief",
+  "repeat": 2,
+  "error": null,
+  "started_utc": "2026-10-29T13:34:43Z",
+  "diff": "--- a/inventory_api/app.py\n+++ b/inventory_api/app.py\n@@ -78,6 +78,8 @@\n def reserve(body: ReservationIn, user: dict = Depends(current_user)) -> dict:\n     if body.sku not in STOCK:\n         raise HTTPException(status_code=404, detail=\"unknown sku\")\n+    if body.qty < 1:\n+        raise HTTPException(status_code=422, detail=\"qty must be positive\")\n     if body.qty > STOCK[body.sku]:\n         raise HTTPException(status_code=409, detail=\"insufficient stock\")\n     STOCK[body.sku] -= body.qty\n@@ -93,6 +95,8 @@\n     reservation = RESERVATIONS.get(reservation_id)\n     if reservation is None or reservation[\"user_id\"] != user[\"id\"]:\n         raise HTTPException(status_code=404, detail=\"reservation not found\")\n+    if reservation[\"status\"] != \"active\":\n+        raise HTTPException(status_code=409, detail=\"reservation already cancelled\")\n     STOCK[reservation[\"sku\"]] += reservation[\"qty\"]\n     reservation[\"status\"] = \"cancelled\"\n     log_event(level=\"INFO\", event=\"cancelled\", reservation_id=reservation_id, sku=reservation[\"sku\"],\n--- /dev/null\n+++ b/tests/test_regression_double_cancel.py\n@@ -0,0 +1,23 @@\n+\"\"\"Regression: double cancel must not inflate stock / enable oversell (C-300).\"\"\"\n+from fastapi.testclient import TestClient\n+from inventory_api import app as inventory\n+from inventory_api.app import app\n+\n+client = TestClient(app)\n+ALICE = {\"Authorization\": \"Bearer token-alice\"}\n+BOB = {\"Authorization\": \"Bearer token-bob\"}\n+\n+def setup_function():\n+    inventory.STOCK.update({\"A-100\": 100, \"B-200\": 20, \"C-300\": 3})\n+    inventory.RESERVATIONS.clear()\n+\n+def test_double_cancel_does_not_inflate_stock():\n+    rid = client.post(\"/reservations\", json={\"sku\": \"C-300\", \"qty\": 2}, headers=BOB).json()[\"id\"]\n+    assert client.delete(f\"/reservations/{rid}\", headers=BOB).status_code == 200\n+    assert client.get(\"/stock/C-300\").json()[\"available\"] == 3\n+    # second cancel must not credit stock again\n+    second = client.delete(f\"/reservations/{rid}\", headers=BOB)\n+    assert second.status_code in (404, 409), f\"double cancel allowed: {second.status_code} {second.text}\"\n+    assert client.get(\"/stock/C-300\").json()[\"available\"] == 3\n+    # oversell must still be blocked\n+    assert client.post(\"/reservations\", json={\"sku\": \"C-300\", \"qty\": 5}, headers=ALICE).status_code == 409\n--- /dev/null\n+++ b/tests/test_regression_negative_qty.py\n@@ -0,0 +1,17 @@\n+\"\"\"Regression: negative qty reservation must not inflate stock (A-100).\"\"\"\n+from fastapi.testclient import TestClient\n+from inventory_api import app as inventory\n+from inventory_api.app import app\n+\n+client = TestClient(app)\n+ALICE = {\"Authorization\": \"Bearer token-alice\"}\n+BOB = {\"Authorization\": \"Bearer token-bob\"}\n+\n+def setup_function():\n+    inventory.STOCK.update({\"A-100\": 100, \"B-200\": 20, \"C-300\": 3})\n+    inventory.RESERVATIONS.clear()\n+\n+def test_negative_qty_rejected():\n+    resp = client.post(\"/reservations\", json={\"sku\": \"A-100\", \"qty\": -15}, headers=BOB)\n+    assert resp.status_code in (400, 422), f\"negative qty accepted: {resp.status_code} {resp.text}\"\n+    assert client.get(\"/stock/A-100\").json()[\"available\"] == 100\n",
+  "usage": {
+    "input_tokens": 204045,
+    "output_tokens": 18046,
+    "cached_tokens": 109012,
+    "model_calls": 23,
+    "tool_calls": 25,
+    "by_phase": {
+      "investigate": 147152,
+      "fix": 69907,
+      "report": 5032
+    }
+  },
+  "reviewer_tokens": 6134,
+  "duration_s": 368.3,
+  "claimed_fixed": true,
+  "heldout_pass": true,
+  "score_error": null,
+  "heldout_tests": {
+    "tests/test_service_oracle.py::test_negative_quantity_never_adds_stock": "passed",
+    "tests/test_service_oracle.py::test_zero_quantity_is_rejected": "passed",
+    "tests/test_service_oracle.py::test_cancel_twice_returns_stock_once": "passed"
+  },
+  "heldout_reasons": {},
+  "false_success": false
+}

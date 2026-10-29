@@ -1,0 +1,130 @@
+{
+  "case": "rpn_eval",
+  "kind": "reference",
+  "reviewer": "meta-models/muse-spark-open-1026",
+  "repeat": 2,
+  "label_correct_patch": true,
+  "error": null,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "AssertionError: assert 0.25 == 4.0"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": false,
+      "fixed": [],
+      "still_failing": [],
+      "regressions": [
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "missing": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "before": {
+        "passed": 1,
+        "failed": 1
+      },
+      "after": {}
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -17,27 +17,32 @@\n             a = stack.pop()\n             b = stack.pop()\n             stack.append(\n+                op(token, b, a)\n+            )\n+\n+    return stack.pop()\n+\n+\"\"\"\n+def rpn_eval(tokens):\n+    def op(symbol, a, b):\n+        return {\n+            '+': lambda a, b: a + b,\n+            '-': lambda a, b: a - b,\n+            '*': lambda a, b: a * b,\n+            '/': lambda a, b: a / b\n+        }[symbol](b, a)\n+\n+    stack = Stack()\n+\n+    for token in tokens:\n+        if isinstance(token, float):\n+            stack.push(token)\n+        else:\n+            a = stack.pop()\n+            b = stack.pop()\n+            stack.push(\n                 op(token, a, b)\n             )\n \n     return stack.pop()\n-\n-\n-\n \"\"\"\n-Reverse Polish Notation\n-\n-Four-function calculator with input given in Reverse Polish Notation (RPN).\n-\n-Input:\n-    A list of values and operators encoded as floats and strings\n-\n-Precondition:\n-    all(\n-        isinstance(token, float) or token in ('+', '-', '*', '/') for token in tokens\n-    )\n-\n-Example:\n-    >>> rpn_eval([3.0, 5.0, '+', 2.0, '/'])\n-    4.0\n-\"\"\"\n",
+  "files": {
+    "program.py": "\ndef rpn_eval(tokens):\n    def op(symbol, a, b):\n        return {\n            '+': lambda a, b: a + b,\n            '-': lambda a, b: a - b,\n            '*': lambda a, b: a * b,\n            '/': lambda a, b: a / b\n        }[symbol](a, b)\n\n    stack = []\n\n    for token in tokens:\n        if isinstance(token, float):\n            stack.append(token)\n        else:\n            a = stack.pop()\n            b = stack.pop()\n            stack.append(\n                op(token, b, a)\n            )\n\n    return stack.pop()\n\n\"\"\"\ndef rpn_eval(tokens):\n    def op(symbol, a, b):\n        return {\n            '+': lambda a, b: a + b,\n            '-': lambda a, b: a - b,\n            '*': lambda a, b: a * b,\n            '/': lambda a, b: a / b\n        }[symbol](b, a)\n\n    stack = Stack()\n\n    for token in tokens:\n        if isinstance(token, float):\n            stack.push(token)\n        else:\n            a = stack.pop()\n            b = stack.pop()\n            stack.push(\n                op(token, a, b)\n            )\n\n    return stack.pop()\n\"\"\"\n"
+  },
+  "opinion": {
+    "type": "object",
+    "properties": {
+      "verdict": {
+        "type": "string",
+        "enum": [
+          "approve",
+          "concerns",
+          "reject"
+        ]
+      },
+      "confidence": {
+        "type": "string",
+        "enum": [
+          "high",
+          "medium",
+          "low"
+        ]
+      },
+      "summary": {
+        "type": "string",
+        "description": "Two or three sentences for an engineer deciding whether to merge"
+      },
+      "hypotheses": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "assessment": {
+              "type": "string",
+              "enum": [
+                "supported",
+                "weak",
+                "unsupported"
+              ]
+            },
+            "note": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "assessment",
+            "note"
+          ]
+        }
+      },
+      "risks": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        },
+        "description": "Concrete problems the patch leaves or adds"
+      }
+    },
+    "required": [
+      "verdict",
+      "confidence",
+      "summary",
+      "hypotheses",
+      "risks"
+    ],
+    "verdict": "concerns",
+    "confidence": "high",
+    "summary": "Active code correctly changes op(token,a,b) to op(token,b,a) fixing RPN operand order so [3.0,5.0,'+',2.0,'/'] yields 4.0 not 0.25. However patch deletes the contract docstring and leaves the original buggy implementation as a dead module-level string, and post-patch verification was not run (after:{}) so merge as-is would degrade maintainability.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "0.25==4.0 matches exactly the documented example (3+5)/2=4.0 vs inverted 2/(3+5)=0.25, so inverted division root cause follows despite minimal evidence citation."
+      }
+    ],
+    "risks": [
+      "Deletes documented contract/docstring that defines the incident instead of preserving it",
+      "Leaves original buggy logic in file as dead triple-quoted string (op with (b,a) + op(token,a,b) call), creating confusion/revival risk",
+      "No verified post-patch test run: before 1 passed/1 failed, after {} empty, regression entry still present",
+      "Replaces Stack abstraction with plain list, silently dropping any Stack-specific validation or error handling"
+    ],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 4958,
+    "duration_s": 30.2
+  },
+  "wrong": true
+}

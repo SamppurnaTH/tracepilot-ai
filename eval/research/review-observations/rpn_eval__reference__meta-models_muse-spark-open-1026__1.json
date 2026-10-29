@@ -1,0 +1,64 @@
+{
+  "case": "rpn_eval",
+  "kind": "reference",
+  "reviewer": "meta-models/muse-spark-open-1026",
+  "repeat": 1,
+  "label_correct_patch": true,
+  "error": null,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "AssertionError: assert 0.25 == 4.0"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "passed": 1,
+        "failed": 1
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -17,27 +17,32 @@\n             a = stack.pop()\n             b = stack.pop()\n             stack.append(\n+                op(token, b, a)\n+            )\n+\n+    return stack.pop()\n+\n+\"\"\"\n+def rpn_eval(tokens):\n+    def op(symbol, a, b):\n+        return {\n+            '+': lambda a, b: a + b,\n+            '-': lambda a, b: a - b,\n+            '*': lambda a, b: a * b,\n+            '/': lambda a, b: a / b\n+        }[symbol](b, a)\n+\n+    stack = Stack()\n+\n+    for token in tokens:\n+        if isinstance(token, float):\n+            stack.push(token)\n+        else:\n+            a = stack.pop()\n+            b = stack.pop()\n+            stack.push(\n                 op(token, a, b)\n             )\n \n     return stack.pop()\n-\n-\n-\n \"\"\"\n-Reverse Polish Notation\n-\n-Four-function calculator with input given in Reverse Polish Notation (RPN).\n-\n-Input:\n-    A list of values and operators encoded as floats and strings\n-\n-Precondition:\n-    all(\n-        isinstance(token, float) or token in ('+', '-', '*', '/') for token in tokens\n-    )\n-\n-Example:\n-    >>> rpn_eval([3.0, 5.0, '+', 2.0, '/'])\n-    4.0\n-\"\"\"\n",
+  "files": {
+    "program.py": "\ndef rpn_eval(tokens):\n    def op(symbol, a, b):\n        return {\n            '+': lambda a, b: a + b,\n            '-': lambda a, b: a - b,\n            '*': lambda a, b: a * b,\n            '/': lambda a, b: a / b\n        }[symbol](a, b)\n\n    stack = []\n\n    for token in tokens:\n        if isinstance(token, float):\n            stack.append(token)\n        else:\n            a = stack.pop()\n            b = stack.pop()\n            stack.append(\n                op(token, b, a)\n            )\n\n    return stack.pop()\n\n\"\"\"\ndef rpn_eval(tokens):\n    def op(symbol, a, b):\n        return {\n            '+': lambda a, b: a + b,\n            '-': lambda a, b: a - b,\n            '*': lambda a, b: a * b,\n            '/': lambda a, b: a / b\n        }[symbol](b, a)\n\n    stack = Stack()\n\n    for token in tokens:\n        if isinstance(token, float):\n            stack.push(token)\n        else:\n            a = stack.pop()\n            b = stack.pop()\n            stack.push(\n                op(token, a, b)\n            )\n\n    return stack.pop()\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "concerns",
+    "confidence": "medium",
+    "summary": "Patch correctly fixes the reversed-operand root cause (0.25 vs 4.0 for [3,5,+,2,/]) by changing op(token,a,b) to op(token,b,a) with op defined as a op b, and public test now passes. However it deletes the contract/example docstring and leaves a full duplicated dead implementation inside a triple-quoted string, harming maintainability.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "0.25 == 4.0 is exactly b/a vs a/b inversion for (3+5)/2 vs 2/(3+5); matches operand-swap bug in RPN non-commutative ops."
+      }
+    ],
+    "risks": [
+      "Correct fix in active code, but docstring containing documented contract and Example >>> rpn_eval([3.0,5.0,'+',2.0,'/']) 4.0 is deleted",
+      "Leaves entire old implementation as dead code inside a stray triple-quoted string literal (Stack vs list version) - confusing, not removed",
+      "No surviving active flaw but dead-code hygiene/documentation loss would require cleanup before merge"
+    ],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 6491,
+    "duration_s": 19.2
+  },
+  "wrong": true
+}

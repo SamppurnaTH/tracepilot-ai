@@ -30,7 +30,7 @@ const QUICKSTART: Record<string, string[]> = {
     '  --screenshot bug.png --incident "Checkout returns 500 when the cart has no coupon"',
   ],
   "Java project": [
-    "# Maven projects run in a cached JDK 17 image (Docker required)",
+    "# Maven discovers default test classes; profiles and CI-specific scopes are optional",
     ".venv/Scripts/python tracepilot.py investigate --repo path/to/spring-service --logs app.log \\",
     '  --tests "ShipControllerTest,UserServiceTest" --test-args "-Dspring.profiles.active=test" \\',
     '  --incident "Users can edit ships hours after posting; the rule is 10 minutes"',

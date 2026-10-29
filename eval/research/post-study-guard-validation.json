@@ -1,0 +1,11 @@
+{
+  "source": "eval/research/runs/wrap__muse-spark-1.3__tracepilot_no_brief__2.json",
+  "source_sha256_lf": "f48d9bdf339f37f7073688dab9db4eb1a4aef4b14d4da0af431752331e02a49b",
+  "original_study_outcome": "fixed",
+  "tests_verified": true,
+  "review_verdict": "concerns",
+  "current_requires_review": true,
+  "current_status_line": "Tests verified; review required (tests 0/2 passing -> 2/2 passing, 0 regressions); independent review: concerns",
+  "current_apply_allowed": false,
+  "qualification": "Deterministic post-study guard validation on an unchanged real recording; no new model attempt and no rewritten research outcome."
+}

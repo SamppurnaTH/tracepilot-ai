@@ -1,0 +1,13 @@
+{
+  "id": "wrap__muse-spark-1.3__tracepilot_no_brief__2",
+  "model": "muse-spark-1.3",
+  "condition": "tracepilot_no_brief",
+  "repeat": 2,
+  "posthoc": true,
+  "passes": false,
+  "timed_out": true,
+  "error": null,
+  "exit_code": -1,
+  "stdout": "",
+  "stderr": "timed out after 3s"
+}

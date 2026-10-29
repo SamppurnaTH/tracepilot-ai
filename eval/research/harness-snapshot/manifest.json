@@ -1,0 +1,19 @@
+{
+  "purpose": "Pre-review-gate software snapshot used by the completed studies; copy into a separate matching repository checkout for replication",
+  "app_files_sha256_lf": {
+    "admin.py": "ea435bab62bc4176f586f6ca89fcdd21853b953cad4d865bbeb4c7b91a400918",
+    "agent.py": "f04d24b7dd340f4061cea37e17232167af6aa1267995152d55af9d7812c572d6",
+    "baseline.py": "a14283f2aeedce71e6cd6258a96b1dcb1539f2eddbc7f4d2b5fffe449b26ffc9",
+    "cli.py": "ba49461390d75f93654e4667249b8f763baa678b48c1383469ed293ab3ca385e",
+    "config.py": "c837da154e2147b1080f666813697dd7b6729cc931d6816fa33e66383dcca2f7",
+    "handoff.py": "4ca9eb32942c6e62299c05b529b42053b92a9cbcf9f1cf713a69410d4905a88f",
+    "llm.py": "8c8f22f2d407eb072b5ad12241752490cbd9a04b7b1ba7cabac26a1c270a285e",
+    "main.py": "09ccbd54f93ed43e4cc2fd1716b09a9da269e1d6088a62265254a30d32e105dd",
+    "reviewer.py": "273fb0e7561dd6104f33ee1ec9ec2d8fe9a8443bf1874cce867096b1fabce529",
+    "sandbox.py": "0fd5bdea08b90766b6b130a879b3c061aa7a42d690186e4a68b4f68053061d70",
+    "scenarios.py": "69ba30add061d5a1cb5eadd7b6ba1eaf52245f147238aca704c1c613f3382dbf",
+    "tools.py": "fdfd8d7919b521b6ebf0ea7a4ab584d83b4a51e8d8434b362f2e7b0aaf644bac",
+    "uploads.py": "843ac195d86b3c8c663ba837a166cf1008a06a6566761a4a2b21051240e5f2bf",
+    "__init__.py": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

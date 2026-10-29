@@ -7,7 +7,7 @@ import s from "@/components/app.module.css";
 import { AppShell } from "@/components/AppShell";
 import { cx } from "@/components/bits";
 import { Icon } from "@/components/icons";
-import { startCustomRun, startLiveRun, uploadsNeedKey } from "@/lib/api";
+import { recordingFallback, startCustomRun, startLiveRun, uploadsNeedKey } from "@/lib/api";
 import { useData } from "@/lib/useData";
 
 type Source = "upload" | "repo" | "example";
@@ -104,7 +104,7 @@ export default function Investigate() {
   const start = async () => {
     setError(null);
     if (source === "example" && !live) {
-      router.push(area(`/app/run?id=${example}&replay=1`));
+      router.push(area(`/app/run?id=${example}&replay=1&fallback=unavailable`));
       return;
     }
     setBusy(true);
@@ -127,6 +127,8 @@ export default function Investigate() {
       const run = await startCustomRun(form, accessKey.trim() || undefined);
       router.push(area(`/app/run?live=${run.id}`));
     } catch (err) {
+      const fallback = source === "example" ? recordingFallback(err) : null;
+      if (fallback) { router.push(area(`/app/run?id=${example}&replay=1&fallback=${fallback}`)); return; }
       setError(err instanceof Error ? err.message : String(err));
       setBusy(false);
     }
@@ -137,7 +139,7 @@ export default function Investigate() {
       <div className={s.pageHead}>
         <div>
           <h1 className={s.pageTitle}>Start a new investigation</h1>
-          <p className={s.pageText}>Provide your code, any logs or screenshots, and a short description of what users are seeing.</p>
+          <p className={s.pageText}>Python/pytest or Java/Maven only. Provide your code, sanitized logs or screenshots, and a short description of what users are seeing. Unsupported projects are refused before investigation.</p>
         </div>
       </div>
 

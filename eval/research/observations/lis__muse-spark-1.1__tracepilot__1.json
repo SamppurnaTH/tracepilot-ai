@@ -1,0 +1,54 @@
+{
+  "id": "lis__muse-spark-1.1__tracepilot__1",
+  "case": "lis",
+  "model": "muse-spark-1.1",
+  "condition": "tracepilot",
+  "repeat": 1,
+  "started_utc": "2026-10-29T12:38:25Z",
+  "error": null,
+  "harness_sha256_lf": {
+    "agent.py": "f04d24b7dd340f4061cea37e17232167af6aa1267995152d55af9d7812c572d6",
+    "baseline.py": "a14283f2aeedce71e6cd6258a96b1dcb1539f2eddbc7f4d2b5fffe449b26ffc9",
+    "tools.py": "fdfd8d7919b521b6ebf0ea7a4ab584d83b4a51e8d8434b362f2e7b0aaf644bac",
+    "sandbox.py": "0fd5bdea08b90766b6b130a879b3c061aa7a42d690186e4a68b4f68053061d70",
+    "reviewer.py": "273fb0e7561dd6104f33ee1ec9ec2d8fe9a8443bf1874cce867096b1fabce529"
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -11,7 +11,8 @@\n \n         if length == longest or val < arr[ends[length + 1]]:\n             ends[length + 1] = i\n-            longest = length + 1\n+            if length == longest:\n+                longest = length + 1\n \n     return longest\n \n--- /dev/null\n+++ b/tests/test_regression_docstring_example.py\n@@ -0,0 +1,9 @@\n+from program import lis\n+\n+def test_lis_docstring_example():\n+    # docstring says lis([4,1,5,3,7,6,2]) == 3, current buggy code returns 2\n+    assert lis([4, 1, 5, 3, 7, 6, 2]) == 3\n+\n+def test_lis_shrinking_bug():\n+    # [2,3,1] has LIS length 2 ([2,3]), but buggy longest shrinks to 1 at last element\n+    assert lis([2, 3, 1]) == 2\n",
+  "claimed_fixed": true,
+  "usage": {
+    "input_tokens": 40517,
+    "output_tokens": 12897,
+    "cached_tokens": 33711,
+    "model_calls": 13,
+    "tool_calls": 10,
+    "by_phase": {
+      "investigate": 36982,
+      "fix": 13366,
+      "report": 3066
+    }
+  },
+  "reviewer_tokens": 3276,
+  "duration_s": 177.9,
+  "outcome": "fixed",
+  "review_verdict": "approve",
+  "heldout_pass": true,
+  "visible_pass": true,
+  "heldout_tests": {
+    "tests/test_heldout.py::test_contract[case_0]": "passed",
+    "tests/test_heldout.py::test_contract[case_1]": "passed",
+    "tests/test_heldout.py::test_contract[case_2]": "passed",
+    "tests/test_heldout.py::test_contract[case_3]": "passed",
+    "tests/test_heldout.py::test_contract[case_4]": "passed",
+    "tests/test_heldout.py::test_contract[case_5]": "passed",
+    "tests/test_heldout.py::test_contract[case_6]": "passed",
+    "tests/test_heldout.py::test_contract[case_7]": "passed",
+    "tests/test_heldout.py::test_contract[case_8]": "passed",
+    "tests/test_heldout.py::test_contract[case_9]": "passed"
+  },
+  "heldout_reasons": {},
+  "visible_tests": {
+    "tests/test_public.py::test_contract[case_0]": "passed",
+    "tests/test_public.py::test_contract[case_1]": "passed"
+  },
+  "false_success": false
+}

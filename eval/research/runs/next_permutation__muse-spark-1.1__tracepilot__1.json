@@ -1,0 +1,494 @@
+{
+  "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+  "provider": "meta",
+  "model": "muse-spark-1.1",
+  "isolation": "docker",
+  "hypotheses": [
+    {
+      "id": "H1",
+      "claim": "next_permutation inner comparison uses < instead of >, selecting a smaller element instead of larger, producing wrong next permutation",
+      "symptom": "FAILING test_contract[case_0]: [3,1,2,4] != [3,4,1,2] and case_1 similarly wrong",
+      "next_check": "Inspect code at program.py lines 4-6 to confirm inverted condition and cross-check with expected algorithm behavior",
+      "status": "confirmed",
+      "evidence": [
+        "program.py line 6: `if perm[j] < perm[i]:` should be `>`, causing selection of smaller successor",
+        "tests/test_public.py::test_contract[case_0] expected [3,4,1,2] got [3,1,2,4]",
+        "tests/test_public.py::test_contract[case_1] expected [3,6,1,2,5] got [3,1,5,2,6]",
+        "Manual trace of [3,2,4,1] matches inverted logic"
+      ],
+      "reason": "Inner loop condition inverted: searches for element smaller than pivot instead of larger, producing previous-like permutation instead of next.",
+      "fix_in": "code"
+    }
+  ],
+  "findings": {
+    "issues": [
+      {
+        "category": "correctness",
+        "evidence": [
+          "program.py line 6: `if perm[j] < perm[i]:` should be `>`, causing selection of smaller successor",
+          "tests/test_public.py::test_contract[case_0] expected [3,4,1,2] got [3,1,2,4]",
+          "tests/test_public.py::test_contract[case_1] expected [3,6,1,2,5] got [3,1,5,2,6]",
+          "Manual trace of [3,2,4,1] matches inverted logic"
+        ],
+        "fix": "Changed program.py line 6 from `if perm[j] < perm[i]:` to `if perm[j] > perm[i]:` to select successor greater than pivot. Fix captured in patch.",
+        "hypothesis_ids": [
+          "H1"
+        ],
+        "root_cause": "Inconsistent between contract and implementation. next_permutation inner comparison uses < instead of >, selecting a smaller element instead of larger, producing wrong next permutation (reason: Inner loop condition inverted: searches for element smaller than pivot instead of larger, producing previous-like permutation instead of next.). Matching symptom: FAILING test_contract[case_0]: [3,1,2,4] != [3,4,1,2] and case_1 similarly wrong / base: The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation. / status: confirmed / hypothesis next_check: Inspect code at program.py lines 4-6 to confirm inverted condition and cross-check with expected algorithm behavior / independent_review verdict: approve / summary: Patch correctly inverts inner comparison from < to > to select the smallest greater successor, matching standard next-permutation algorithm. The two failing contract tests now pass and manual trace aligns with documented example [3,2,4,1]->[3,4,1,2]. No residual flaw or new defect introduced in patched file.",
+        "severity": "medium",
+        "title": "Root cause: next_permutation inner comparison uses < instead of > (H1)"
+      }
+    ],
+    "summary": "The function's behavior disagrees with its documented contract and supplied examples. Investigation confirmed H1: inner loop at program.py line 6 used < instead of >. Patch inverts comparison to >. Verification: verified=true, fixed [tests/test_public.py::test_contract[case_0], tests/test_public.py::test_contract[case_1]], still_failing=[], regressions=[]. Independent review: approve - Patch correctly inverts inner comparison from < to > to select the smallest greater successor, matching standard next-permutation algorithm. The two failing contract tests now pass and manual trace aligns with documented example [3,2,4,1]->[3,4,1,2]. No residual flaw or new defect introduced in patched file. Risks: []. Patch applied:\n--- a/program.py\n+++ b/program.py\n@@ -3,7 +3,7 @@\n     for i in range(len(perm) - 2, -1, -1):\n         if perm[i] < perm[i + 1]:\n             for j in range(len(perm) - 1, i, -1):\n-                if perm[j] < perm[i]:\n+                if perm[j] > perm[i]:\n                     next_perm = list(perm)\n                     next_perm[i], next_perm[j] = perm[j], perm[i]\n                     next_perm[i + 1:] = reversed(next_perm[i + 1:])"
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -3,7 +3,7 @@\n     for i in range(len(perm) - 2, -1, -1):\n         if perm[i] < perm[i + 1]:\n             for j in range(len(perm) - 1, i, -1):\n-                if perm[j] < perm[i]:\n+                if perm[j] > perm[i]:\n                     next_perm = list(perm)\n                     next_perm[i], next_perm[j] = perm[j], perm[i]\n                     next_perm[i + 1:] = reversed(next_perm[i + 1:])\n",
+  "excluded_tests": [],
+  "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+  "verification": {
+    "verified": true,
+    "fixed": [
+      "tests/test_public.py::test_contract[case_0]",
+      "tests/test_public.py::test_contract[case_1]"
+    ],
+    "still_failing": [],
+    "regressions": [],
+    "missing": [],
+    "before": {
+      "failed": 2
+    },
+    "after": {
+      "passed": 2
+    }
+  },
+  "outcome": "fixed",
+  "second_opinion": {
+    "verdict": "approve",
+    "confidence": "high",
+    "summary": "Patch correctly inverts inner comparison from < to > to select the smallest greater successor, matching standard next-permutation algorithm. The two failing contract tests now pass and manual trace aligns with documented example [3,2,4,1]->[3,4,1,2]. No residual flaw or new defect introduced in patched file.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "Evidence (code line, test expected vs actual outputs, manual trace) directly demonstrates inverted successor search; fixing < to > restores correct lexicographic successor."
+      }
+    ],
+    "risks": [],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 2241,
+    "duration_s": 4.8
+  },
+  "usage": {
+    "input_tokens": 26510,
+    "output_tokens": 7174,
+    "cached_tokens": 19036,
+    "model_calls": 10,
+    "tool_calls": 8,
+    "by_phase": {
+      "investigate": 15650,
+      "fix": 13913,
+      "report": 4121
+    }
+  },
+  "timing": {
+    "prepare_s": 0.0,
+    "sandbox_s": 2.06,
+    "model_s": 135.75,
+    "tools_s": 0.89,
+    "verify_s": 0.86,
+    "review_s": 4.82,
+    "by_phase": {
+      "investigate": 64.11,
+      "fix": 64.22,
+      "review": 4.83,
+      "report": 9.17
+    }
+  },
+  "duration_s": 144.4,
+  "events": [
+    {
+      "seq": 1,
+      "t": 0.6,
+      "type": "start",
+      "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+      "provider": "meta",
+      "model": "muse-spark-1.1",
+      "isolation": "docker"
+    },
+    {
+      "seq": 2,
+      "t": 2.05,
+      "type": "baseline",
+      "tests": {
+        "tests/test_public.py::test_contract[case_0]": "failed",
+        "tests/test_public.py::test_contract[case_1]": "failed"
+      },
+      "tally": {
+        "failed": 2
+      }
+    },
+    {
+      "seq": 3,
+      "t": 2.06,
+      "type": "brief",
+      "text": "Workspace files: program.py, tests/test_public.py\nTests: 0 passed, 2 failing\n  FAILING tests/test_public.py::test_contract[case_0]: assert [3, 1, 2, 4] == [3, 4, 1, 2]\n  FAILING tests/test_public.py::test_contract[case_1]: assert [3, 1, 5, 2, 6] == [3, 6, 1, 2, 5]",
+      "supplied_to_model": true
+    },
+    {
+      "seq": 4,
+      "t": 2.06,
+      "type": "phase",
+      "phase": "investigate"
+    },
+    {
+      "seq": 5,
+      "t": 3.23,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "."
+      }
+    },
+    {
+      "seq": 6,
+      "t": 3.23,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"directory\": \".\", \"files\": [\"program.py\", \"tests/test_public.py\"]}"
+    },
+    {
+      "seq": 7,
+      "t": 13.6,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 8,
+      "t": 13.6,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"program.py\", \"lines\": \"1-31 of 31\", \"content\": \"   1  \\n   2  def next_permutation(perm):\\n   3      for i in range(len(perm) - 2, -1, -1):\\n   4          if perm[i] < perm[i + 1]:\\n   5              for j in range(len(perm) - 1, i, -1):\\n   6                  if perm[j] < perm[i]:\\n   7                      next_perm = list(perm)\\n   8                      next_perm[i], next_perm[j] = perm[j], perm[i]\\n   9                      next_perm[i + 1:] = reversed(next_perm[i + 1:])\\n  10                      return next_perm\\n  11  \\n  12  \\n  13  \\n  14  \\\"\\\"\\\"\\n  15  Next Permutation\\n  16  next-perm\\n  17  \\n  18  \\n  19  Input:\\n  20      perm: A list of unique ints\\n  21  \\n  22  Precondition:\\n  23      perm is not sorted in reverse order\\n  24  \\n  25  Output:\\n  26      The lexicographically next permutation of the elements of perm\\n  27  \\n  28  Example:\\n  29      >>> next_permutation([3, 2, 4, 1])\\n  30      [3, 4, 1, 2]\\n  31  \\\"\\\"\\\"\"}"
+    },
+    {
+      "seq": 9,
+      "t": 13.6,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "tests/test_public.py"
+      }
+    },
+    {
+      "seq": 10,
+      "t": 13.6,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"tests/test_public.py\", \"lines\": \"1-7 of 7\", \"content\": \"   1  import json\\n   2  import pytest\\n   3  from program import next_permutation as function\\n   4  CASES = json.loads('[[[[3, 2, 4, 1]], [3, 4, 1, 2]], [[[3, 5, 6, 2, 1]], [3, 6, 1, 2, 5]]]')\\n   5  @pytest.mark.parametrize(\\\"arguments,expected\\\", CASES, ids=[\\\"case_%d\\\" % i for i in range(len(CASES))])\\n   6  def test_contract(arguments, expected):\\n   7      assert function(*arguments) == expected\"}"
+    },
+    {
+      "seq": 11,
+      "t": 41.9,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Identifying a comparison operator bug in the next permutation algorithm and correcting the condition for selecting the suffix element. Extending the fix to reverse the suffix after the swap to restore ascending order."
+    },
+    {
+      "seq": 12,
+      "t": 41.91,
+      "type": "hypothesis",
+      "id": "H1",
+      "claim": "next_permutation inner comparison uses < instead of >, selecting a smaller element instead of larger, producing wrong next permutation",
+      "symptom": "FAILING test_contract[case_0]: [3,1,2,4] != [3,4,1,2] and case_1 similarly wrong",
+      "next_check": "Inspect code at program.py lines 4-6 to confirm inverted condition and cross-check with expected algorithm behavior",
+      "status": "open",
+      "evidence": [],
+      "reason": "",
+      "fix_in": "code"
+    },
+    {
+      "seq": 13,
+      "t": 59.72,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Identifying a comparison operator bug in the permutation algorithm and noting the correct condition."
+    },
+    {
+      "seq": 14,
+      "t": 59.72,
+      "type": "hypothesis_update",
+      "id": "H1",
+      "claim": "next_permutation inner comparison uses < instead of >, selecting a smaller element instead of larger, producing wrong next permutation",
+      "symptom": "FAILING test_contract[case_0]: [3,1,2,4] != [3,4,1,2] and case_1 similarly wrong",
+      "next_check": "Inspect code at program.py lines 4-6 to confirm inverted condition and cross-check with expected algorithm behavior",
+      "status": "confirmed",
+      "evidence": [
+        "program.py line 6: `if perm[j] < perm[i]:` should be `>`, causing selection of smaller successor",
+        "tests/test_public.py::test_contract[case_0] expected [3,4,1,2] got [3,1,2,4]",
+        "tests/test_public.py::test_contract[case_1] expected [3,6,1,2,5] got [3,1,5,2,6]",
+        "Manual trace of [3,2,4,1] matches inverted logic"
+      ],
+      "reason": "Inner loop condition inverted: searches for element smaller than pivot instead of larger, producing previous-like permutation instead of next.",
+      "fix_in": "code"
+    },
+    {
+      "seq": 15,
+      "t": 61.81,
+      "type": "recovered",
+      "reason": "the server lost the conversation; replaying it from the local transcript"
+    },
+    {
+      "seq": 16,
+      "t": 66.17,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Diagnosing a mismatch between next_permutation implementation and documented contract by reviewing failing tests and code logic. Identifying the comparison operator reversal as the root cause and preparing a regression test to verify the fix."
+    },
+    {
+      "seq": 17,
+      "t": 66.17,
+      "type": "message",
+      "phase": "investigate",
+      "text": "Investigation complete:\n\n**Root cause H1 confirmed**: In `program.py:6` the successor search uses `perm[j] < perm[i]` instead of `perm[j] > perm[i]`. The next-permutation algorithm requires finding the smallest element in the suffix larger than the pivot, but the code finds a smaller one, producing incorrect results.\n\nEvidence:\n- Manual trace of `[3,2,4,1]` shows the bug selects `1` at index 3 as successor to `2`, yielding `[3,1,2,4]` instead of expected `[3,4,1,2]`.\n- Both failing tests `test_contract[case_0]` and `case_1` exhibit this inverted selection.\n\nFix: Change line 6 condition to `>` in `program.py`."
+    },
+    {
+      "seq": 18,
+      "t": 66.17,
+      "type": "phase",
+      "phase": "fix"
+    },
+    {
+      "seq": 19,
+      "t": 79.48,
+      "type": "tool_call",
+      "tool": "edit_file",
+      "args": {
+        "path": "program.py",
+        "old": "            for j in range(len(perm) - 1, i, -1):\n                if perm[j] < perm[i]:",
+        "new": "            for j in range(len(perm) - 1, i, -1):\n                if perm[j] > perm[i]:"
+      }
+    },
+    {
+      "seq": 20,
+      "t": 79.48,
+      "type": "tool_result",
+      "tool": "edit_file",
+      "preview": "{\"edited\": \"program.py\"}"
+    },
+    {
+      "seq": 21,
+      "t": 79.49,
+      "type": "patch",
+      "path": "program.py",
+      "diff": "--- a/program.py\n+++ b/program.py\n@@ -3,7 +3,7 @@\n     for i in range(len(perm) - 2, -1, -1):\n         if perm[i] < perm[i + 1]:\n             for j in range(len(perm) - 1, i, -1):\n-                if perm[j] < perm[i]:\n+                if perm[j] > perm[i]:\n                     next_perm = list(perm)\n                     next_perm[i], next_perm[j] = perm[j], perm[i]\n                     next_perm[i + 1:] = reversed(next_perm[i + 1:])\n"
+    },
+    {
+      "seq": 22,
+      "t": 97.91,
+      "type": "tool_call",
+      "tool": "run_tests",
+      "args": {}
+    },
+    {
+      "seq": 23,
+      "t": 98.78,
+      "type": "tool_result",
+      "tool": "run_tests",
+      "preview": "{\"exit_code\": 0, \"summary\": \"2 passed in 0.07s\"}"
+    },
+    {
+      "seq": 24,
+      "t": 114.41,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 25,
+      "t": 114.41,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"program.py\", \"lines\": \"1-31 of 31\", \"content\": \"   1  \\n   2  def next_permutation(perm):\\n   3      for i in range(len(perm) - 2, -1, -1):\\n   4          if perm[i] < perm[i + 1]:\\n   5              for j in range(len(perm) - 1, i, -1):\\n   6                  if perm[j] > perm[i]:\\n   7                      next_perm = list(perm)\\n   8                      next_perm[i], next_perm[j] = perm[j], perm[i]\\n   9                      next_perm[i + 1:] = reversed(next_perm[i + 1:])\\n  10                      return next_perm\\n  11  \\n  12  \\n  13  \\n  14  \\\"\\\"\\\"\\n  15  Next Permutation\\n  16  next-perm\\n  17  \\n  18  \\n  19  Input:\\n  20      perm: A list of unique ints\\n  21  \\n  22  Precondition:\\n  23      perm is not sorted in reverse order\\n  24  \\n  25  Output:\\n  26      The lexicographically next permutation of the elements of perm\\n  27  \\n  28  Example:\\n  29      >>> next_permutation([3, 2, 4, 1])\\n  30      [3, 4, 1, 2]\\n  31  \\\"\\\"\\\"\"}"
+    },
+    {
+      "seq": 26,
+      "t": 129.52,
+      "type": "message",
+      "phase": "fix",
+      "text": "Fix applied:\n\n- Changed `program.py:6` from `perm[j] < perm[i]` to `perm[j] > perm[i]` to correctly find the successor larger than the pivot for the next lexicographic permutation.\n\nVerification: `2 passed` (previously 2 failing)."
+    },
+    {
+      "seq": 27,
+      "t": 130.39,
+      "type": "verification",
+      "attempt": 1,
+      "tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      },
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    },
+    {
+      "seq": 28,
+      "t": 130.39,
+      "type": "phase",
+      "phase": "review"
+    },
+    {
+      "seq": 29,
+      "t": 135.21,
+      "type": "second_opinion",
+      "verdict": "approve",
+      "confidence": "high",
+      "summary": "Patch correctly inverts inner comparison from < to > to select the smallest greater successor, matching standard next-permutation algorithm. The two failing contract tests now pass and manual trace aligns with documented example [3,2,4,1]->[3,4,1,2]. No residual flaw or new defect introduced in patched file.",
+      "hypotheses": [
+        {
+          "id": "H1",
+          "assessment": "supported",
+          "note": "Evidence (code line, test expected vs actual outputs, manual trace) directly demonstrates inverted successor search; fixing < to > restores correct lexicographic successor."
+        }
+      ],
+      "risks": [],
+      "provider": "baseten",
+      "model": "meta-models/muse-spark-open-1026",
+      "tokens": 2241,
+      "duration_s": 4.8
+    },
+    {
+      "seq": 30,
+      "t": 135.22,
+      "type": "phase",
+      "phase": "report"
+    },
+    {
+      "seq": 31,
+      "t": 144.39,
+      "type": "report",
+      "report": {
+        "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+        "provider": "meta",
+        "model": "muse-spark-1.1",
+        "isolation": "docker",
+        "hypotheses": [
+          {
+            "id": "H1",
+            "claim": "next_permutation inner comparison uses < instead of >, selecting a smaller element instead of larger, producing wrong next permutation",
+            "symptom": "FAILING test_contract[case_0]: [3,1,2,4] != [3,4,1,2] and case_1 similarly wrong",
+            "next_check": "Inspect code at program.py lines 4-6 to confirm inverted condition and cross-check with expected algorithm behavior",
+            "status": "confirmed",
+            "evidence": [
+              "program.py line 6: `if perm[j] < perm[i]:` should be `>`, causing selection of smaller successor",
+              "tests/test_public.py::test_contract[case_0] expected [3,4,1,2] got [3,1,2,4]",
+              "tests/test_public.py::test_contract[case_1] expected [3,6,1,2,5] got [3,1,5,2,6]",
+              "Manual trace of [3,2,4,1] matches inverted logic"
+            ],
+            "reason": "Inner loop condition inverted: searches for element smaller than pivot instead of larger, producing previous-like permutation instead of next.",
+            "fix_in": "code"
+          }
+        ],
+        "findings": {
+          "issues": [
+            {
+              "category": "correctness",
+              "evidence": [
+                "program.py line 6: `if perm[j] < perm[i]:` should be `>`, causing selection of smaller successor",
+                "tests/test_public.py::test_contract[case_0] expected [3,4,1,2] got [3,1,2,4]",
+                "tests/test_public.py::test_contract[case_1] expected [3,6,1,2,5] got [3,1,5,2,6]",
+                "Manual trace of [3,2,4,1] matches inverted logic"
+              ],
+              "fix": "Changed program.py line 6 from `if perm[j] < perm[i]:` to `if perm[j] > perm[i]:` to select successor greater than pivot. Fix captured in patch.",
+              "hypothesis_ids": [
+                "H1"
+              ],
+              "root_cause": "Inconsistent between contract and implementation. next_permutation inner comparison uses < instead of >, selecting a smaller element instead of larger, producing wrong next permutation (reason: Inner loop condition inverted: searches for element smaller than pivot instead of larger, producing previous-like permutation instead of next.). Matching symptom: FAILING test_contract[case_0]: [3,1,2,4] != [3,4,1,2] and case_1 similarly wrong / base: The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation. / status: confirmed / hypothesis next_check: Inspect code at program.py lines 4-6 to confirm inverted condition and cross-check with expected algorithm behavior / independent_review verdict: approve / summary: Patch correctly inverts inner comparison from < to > to select the smallest greater successor, matching standard next-permutation algorithm. The two failing contract tests now pass and manual trace aligns with documented example [3,2,4,1]->[3,4,1,2]. No residual flaw or new defect introduced in patched file.",
+              "severity": "medium",
+              "title": "Root cause: next_permutation inner comparison uses < instead of > (H1)"
+            }
+          ],
+          "summary": "The function's behavior disagrees with its documented contract and supplied examples. Investigation confirmed H1: inner loop at program.py line 6 used < instead of >. Patch inverts comparison to >. Verification: verified=true, fixed [tests/test_public.py::test_contract[case_0], tests/test_public.py::test_contract[case_1]], still_failing=[], regressions=[]. Independent review: approve - Patch correctly inverts inner comparison from < to > to select the smallest greater successor, matching standard next-permutation algorithm. The two failing contract tests now pass and manual trace aligns with documented example [3,2,4,1]->[3,4,1,2]. No residual flaw or new defect introduced in patched file. Risks: []. Patch applied:\n--- a/program.py\n+++ b/program.py\n@@ -3,7 +3,7 @@\n     for i in range(len(perm) - 2, -1, -1):\n         if perm[i] < perm[i + 1]:\n             for j in range(len(perm) - 1, i, -1):\n-                if perm[j] < perm[i]:\n+                if perm[j] > perm[i]:\n                     next_perm = list(perm)\n                     next_perm[i], next_perm[j] = perm[j], perm[i]\n                     next_perm[i + 1:] = reversed(next_perm[i + 1:])"
+        },
+        "diff": "--- a/program.py\n+++ b/program.py\n@@ -3,7 +3,7 @@\n     for i in range(len(perm) - 2, -1, -1):\n         if perm[i] < perm[i + 1]:\n             for j in range(len(perm) - 1, i, -1):\n-                if perm[j] < perm[i]:\n+                if perm[j] > perm[i]:\n                     next_perm = list(perm)\n                     next_perm[i], next_perm[j] = perm[j], perm[i]\n                     next_perm[i + 1:] = reversed(next_perm[i + 1:])\n",
+        "excluded_tests": [],
+        "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+        "verification": {
+          "verified": true,
+          "fixed": [
+            "tests/test_public.py::test_contract[case_0]",
+            "tests/test_public.py::test_contract[case_1]"
+          ],
+          "still_failing": [],
+          "regressions": [],
+          "missing": [],
+          "before": {
+            "failed": 2
+          },
+          "after": {
+            "passed": 2
+          }
+        },
+        "outcome": "fixed",
+        "second_opinion": {
+          "verdict": "approve",
+          "confidence": "high",
+          "summary": "Patch correctly inverts inner comparison from < to > to select the smallest greater successor, matching standard next-permutation algorithm. The two failing contract tests now pass and manual trace aligns with documented example [3,2,4,1]->[3,4,1,2]. No residual flaw or new defect introduced in patched file.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "assessment": "supported",
+              "note": "Evidence (code line, test expected vs actual outputs, manual trace) directly demonstrates inverted successor search; fixing < to > restores correct lexicographic successor."
+            }
+          ],
+          "risks": [],
+          "provider": "baseten",
+          "model": "meta-models/muse-spark-open-1026",
+          "tokens": 2241,
+          "duration_s": 4.8
+        },
+        "usage": {
+          "input_tokens": 26510,
+          "output_tokens": 7174,
+          "cached_tokens": 19036,
+          "model_calls": 10,
+          "tool_calls": 8,
+          "by_phase": {
+            "investigate": 15650,
+            "fix": 13913,
+            "report": 4121
+          }
+        },
+        "timing": {
+          "prepare_s": 0.0,
+          "sandbox_s": 2.06,
+          "model_s": 135.75,
+          "tools_s": 0.89,
+          "verify_s": 0.86,
+          "review_s": 4.82,
+          "by_phase": {
+            "investigate": 64.11,
+            "fix": 64.22,
+            "review": 4.83,
+            "report": 9.17
+          }
+        },
+        "duration_s": 144.4
+      }
+    }
+  ]
+}

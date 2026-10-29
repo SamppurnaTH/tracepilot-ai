@@ -1,0 +1,31 @@
+{
+  "id": "lis__muse-spark-1.1__tracepilot__1",
+  "status": "valid",
+  "attempts": [
+    {
+      "heldout_pass": true,
+      "visible_pass": true,
+      "heldout_tests": {
+        "tests/test_heldout.py::test_contract[case_0]": "passed",
+        "tests/test_heldout.py::test_contract[case_1]": "passed",
+        "tests/test_heldout.py::test_contract[case_2]": "passed",
+        "tests/test_heldout.py::test_contract[case_3]": "passed",
+        "tests/test_heldout.py::test_contract[case_4]": "passed",
+        "tests/test_heldout.py::test_contract[case_5]": "passed",
+        "tests/test_heldout.py::test_contract[case_6]": "passed",
+        "tests/test_heldout.py::test_contract[case_7]": "passed",
+        "tests/test_heldout.py::test_contract[case_8]": "passed",
+        "tests/test_heldout.py::test_contract[case_9]": "passed"
+      },
+      "heldout_reasons": {},
+      "visible_tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      }
+    }
+  ],
+  "heldout_pass": true,
+  "initial_heldout_pass": true,
+  "initial_outcomes_empty": false,
+  "changed_from_initial": false
+}

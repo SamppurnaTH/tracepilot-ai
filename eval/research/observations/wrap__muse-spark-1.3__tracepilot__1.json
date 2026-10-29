@@ -1,0 +1,47 @@
+{
+  "id": "wrap__muse-spark-1.3__tracepilot__1",
+  "case": "wrap",
+  "model": "muse-spark-1.3",
+  "condition": "tracepilot",
+  "repeat": 1,
+  "started_utc": "2026-10-29T13:26:33Z",
+  "error": null,
+  "harness_sha256_lf": {
+    "agent.py": "f04d24b7dd340f4061cea37e17232167af6aa1267995152d55af9d7812c572d6",
+    "baseline.py": "a14283f2aeedce71e6cd6258a96b1dcb1539f2eddbc7f4d2b5fffe449b26ffc9",
+    "tools.py": "fdfd8d7919b521b6ebf0ea7a4ab584d83b4a51e8d8434b362f2e7b0aaf644bac",
+    "sandbox.py": "0fd5bdea08b90766b6b130a879b3c061aa7a42d690186e4a68b4f68053061d70",
+    "reviewer.py": "273fb0e7561dd6104f33ee1ec9ec2d8fe9a8443bf1874cce867096b1fabce529"
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -2,10 +2,12 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n+    if text:\n+        lines.append(text)\n \n     return lines\n \n",
+  "claimed_fixed": true,
+  "usage": {
+    "input_tokens": 56964,
+    "output_tokens": 14927,
+    "cached_tokens": 23101,
+    "model_calls": 14,
+    "tool_calls": 11,
+    "by_phase": {
+      "investigate": 19808,
+      "fix": 44820,
+      "report": 7263
+    }
+  },
+  "reviewer_tokens": 5839,
+  "duration_s": 238.9,
+  "outcome": "fixed",
+  "review_verdict": "approve",
+  "heldout_pass": true,
+  "visible_pass": true,
+  "heldout_tests": {
+    "tests/test_heldout.py::test_contract[case_0]": "passed",
+    "tests/test_heldout.py::test_contract[case_1]": "passed",
+    "tests/test_heldout.py::test_contract[case_2]": "passed"
+  },
+  "heldout_reasons": {},
+  "visible_tests": {
+    "tests/test_public.py::test_contract[case_0]": "passed",
+    "tests/test_public.py::test_contract[case_1]": "passed"
+  },
+  "false_success": false
+}

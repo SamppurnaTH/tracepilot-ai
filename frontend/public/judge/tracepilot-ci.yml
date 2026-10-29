@@ -1,0 +1,58 @@
+# Copy to .github/workflows/tracepilot.yml in an authorized Python/pytest or Java/Maven project.
+# Set TRACEPILOT_COMMIT to a reviewed 40-character TracePilot revision; configure model secrets.
+# Manual only: never run untrusted pull-request code with provider credentials.
+name: Investigate an incident with TracePilot
+on:
+  workflow_dispatch:
+    inputs:
+      incident:
+        description: Describe the observed incident (no secrets)
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  investigate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Require a reviewed tool revision
+        env:
+          TOOL_REVISION: ${{ vars.TRACEPILOT_COMMIT }}
+        run: '[[ "$TOOL_REVISION" =~ ^[0-9a-f]{40}$ ]]'
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          path: project
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: SamppurnaTH/tracepilot-ai
+          ref: ${{ vars.TRACEPILOT_COMMIT }}
+          path: tracepilot
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -r tracepilot/backend/requirements.txt
+      - name: Investigate in Docker; retain an unverified report on failure
+        id: investigation
+        continue-on-error: true
+        env:
+          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
+          BASETEN_API_KEY: ${{ secrets.BASETEN_API_KEY }}
+          INCIDENT: ${{ inputs.incident }}
+        run: >-
+          python tracepilot/tracepilot.py investigate
+          --repo project --incident "$INCIDENT" --isolation docker
+          --out "$RUNNER_TEMP/tracepilot-report"
+      - name: Upload evidence for human review
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: tracepilot-evidence
+          path: ${{ runner.temp }}/tracepilot-report/
+          if-no-files-found: warn
+          retention-days: 3
+      - name: Preserve investigation exit status
+        if: steps.investigation.outcome == 'failure'
+        run: exit 1

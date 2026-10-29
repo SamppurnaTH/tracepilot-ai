@@ -1,0 +1,63 @@
+{
+  "case": "rpn_eval",
+  "kind": "reference",
+  "reviewer": "muse-spark-1.3",
+  "repeat": 2,
+  "label_correct_patch": true,
+  "error": null,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "AssertionError: assert 0.25 == 4.0"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "passed": 1,
+        "failed": 1
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -17,27 +17,32 @@\n             a = stack.pop()\n             b = stack.pop()\n             stack.append(\n+                op(token, b, a)\n+            )\n+\n+    return stack.pop()\n+\n+\"\"\"\n+def rpn_eval(tokens):\n+    def op(symbol, a, b):\n+        return {\n+            '+': lambda a, b: a + b,\n+            '-': lambda a, b: a - b,\n+            '*': lambda a, b: a * b,\n+            '/': lambda a, b: a / b\n+        }[symbol](b, a)\n+\n+    stack = Stack()\n+\n+    for token in tokens:\n+        if isinstance(token, float):\n+            stack.push(token)\n+        else:\n+            a = stack.pop()\n+            b = stack.pop()\n+            stack.push(\n                 op(token, a, b)\n             )\n \n     return stack.pop()\n-\n-\n-\n \"\"\"\n-Reverse Polish Notation\n-\n-Four-function calculator with input given in Reverse Polish Notation (RPN).\n-\n-Input:\n-    A list of values and operators encoded as floats and strings\n-\n-Precondition:\n-    all(\n-        isinstance(token, float) or token in ('+', '-', '*', '/') for token in tokens\n-    )\n-\n-Example:\n-    >>> rpn_eval([3.0, 5.0, '+', 2.0, '/'])\n-    4.0\n-\"\"\"\n",
+  "files": {
+    "program.py": "\ndef rpn_eval(tokens):\n    def op(symbol, a, b):\n        return {\n            '+': lambda a, b: a + b,\n            '-': lambda a, b: a - b,\n            '*': lambda a, b: a * b,\n            '/': lambda a, b: a / b\n        }[symbol](a, b)\n\n    stack = []\n\n    for token in tokens:\n        if isinstance(token, float):\n            stack.append(token)\n        else:\n            a = stack.pop()\n            b = stack.pop()\n            stack.append(\n                op(token, b, a)\n            )\n\n    return stack.pop()\n\n\"\"\"\ndef rpn_eval(tokens):\n    def op(symbol, a, b):\n        return {\n            '+': lambda a, b: a + b,\n            '-': lambda a, b: a - b,\n            '*': lambda a, b: a * b,\n            '/': lambda a, b: a / b\n        }[symbol](b, a)\n\n    stack = Stack()\n\n    for token in tokens:\n        if isinstance(token, float):\n            stack.push(token)\n        else:\n            a = stack.pop()\n            b = stack.pop()\n            stack.push(\n                op(token, a, b)\n            )\n\n    return stack.pop()\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "reject",
+    "confidence": "high",
+    "summary": "The operand-order fix is correct for RPN and explains 0.25 vs 4.0, but the patch deletes the RPN contract docstring with the example and leaves a dead duplicate implementation in a triple-quoted string. I would not merge as-is; restore docs and remove dead code.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "Getting 0.25 instead of 4.0 for [3.0,5.0,'+',2.0,'/'] matches 2.0/8.0 vs 8.0/2.0, i.e. inverted operands, consistent with contract violation."
+      }
+    ],
+    "risks": [
+      "Deletes the Reverse Polish Notation docstring, precondition and example that define the contract",
+      "Leaves dead duplicate rpn_eval inside triple-quoted string with buggy operand logic and undefined Stack, preserving flaw in file and confusing maintenance"
+    ],
+    "provider": "meta",
+    "model": "muse-spark-1.3",
+    "tokens": 6564,
+    "duration_s": 25.0
+  },
+  "wrong": true
+}

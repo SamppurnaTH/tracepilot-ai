@@ -1,0 +1,16 @@
+{
+  "frozen_at_utc": "2026-10-29T12:54:11Z",
+  "status": "post-hoc exploratory check, separate from the fixed primary oracle",
+  "origin": "Both cold reviewers flagged zero-progress iteration in the upstream wrap reference",
+  "input": {
+    "text": " abcdef",
+    "cols": 3
+  },
+  "checks": [
+    "terminates within 3 seconds in Docker",
+    "concatenation preserves the original input exactly",
+    "each output line has length <= cols"
+  ],
+  "candidate_set": "all wrap repairs from the frozen matrix, including plain and TracePilot, both models and repetitions",
+  "no_new_inference": true
+}

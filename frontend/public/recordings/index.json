@@ -299,5 +299,22 @@
     "tokens": 334667,
     "model_calls": 15,
     "review": "approve"
+  },
+  {
+    "scenario": {
+      "id": "wrap-review",
+      "title": "Wrap utility: tests pass, but review finds a remaining hang",
+      "service": "program",
+      "incident": "Recorded controlled experiment with the evidence brief disabled. Actual input to the agent: The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+      "language": "python",
+      "live": false
+    },
+    "file": "wrap-review.json",
+    "verified": true,
+    "outcome": "needs_review",
+    "duration_s": 172.1,
+    "tokens": 46117,
+    "review": "concerns",
+    "started_at": 1793281025.0
   }
 ]

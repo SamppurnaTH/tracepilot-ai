@@ -1,0 +1,20 @@
+{
+  "reason": "Original held-out outcomes were empty; diagnostic re-execution, raw observation unchanged",
+  "result": {
+    "heldout_pass": true,
+    "visible_pass": true,
+    "heldout_tests": {
+      "tests/test_heldout.py::test_contract[case_0]": "passed",
+      "tests/test_heldout.py::test_contract[case_1]": "passed",
+      "tests/test_heldout.py::test_contract[case_2]": "passed",
+      "tests/test_heldout.py::test_contract[case_3]": "passed",
+      "tests/test_heldout.py::test_contract[case_4]": "passed",
+      "tests/test_heldout.py::test_contract[case_5]": "passed"
+    },
+    "heldout_reasons": {},
+    "visible_tests": {
+      "tests/test_public.py::test_contract[case_0]": "passed",
+      "tests/test_public.py::test_contract[case_1]": "passed"
+    }
+  }
+}

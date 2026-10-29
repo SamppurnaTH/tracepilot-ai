@@ -5,8 +5,8 @@ import s from "./app.module.css";
 import { CopyButton, cx } from "./bits";
 import { DiffBlock, Evidence, ReproTests, Review, RootCauses, Terminal, TestResults, isTestPath, splitDiff } from "./Console";
 import { Icon, type IconName } from "./icons";
-import { downloadText, markdownReport, prDescription } from "@/lib/report";
-import { estimateCost, formatTally, type RunState, type ScenarioSummary } from "@/lib/run";
+import { downloadText, markdownReport, patchScope, prDescription } from "@/lib/report";
+import { estimateCost, formatTally, needsReview, timeParts, type RunState, type ScenarioSummary } from "@/lib/run";
 import { minutes } from "@/lib/useData";
 
 const VERDICT: Record<string, string> = { approve: "Approved", concerns: "Concerns raised", reject: "Rejected", unavailable: "Unavailable" };
@@ -16,7 +16,8 @@ export function RunResult({ scenario, state, startedAt }: { scenario: ScenarioSu
   const r = state.report!;
   const noCode = r.outcome === "no_code_change";
   const v = state.verification;
-  const ok = noCode || Boolean(v?.verified);
+  const reviewRequired = needsReview(state);
+  const ok = noCode || Boolean(v?.verified && !reviewRequired);
   const files = splitDiff(state.diff || "");
   const code = files.filter((f) => !isTestPath(f.path));
   const tests = files.filter((f) => f.isNew && isTestPath(f.path));
@@ -35,13 +36,13 @@ export function RunResult({ scenario, state, startedAt }: { scenario: ScenarioSu
       : ["file", "Files changed", code.length ? `${code.length} file${code.length > 1 ? "s" : ""} modified${tests.length ? `, ${tests.length} test file${tests.length > 1 ? "s" : ""} added` : ""}` : "None", s.iconBlue],
     ["flask", "Tests", noCode ? "No test needed" : v ? `${formatTally(v.before)} → ${formatTally(v.after)}` : "—", s.iconPink],
     ["eye", "Second opinion", state.secondOpinion ? `${VERDICT[state.secondOpinion.verdict]} (${state.secondOpinion.model})` : noCode ? "Not needed" : "—", s.iconGreen],
-    ["clock", "Execution time", minutes(r.duration_s), s.iconAmber],
-    ["layers", "Tokens used", `${tokens.toLocaleString()} · est. ${estimateCost(tokens)}`, s.iconViolet],
+    ["clock", "Execution time", [minutes(r.duration_s), timeParts(r.timing).map(([label, sec]) => `${label} ${minutes(sec)}`).join(" · ")].filter(Boolean).join(" — "), s.iconAmber],
+    ["layers", "Investigator tokens", `${tokens.toLocaleString()} · historical cost estimate ${estimateCost(tokens)} (reviewer/hosting excluded)`, s.iconViolet],
   ];
 
   const handoff = (
     <div className={s.handoff}>
-      <p className={s.handoffLabel}>READY FOR HAND-OFF</p><div className={s.actions}>
+      <p className={s.handoffLabel}>{reviewRequired ? "REVIEW BEFORE HAND-OFF" : ok ? "READY FOR HAND-OFF" : "UNVERIFIED REPORT"}</p><div className={s.actions}>
       <button type="button" className={cx(s.btn, s.btnPrimary)} onClick={() => downloadText(`tracepilot-${scenario.id}-report.md`, markdownReport(scenario, state))}>
         <Icon name="download" size={16} /> Download report
       </button>
@@ -62,10 +63,11 @@ export function RunResult({ scenario, state, startedAt }: { scenario: ScenarioSu
           <h2 id="result-title" className={s.panelTitle}>
             Investigation complete
           </h2>
-          <span className={cx(s.tag, ok ? s.sevPass : s.sevCritical)}>{noCode ? "No code change needed" : ok ? "Verified fix" : "Not verified"}</span>
+          <span className={cx(s.tag, ok ? s.sevPass : s.sevCritical)}>{noCode ? "No code change needed" : reviewRequired ? "Review required" : ok ? "Verified fix" : "Not verified"}</span>
         </div>
       </div>
       <div className={s.resultMetrics}><span><Icon name="clock" size={14} /> {minutes(r.duration_s)}</span><span><Icon name="layers" size={14} /> {tokens.toLocaleString()} tokens</span><span><Icon name="file" size={14} /> {code.length} code files changed</span><span><Icon name="shieldCheck" size={14} /> {noCode ? "External root cause" : state.secondOpinion ? VERDICT[state.secondOpinion.verdict] : "Review unavailable"}</span></div>
+      <p className={s.footnote}>{state.diff ? patchScope(state.diff) : "No application patch."} {r.verification_scope ?? "Verified against recorded tests only; untested production behavior remains unverified."}{r.excluded_tests?.length ? ` ${r.excluded_tests.length} infrastructure test classes excluded: ${r.excluded_tests.join(", ")}.` : ""}</p>
       <div className={s.tabs} role="tablist" aria-label="Result views">
         {tabs.map((t) => (
           <button key={t} type="button" role="tab" id={`result-tab-${t.replaceAll(" ", "-")}`} aria-controls="result-panel" aria-selected={tab === t} className={cx(s.tab, tab === t && s.tabOn)} onClick={() => setTab(t)}>
@@ -83,9 +85,9 @@ export function RunResult({ scenario, state, startedAt }: { scenario: ScenarioSu
                   <Icon name={noCode ? "bulb" : ok ? "check" : "minusCircle"} size={22} />
                 </span>
                 <div>
-                  <p className={s.verdictTitle}>{noCode ? "No code change needed" : ok ? "Fix verified" : "Not verified"}</p>
+                  <p className={s.verdictTitle}>{noCode ? "No code change needed" : reviewRequired ? (v?.verified ? "Tests passed; review required" : "Tests not verified; review required") : ok ? "Fix verified" : "Not verified"}</p>
                   <p className={s.factValue}>
-                    {noCode ? "The cause is real, but its fix belongs outside this code." : ok ? "The issue is fixed and proven by tests." : "The tests did not confirm the fix."}
+                    {noCode ? "The cause is real, but its fix belongs outside this code." : reviewRequired ? "The reviewer raised unresolved objections. Inspect the risks before applying or merging this patch." : ok ? "The patch is verified against the recorded test scope." : "The tests did not confirm the fix."}
                   </p>
                 </div>
               </div>
@@ -105,6 +107,7 @@ export function RunResult({ scenario, state, startedAt }: { scenario: ScenarioSu
               </ul>
             </div>
             <div className={s.field} style={{ gap: 14 }}>
+              {reviewRequired && <p className={s.hint}>Original investigator summary below. Reviewer objections remain unresolved; this summary does not override the review-required status.</p>}
               <p className={s.factValue}>{r.findings.summary}</p>
               {noCode ? (
                 <>

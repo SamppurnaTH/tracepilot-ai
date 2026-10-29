@@ -1,0 +1,615 @@
+{
+  "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+  "provider": "meta",
+  "model": "muse-spark-1.3",
+  "isolation": "docker",
+  "hypotheses": [
+    {
+      "id": "H1",
+      "claim": "wrap() drops the final chunk because it returns without appending the remaining text after the loop",
+      "symptom": "Both contract cases fail with truncated output (missing last line)",
+      "next_check": "Run public tests and inspect actual vs expected output tail",
+      "status": "confirmed",
+      "evidence": [
+        "tests/test_public.py::test_contract case_0: Right contains one more item ' dignity and the higher aims of our existence.'",
+        "tests/test_public.py::test_contract case_1: Right contains one more item ' existence.'",
+        "program.py lines 3-10: while len(text) > cols loop appends chunks but return lines never appends final remainder"
+      ],
+      "reason": "Both failures show actual output equals expected prefix minus the final chunk; loop exits when remainder fits but code returns without appending it.",
+      "fix_in": "code"
+    },
+    {
+      "id": "H2",
+      "claim": "wrap() can loop forever when the only space in window is at index 0 (end==0 makes no progress)",
+      "symptom": "Closely related robustness defect (potential hang on leading-space/long-word inputs)",
+      "next_check": "Static inspection of program.py lines 4-8 showing text[end:] with end==0 never shrinks",
+      "status": "confirmed",
+      "evidence": [
+        "program.py line 4: end = text.rfind(' ', 0, cols+1) can return 0 when only space in window is at index 0",
+        "program.py line 7: text[end:] with end==0 leaves text unchanged so while len(text) > cols never terminates"
+      ],
+      "reason": "Static code path shows zero-progress iteration is possible, a closely related hang distinct from the reported truncation.",
+      "fix_in": "code"
+    }
+  ],
+  "findings": {
+    "issues": [
+      {
+        "category": "correctness",
+        "evidence": [
+          "tests/test_public.py::test_contract case_0: Right contains one more item ' dignity and the higher aims of our existence.'",
+          "tests/test_public.py::test_contract case_1: Right contains one more item ' existence.'",
+          "program.py lines 3-10: while len(text) > cols loop appends chunks but return lines never appends final remainder"
+        ],
+        "fix": "Added lines.append(text) before return lines to append the remaining text after the while loop.",
+        "hypothesis_ids": [
+          "H1"
+        ],
+        "root_cause": "wrap() drops the final chunk because it returns without appending the remaining text after the loop",
+        "severity": "high",
+        "title": "wrap() truncates output by dropping final remainder"
+      },
+      {
+        "category": "reliability",
+        "evidence": [
+          "program.py line 4: end = text.rfind(' ', 0, cols+1) can return 0 when only space in window is at index 0",
+          "program.py line 7: text[end:] with end==0 leaves text unchanged so while len(text) > cols never terminates"
+        ],
+        "fix": "Changed `if end == -1:` to `if end <= 0:` so end falls back to cols when rfind returns 0, ensuring progress.",
+        "hypothesis_ids": [
+          "H2"
+        ],
+        "root_cause": "wrap() can loop forever when the only space in window is at index 0 (end==0 makes no progress)",
+        "severity": "high",
+        "title": "wrap() zero-progress loop when rfind returns 0"
+      }
+    ],
+    "summary": "wrap() disagreed with documented contract with truncated output. Confirmed H1 final-chunk truncation and H2 zero-progress hang. Patch appends final remainder and changes end==-1 to end<=0. Verification passed 2/2 contract cases with no failures or regressions. Independent review verdict approve."
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -2,10 +2,11 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n+    lines.append(text)\n \n     return lines\n \n",
+  "excluded_tests": [],
+  "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+  "verification": {
+    "verified": true,
+    "fixed": [
+      "tests/test_public.py::test_contract[case_0]",
+      "tests/test_public.py::test_contract[case_1]"
+    ],
+    "still_failing": [],
+    "regressions": [],
+    "missing": [],
+    "before": {
+      "failed": 2
+    },
+    "after": {
+      "passed": 2
+    }
+  },
+  "outcome": "fixed",
+  "second_opinion": {
+    "verdict": "approve",
+    "confidence": "high",
+    "summary": "Patch directly fixes both root causes: appending final remainder eliminates truncation and `end <= 0` prevents zero-progress loop. Test results show 2/2 contract cases now pass with no regressions; implementation preserves concatenation and max-length invariants.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "Failures show output missing exactly final chunk and code has loop that appends inside loop but returns without remainder."
+      },
+      {
+        "id": "H2",
+        "assessment": "supported",
+        "note": "Static path end==0 with text[end:] leaves text unchanged, causing infinite loop; patch changes guard to end <=0 to force progress."
+      }
+    ],
+    "risks": [
+      "Empty input now returns [''] vs previous [] \u2013 low impact and still satisfies concatenation invariant but untested."
+    ],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 4717,
+    "duration_s": 14.3
+  },
+  "usage": {
+    "input_tokens": 41736,
+    "output_tokens": 13129,
+    "cached_tokens": 12138,
+    "model_calls": 11,
+    "tool_calls": 9,
+    "by_phase": {
+      "investigate": 36102,
+      "fix": 15472,
+      "report": 3291
+    }
+  },
+  "timing": {
+    "prepare_s": 0.0,
+    "sandbox_s": 1.43,
+    "model_s": 152.91,
+    "tools_s": 1.97,
+    "verify_s": 0.83,
+    "review_s": 14.33,
+    "by_phase": {
+      "investigate": 108.47,
+      "fix": 39.01,
+      "review": 14.34,
+      "report": 8.24
+    }
+  },
+  "duration_s": 171.5,
+  "events": [
+    {
+      "seq": 1,
+      "t": 0.55,
+      "type": "start",
+      "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+      "provider": "meta",
+      "model": "muse-spark-1.3",
+      "isolation": "docker"
+    },
+    {
+      "seq": 2,
+      "t": 1.42,
+      "type": "baseline",
+      "tests": {
+        "tests/test_public.py::test_contract[case_0]": "failed",
+        "tests/test_public.py::test_contract[case_1]": "failed"
+      },
+      "tally": {
+        "failed": 2
+      }
+    },
+    {
+      "seq": 3,
+      "t": 1.43,
+      "type": "brief",
+      "text": "Workspace files: program.py, tests/test_public.py\nTests: 0 passed, 2 failing\n  FAILING tests/test_public.py::test_contract[case_0]: AssertionError: assert ['The leaves ...ound as', ...] == ['The leaves ...ound as', ...]\n  FAILING tests/test_public.py::test_contract[case_1]: AssertionError: assert ['The leaves ...the sea', ...] == ['The leaves ...the sea', ...]",
+      "supplied_to_model": true
+    },
+    {
+      "seq": 4,
+      "t": 1.43,
+      "type": "phase",
+      "phase": "investigate"
+    },
+    {
+      "seq": 5,
+      "t": 2.98,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Fixing the contract mismatch \u2014 inspecting the code and failing cases."
+    },
+    {
+      "seq": 6,
+      "t": 2.98,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 7,
+      "t": 2.98,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"program.py\", \"lines\": \"1-28 of 28\", \"content\": \"   1  def wrap(text, cols):\\n   2      lines = []\\n   3      while len(text) > cols:\\n   4          end = text.rfind(' ', 0, cols + 1)\\n   5          if end == -1:\\n   6              end = cols\\n   7          line, text = text[:end], text[end:]\\n   8          lines.append(line)\\n   9  \\n  10      return lines\\n  11  \\n  12  \\\"\\\"\\\"\\n  13  Wrap Text\\n  14  \\n  15  Given a long string and a column width, break the string on spaces into a list of lines such that each line is no longer than the column width.\\n  16  \\n  17  Input:\\n  18      text: The starting text.\\n  19      cols: The target column width, i.e. the maximum length of any single line after wrapping.\\n  20  \\n  21  Precondition:\\n  22      cols > 0.\\n  23  \\n  24  Output:\\n  25      An ordered list of strings, each no longer than the column width, such that the concatenation of the strings returns the original text,\\n  26  and such that no word in the original text is broken into two parts unless necessary.  The original amount of spaces are preserved (e.g. spaces\\n  27  at the start or end of each line aren't trimmed.),Wrapping Text\\n  28  \\\"\\\"\\\"\"}"
+    },
+    {
+      "seq": 8,
+      "t": 2.98,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "tests/test_public.py"
+      }
+    },
+    {
+      "seq": 9,
+      "t": 2.98,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"tests/test_public.py\", \"lines\": \"1-7 of 7\", \"content\": \"   1  import json\\n   2  import pytest\\n   3  from program import wrap as function\\n   4  CASES = json.loads('[[[\\\"The leaves did not stir on the trees, grasshoppers chirruped, and the monotonous hollow sound of the sea rising up from below, spoke of the peace, of the eternal sleep awaiting us. So it must have sounded when there was no Yalta, no Oreanda here; so it sounds now, and it will sound as indifferently and monotonously when we are all no more. And in this constancy, in this complete indifference to the life and death of each of us, there lies hid, perhaps, a pledge of our eternal salvation, of the unceasing movement of life upon earth, of unceasing progress towards perfection. Sitting beside a young woman who in the dawn seemed so lovely, soothed and spellbound in these magical surroundings - the sea, mountains, clouds, the open sky - Gurov thought how in reality everything is beautiful in this world when one reflects: everything except what we think or do ourselves when we forget our human dignity and the higher aims of our existence.\\\", 50], [\\\"The leaves did not stir on the trees, grasshoppers\\\", \\\" chirruped, and the monotonous hollow sound of the\\\", \\\" sea rising up from below, spoke of the peace, of\\\", \\\" the eternal sleep awaiting us. So it must have\\\", \\\" sounded when there was no Yalta, no Oreanda here;\\\", \\\" so it sounds now, and it will sound as\\\", \\\" indifferently and monotonously when we are all no\\\", \\\" more. And in this constancy, in this complete\\\", \\\" indifference to the life and death of each of us,\\\", \\\" there lies hid, perhaps, a pledge of our eternal\\\", \\\" salvation, of the unceasing movement of life upon\\\", \\\" earth, of unceasing progress towards perfection.\\\", \\\" Sitting beside a young woman who in the dawn\\\", \\\" seemed so lovely, soothed and spellbound in these\\\", \\\" magical surroundings - the sea, mountains,\\\", \\\" clouds, the open sky - Gurov thought how in\\\", \\\" real"
+    },
+    {
+      "seq": 10,
+      "t": 18.15,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "I've pinpointed the likely flaw \u2014 now confirming it against the test evidence.",
+      "summary": "Analyzing a text wrap function for a missing final remainder append and space-preservation behavior."
+    },
+    {
+      "seq": 11,
+      "t": 18.16,
+      "type": "hypothesis",
+      "id": "H1",
+      "claim": "wrap() drops the final chunk because it returns without appending the remaining text after the loop",
+      "symptom": "Both contract cases fail with truncated output (missing last line)",
+      "next_check": "Run public tests and inspect actual vs expected output tail",
+      "status": "open",
+      "evidence": [],
+      "reason": "",
+      "fix_in": "code"
+    },
+    {
+      "seq": 12,
+      "t": 31.38,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "My leading hypothesis is a missing final line \u2014 now gathering proof."
+    },
+    {
+      "seq": 13,
+      "t": 31.38,
+      "type": "tool_call",
+      "tool": "run_tests",
+      "args": {
+        "selector": "tests/test_public.py::test_contract"
+      }
+    },
+    {
+      "seq": 14,
+      "t": 32.24,
+      "type": "tool_result",
+      "tool": "run_tests",
+      "preview": "{\"exit_code\": 1, \"summary\": \"2 failed in 0.06s\", \"output\": \"FF                                                                       [100%]\\n=================================== FAILURES ===================================\\n____________________________ test_contract[case_0] _____________________________\\ntests/test_public.py:7: in test_contract\\n    assert function(*arguments) == expected\\nE   AssertionError: assert ['The leaves ...ound as', ...] == ['The leaves ...ound as', ...]\\nE     \\nE     Right contains one more item: ' dignity and the higher aims of our existence.'\\nE     Use -v to get more diff\\n____________________________ test_contract[case_1] _____________________________\\ntests/test_public.py:7: in test_contract\\n    assert function(*arguments) == expected\\nE   AssertionError: assert ['The leaves ...the sea', ...] == ['The leaves ...the sea', ...]\\nE     \\nE     Right contains one more item: ' existence.'\\nE     Use -v to get more diff\\n=========================== short test summary info ============================\\nFAILED tests/test_public.py::test_contract[case_0] - AssertionError: assert [...\\nFAILED tests/test_public.py::test_contract[case_1] - AssertionError: assert [...\\n2 failed in 0.06s\\n\"}"
+    },
+    {
+      "seq": 15,
+      "t": 59.0,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Analyzing text-wrapping code for a missing remainder bug and edge case when length equals column width. Evaluating empty-input behavior and leading-space handling for the wrap function. Identifying an infinite-loop risk when the first space is at index zero and proposing a fallback split. Evaluating whether to add an end<=0 guard for leading-space edge cases despite no confirmed symptom. Extending the wrap logic to handle leading-space edge cases and remainder appending. Addressing the end==0 infinite-loop edge case and empty-string return behavior. Confirming the split-count mismatch via test output and noting the static end==0 termination risk."
+    },
+    {
+      "seq": 16,
+      "t": 59.01,
+      "type": "hypothesis",
+      "id": "H2",
+      "claim": "wrap() can loop forever when the only space in window is at index 0 (end==0 makes no progress)",
+      "symptom": "Closely related robustness defect (potential hang on leading-space/long-word inputs)",
+      "next_check": "Static inspection of program.py lines 4-8 showing text[end:] with end==0 never shrinks",
+      "status": "open",
+      "evidence": [],
+      "reason": "",
+      "fix_in": "code"
+    },
+    {
+      "seq": 17,
+      "t": 75.59,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Confirming the first hypothesis about the loop condition and remainder, and analyzing the second hypothesis on leading-space handling. Confirming the first hypothesis with file-path evidence and resolving the second related defect. Resolving the second hypothesis as rejected after verifying it does not explain the reported failures."
+    },
+    {
+      "seq": 18,
+      "t": 75.59,
+      "type": "hypothesis_update",
+      "id": "H1",
+      "claim": "wrap() drops the final chunk because it returns without appending the remaining text after the loop",
+      "symptom": "Both contract cases fail with truncated output (missing last line)",
+      "next_check": "Run public tests and inspect actual vs expected output tail",
+      "status": "confirmed",
+      "evidence": [
+        "tests/test_public.py::test_contract case_0: Right contains one more item ' dignity and the higher aims of our existence.'",
+        "tests/test_public.py::test_contract case_1: Right contains one more item ' existence.'",
+        "program.py lines 3-10: while len(text) > cols loop appends chunks but return lines never appends final remainder"
+      ],
+      "reason": "Both failures show actual output equals expected prefix minus the final chunk; loop exits when remainder fits but code returns without appending it.",
+      "fix_in": "code"
+    },
+    {
+      "seq": 19,
+      "t": 92.17,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Analyzing static code evidence to confirm an infinite loop hypothesis without modifying code. Identifying a deterministic wrap edge case that can cause an infinite loop from static line evidence. Resolving the secondary wrap edge case and finalizing the minimal code fix scope."
+    },
+    {
+      "seq": 20,
+      "t": 92.17,
+      "type": "hypothesis_update",
+      "id": "H2",
+      "claim": "wrap() can loop forever when the only space in window is at index 0 (end==0 makes no progress)",
+      "symptom": "Closely related robustness defect (potential hang on leading-space/long-word inputs)",
+      "next_check": "Static inspection of program.py lines 4-8 showing text[end:] with end==0 never shrinks",
+      "status": "confirmed",
+      "evidence": [
+        "program.py line 4: end = text.rfind(' ', 0, cols+1) can return 0 when only space in window is at index 0",
+        "program.py line 7: text[end:] with end==0 leaves text unchanged so while len(text) > cols never terminates"
+      ],
+      "reason": "Static code path shows zero-progress iteration is possible, a closely related hang distinct from the reported truncation.",
+      "fix_in": "code"
+    },
+    {
+      "seq": 21,
+      "t": 109.89,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Summarizing investigation findings without code changes and noting missing regression test requirement. Evaluating whether to add a regression test for the closely related defect given the timeout risk and phase constraints."
+    },
+    {
+      "seq": 22,
+      "t": 109.9,
+      "type": "message",
+      "phase": "investigate",
+      "text": "Investigation complete.\n\n- H1 confirmed: `wrap` in `program.py:3-10` never appends the final remainder \u2014 both `test_contract` cases fail with \"Right contains one more item\" (`case_0` missing `' dignity and the higher aims of our existence.'`, `case_1` missing `' existence.'`).\n- H2 confirmed (related): `end = text.rfind(' ',0,cols+1)` can return 0, then `text[end:]` makes no progress \u2192 potential infinite loop."
+    },
+    {
+      "seq": 23,
+      "t": 109.9,
+      "type": "phase",
+      "phase": "fix"
+    },
+    {
+      "seq": 24,
+      "t": 121.9,
+      "type": "thinking",
+      "phase": "fix",
+      "text": "Applying the minimal fix for the truncation and hang.",
+      "summary": "Analyzing the text wrapping function to fix the infinite loop and append remaining text. Adjusting the wrap fallback to use cols when no space is found and handling the empty-input case."
+    },
+    {
+      "seq": 25,
+      "t": 121.9,
+      "type": "tool_call",
+      "tool": "edit_file",
+      "args": {
+        "new": "    while len(text) > cols:\n        end = text.rfind(' ', 0, cols + 1)\n        if end <= 0:\n            end = cols\n        line, text = text[:end], text[end:]\n        lines.append(line)\n    lines.append(text)\n\n    return lines",
+        "old": "    while len(text) > cols:\n        end = text.rfind(' ', 0, cols + 1)\n        if end == -1:\n            end = cols\n        line, text = text[:end], text[end:]\n        lines.append(line)\n\n    return lines",
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 26,
+      "t": 121.9,
+      "type": "tool_result",
+      "tool": "edit_file",
+      "preview": "{\"edited\": \"program.py\"}"
+    },
+    {
+      "seq": 27,
+      "t": 121.91,
+      "type": "patch",
+      "path": "program.py",
+      "diff": "--- a/program.py\n+++ b/program.py\n@@ -2,10 +2,11 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n+    lines.append(text)\n \n     return lines\n \n"
+    },
+    {
+      "seq": 28,
+      "t": 135.71,
+      "type": "thinking",
+      "phase": "fix",
+      "text": "Fix applied \u2014 verifying it resolves the failures."
+    },
+    {
+      "seq": 29,
+      "t": 135.71,
+      "type": "tool_call",
+      "tool": "run_tests",
+      "args": {}
+    },
+    {
+      "seq": 30,
+      "t": 136.8,
+      "type": "tool_result",
+      "tool": "run_tests",
+      "preview": "{\"exit_code\": 0, \"summary\": \"2 passed in 0.09s\"}"
+    },
+    {
+      "seq": 31,
+      "t": 148.07,
+      "type": "message",
+      "phase": "fix",
+      "text": "Fixed `wrap` in `program.py`: append the final remainder after the loop, and treat `end <= 0` as no usable space so `end = cols` guarantees progress.\n\nVerification: `tests/test_public.py` \u2014 2 passed."
+    },
+    {
+      "seq": 32,
+      "t": 148.91,
+      "type": "verification",
+      "attempt": 1,
+      "tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      },
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    },
+    {
+      "seq": 33,
+      "t": 148.91,
+      "type": "phase",
+      "phase": "review"
+    },
+    {
+      "seq": 34,
+      "t": 163.24,
+      "type": "second_opinion",
+      "verdict": "approve",
+      "confidence": "high",
+      "summary": "Patch directly fixes both root causes: appending final remainder eliminates truncation and `end <= 0` prevents zero-progress loop. Test results show 2/2 contract cases now pass with no regressions; implementation preserves concatenation and max-length invariants.",
+      "hypotheses": [
+        {
+          "id": "H1",
+          "assessment": "supported",
+          "note": "Failures show output missing exactly final chunk and code has loop that appends inside loop but returns without remainder."
+        },
+        {
+          "id": "H2",
+          "assessment": "supported",
+          "note": "Static path end==0 with text[end:] leaves text unchanged, causing infinite loop; patch changes guard to end <=0 to force progress."
+        }
+      ],
+      "risks": [
+        "Empty input now returns [''] vs previous [] \u2013 low impact and still satisfies concatenation invariant but untested."
+      ],
+      "provider": "baseten",
+      "model": "meta-models/muse-spark-open-1026",
+      "tokens": 4717,
+      "duration_s": 14.3
+    },
+    {
+      "seq": 35,
+      "t": 163.25,
+      "type": "phase",
+      "phase": "report"
+    },
+    {
+      "seq": 36,
+      "t": 171.5,
+      "type": "report",
+      "report": {
+        "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+        "provider": "meta",
+        "model": "muse-spark-1.3",
+        "isolation": "docker",
+        "hypotheses": [
+          {
+            "id": "H1",
+            "claim": "wrap() drops the final chunk because it returns without appending the remaining text after the loop",
+            "symptom": "Both contract cases fail with truncated output (missing last line)",
+            "next_check": "Run public tests and inspect actual vs expected output tail",
+            "status": "confirmed",
+            "evidence": [
+              "tests/test_public.py::test_contract case_0: Right contains one more item ' dignity and the higher aims of our existence.'",
+              "tests/test_public.py::test_contract case_1: Right contains one more item ' existence.'",
+              "program.py lines 3-10: while len(text) > cols loop appends chunks but return lines never appends final remainder"
+            ],
+            "reason": "Both failures show actual output equals expected prefix minus the final chunk; loop exits when remainder fits but code returns without appending it.",
+            "fix_in": "code"
+          },
+          {
+            "id": "H2",
+            "claim": "wrap() can loop forever when the only space in window is at index 0 (end==0 makes no progress)",
+            "symptom": "Closely related robustness defect (potential hang on leading-space/long-word inputs)",
+            "next_check": "Static inspection of program.py lines 4-8 showing text[end:] with end==0 never shrinks",
+            "status": "confirmed",
+            "evidence": [
+              "program.py line 4: end = text.rfind(' ', 0, cols+1) can return 0 when only space in window is at index 0",
+              "program.py line 7: text[end:] with end==0 leaves text unchanged so while len(text) > cols never terminates"
+            ],
+            "reason": "Static code path shows zero-progress iteration is possible, a closely related hang distinct from the reported truncation.",
+            "fix_in": "code"
+          }
+        ],
+        "findings": {
+          "issues": [
+            {
+              "category": "correctness",
+              "evidence": [
+                "tests/test_public.py::test_contract case_0: Right contains one more item ' dignity and the higher aims of our existence.'",
+                "tests/test_public.py::test_contract case_1: Right contains one more item ' existence.'",
+                "program.py lines 3-10: while len(text) > cols loop appends chunks but return lines never appends final remainder"
+              ],
+              "fix": "Added lines.append(text) before return lines to append the remaining text after the while loop.",
+              "hypothesis_ids": [
+                "H1"
+              ],
+              "root_cause": "wrap() drops the final chunk because it returns without appending the remaining text after the loop",
+              "severity": "high",
+              "title": "wrap() truncates output by dropping final remainder"
+            },
+            {
+              "category": "reliability",
+              "evidence": [
+                "program.py line 4: end = text.rfind(' ', 0, cols+1) can return 0 when only space in window is at index 0",
+                "program.py line 7: text[end:] with end==0 leaves text unchanged so while len(text) > cols never terminates"
+              ],
+              "fix": "Changed `if end == -1:` to `if end <= 0:` so end falls back to cols when rfind returns 0, ensuring progress.",
+              "hypothesis_ids": [
+                "H2"
+              ],
+              "root_cause": "wrap() can loop forever when the only space in window is at index 0 (end==0 makes no progress)",
+              "severity": "high",
+              "title": "wrap() zero-progress loop when rfind returns 0"
+            }
+          ],
+          "summary": "wrap() disagreed with documented contract with truncated output. Confirmed H1 final-chunk truncation and H2 zero-progress hang. Patch appends final remainder and changes end==-1 to end<=0. Verification passed 2/2 contract cases with no failures or regressions. Independent review verdict approve."
+        },
+        "diff": "--- a/program.py\n+++ b/program.py\n@@ -2,10 +2,11 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n+    lines.append(text)\n \n     return lines\n \n",
+        "excluded_tests": [],
+        "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+        "verification": {
+          "verified": true,
+          "fixed": [
+            "tests/test_public.py::test_contract[case_0]",
+            "tests/test_public.py::test_contract[case_1]"
+          ],
+          "still_failing": [],
+          "regressions": [],
+          "missing": [],
+          "before": {
+            "failed": 2
+          },
+          "after": {
+            "passed": 2
+          }
+        },
+        "outcome": "fixed",
+        "second_opinion": {
+          "verdict": "approve",
+          "confidence": "high",
+          "summary": "Patch directly fixes both root causes: appending final remainder eliminates truncation and `end <= 0` prevents zero-progress loop. Test results show 2/2 contract cases now pass with no regressions; implementation preserves concatenation and max-length invariants.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "assessment": "supported",
+              "note": "Failures show output missing exactly final chunk and code has loop that appends inside loop but returns without remainder."
+            },
+            {
+              "id": "H2",
+              "assessment": "supported",
+              "note": "Static path end==0 with text[end:] leaves text unchanged, causing infinite loop; patch changes guard to end <=0 to force progress."
+            }
+          ],
+          "risks": [
+            "Empty input now returns [''] vs previous [] \u2013 low impact and still satisfies concatenation invariant but untested."
+          ],
+          "provider": "baseten",
+          "model": "meta-models/muse-spark-open-1026",
+          "tokens": 4717,
+          "duration_s": 14.3
+        },
+        "usage": {
+          "input_tokens": 41736,
+          "output_tokens": 13129,
+          "cached_tokens": 12138,
+          "model_calls": 11,
+          "tool_calls": 9,
+          "by_phase": {
+            "investigate": 36102,
+            "fix": 15472,
+            "report": 3291
+          }
+        },
+        "timing": {
+          "prepare_s": 0.0,
+          "sandbox_s": 1.43,
+          "model_s": 152.91,
+          "tools_s": 1.97,
+          "verify_s": 0.83,
+          "review_s": 14.33,
+          "by_phase": {
+            "investigate": 108.47,
+            "fix": 39.01,
+            "review": 14.34,
+            "report": 8.24
+          }
+        },
+        "duration_s": 171.5
+      }
+    }
+  ]
+}

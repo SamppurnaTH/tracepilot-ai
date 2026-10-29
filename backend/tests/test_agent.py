@@ -124,6 +124,33 @@ def test_full_run_verifies_fix():
     assert "edit_file" not in first_tools and "propose_hypothesis" in first_tools
 
 
+def test_run_reports_where_the_time_went():
+    import time
+
+    client = FakeClient(
+        investigation_script()
+        + [
+            [call("edit_file", path="orders_api/app.py", old=COUPON_BUG, new=COUPON_FIX), call("edit_file", path="orders_api/app.py", old=IDOR_BUG, new=IDOR_FIX)],
+            "Fixed both.",
+            REPORT,
+        ]
+    )
+    # Started 3 seconds ago, as when the API spends that long preparing the sandbox image first.
+    inv = Investigation("orders_api has errors", SAMPLE_APP, client=client, model="fake", isolation="process", started_at=time.time() - 3)
+    report = inv.run()
+    timing = report["timing"]
+    assert 2.9 <= timing["prepare_s"] <= 4 and report["duration_s"] >= timing["prepare_s"]
+    assert set(timing["by_phase"]) == {"investigate", "fix", "report"}
+    assert timing["sandbox_s"] > 0 and timing["verify_s"] > 0
+    assert inv.timing["tools_s"] > 0  # many sub-millisecond tool calls still add up: nothing is rounded away
+    # The parts never add up to more than the run itself.
+    parts = timing["prepare_s"] + timing["sandbox_s"] + sum(timing["by_phase"].values())
+    assert parts <= report["duration_s"] + 0.2
+    assert timing["model_s"] + timing["tools_s"] + timing["verify_s"] <= sum(timing["by_phase"].values()) + 0.2
+    # Event times count from when the user started, so the first event comes after the preparation.
+    assert report["events"][0]["t"] >= 2.9
+
+
 def test_recovers_when_server_loses_conversation():
     import httpx
     import openai

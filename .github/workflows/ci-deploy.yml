@@ -32,7 +32,13 @@ jobs:
           PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
         run: python -m pytest backend/tests -q
       - name: Validate deployment scripts
-        run: bash -n deploy/setup.sh deploy/update.sh deploy/receive-deploy.sh deploy/bootstrap-ci.sh
+        run: for f in deploy/*.sh; do bash -n "$f" || exit 1; done
+      - name: Check published evidence matches saved observations
+        run: |
+          python backend/scripts/research_summary.py
+          python backend/scripts/service_summary.py
+          python backend/scripts/judge_evidence.py
+          git diff --exit-code -- eval/STATISTICS.md eval/research/summary.json eval/research/RESULTS.md eval/research/observations.csv eval/service-ablation/summary.json eval/service-ablation/RESULTS.md eval/service-ablation/observations.csv frontend/public/evidence.json frontend/public/research.json frontend/public/research.csv frontend/public/service-ablation.json frontend/public/reviewer-discovery.json frontend/public/security-probe.json frontend/public/abstention-probe.json frontend/public/judge/
 
   frontend:
     name: Frontend checks
@@ -52,6 +58,7 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run lint
+      - run: npm run check:demo
       - name: Production build and TypeScript checks
         env:
           NEXT_PUBLIC_API_URL: ${{ vars.NEXT_PUBLIC_API_URL }}

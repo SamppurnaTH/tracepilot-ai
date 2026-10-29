@@ -60,27 +60,43 @@ export async function loadRecording(file: string): Promise<Recording> {
   return resp.json();
 }
 
+export class LiveRunError extends Error {
+  constructor(message: string, public status: number) { super(message); }
+}
+
+export function recordingFallback(error: unknown): string | null {
+  if (error instanceof LiveRunError) {
+    if (error.status === 429) return "capacity";
+    if (error.status >= 500) return "unavailable";
+    return null; // Permission and validation errors must remain visible.
+  }
+  return error instanceof TypeError || (error instanceof Error && ["TimeoutError", "AbortError"].includes(error.name)) ? "unavailable" : null;
+}
+
 export async function startLiveRun(scenario: string): Promise<string> {
   const resp = await apiFetch(`${API_URL}/api/investigations`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ scenario }),
+    signal: AbortSignal.timeout(15000),
   });
   const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) throw new Error(data.detail ?? `The backend refused the run (HTTP ${resp.status})`);
+  if (!resp.ok) throw new LiveRunError(data.detail ?? `The backend refused the run (HTTP ${resp.status})`, resp.status);
   return data.id as string;
 }
 
 /** Subscribe to a live run's events. Returns a function that closes the stream. */
-export function streamRun(runId: string, onEvent: (e: RunEvent) => void, onEnd: () => void): () => void {
+export function streamRun(runId: string, onEvent: (e: RunEvent) => void, onEnd: () => void, onError?: (error: unknown) => void): () => void {
   const controller = new AbortController();
   (async () => {
     try {
       const response = await apiFetch(`${API_URL}/api/investigations/${encodeURIComponent(runId)}/events`, { signal: controller.signal });
-      if (!response.ok || !response.body) throw new Error("Investigation stream unavailable");
+      if (!response.ok) throw new LiveRunError(`Investigation stream unavailable (HTTP ${response.status})`, response.status);
+      if (!response.body) throw new TypeError("Investigation stream unavailable");
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let pending = "";
+      let terminal = false;
       while (!controller.signal.aborted) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -92,10 +108,15 @@ export function streamRun(runId: string, onEvent: (e: RunEvent) => void, onEnd: 
           const lines = frame.split("\n");
           if (lines.some((line) => line === "event: end")) { await reader.cancel(); onEnd(); return; }
           const data = lines.filter((line) => line.startsWith("data: ")).map((line) => line.slice(6)).join("\n");
-          if (data) onEvent(JSON.parse(data));
+          if (data) {
+            const event = JSON.parse(data);
+            terminal ||= ["report", "cancelled", "error"].includes(event.type);
+            onEvent(event);
+          }
         }
       }
-    } catch (error) { if (controller.signal.aborted) return; console.error("Investigation stream ended", error); }
+      if (!controller.signal.aborted && !terminal) throw new TypeError("Live stream closed before an outcome");
+    } catch (error) { if (controller.signal.aborted) return; console.error("Investigation stream ended", error); onError?.(error); }
     onEnd();
   })();
   return () => controller.abort();

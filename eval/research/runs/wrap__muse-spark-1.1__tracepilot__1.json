@@ -1,0 +1,582 @@
+{
+  "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+  "provider": "meta",
+  "model": "muse-spark-1.1",
+  "isolation": "docker",
+  "hypotheses": [
+    {
+      "id": "H1",
+      "claim": "wrap returns lines without final remainder, dropping last chunk",
+      "symptom": "test_contract case 0 and 1 fail due to missing last line",
+      "next_check": "inspect program.py lines 2-10 logic, run reproduction comparing output length",
+      "status": "confirmed",
+      "evidence": [
+        "program.py:3 while len(text) > cols:",
+        "program.py:10 return lines without final text",
+        "tests/test_public.py::test_contract[case_0] Right contains one more item: ' dignity and the higher aims of our existence.'",
+        "tests/test_public.py::test_contract[case_1] Right contains one more item: ' existence.'"
+      ],
+      "reason": "Loop exits when len(text)<=cols and returns only collected lines, missing the last piece. Tests show expected list has one extra final line.",
+      "fix_in": "code"
+    },
+    {
+      "id": "H2",
+      "claim": "wrap can infinite loop when only breakable space is at index 0 (leading space + long word)",
+      "symptom": "potential hang or empty string line violating spec",
+      "next_check": "simulate text \" a...long\" with cols small and trace loop",
+      "status": "confirmed",
+      "evidence": [
+        "program.py:4 end = text.rfind(' ', 0, cols + 1) can be 0",
+        "program.py:7 line, text = text[:end], text[end:] with end=0 gives zero progress"
+      ],
+      "reason": "If rfind returns 0 (only space at start within window), slicing yields empty line and unchanged text, causing infinite loop. This violates progress guarantee.",
+      "fix_in": "code"
+    }
+  ],
+  "findings": {
+    "issues": [
+      {
+        "category": "other",
+        "evidence": [
+          "program.py:3 while len(text) > cols:",
+          "program.py:10 return lines without final text",
+          "tests/test_public.py::test_contract[case_0] Right contains one more item: ' dignity and the higher aims of our existence.'",
+          "tests/test_public.py::test_contract[case_1] Right contains one more item: ' existence.'"
+        ],
+        "fix": "Changed program.py: code fix for H1 - added final remainder handling:\n  if text:\n      lines.append(text)\nbefore return lines.\nRecommended, not in this patch: No additional actions.",
+        "hypothesis_ids": [
+          "H1"
+        ],
+        "root_cause": "Incident: The function's behavior disagrees with its documented contract and supplied examples.\n\nClaim [H1] - wrap returns lines without final remainder, dropping last chunk\nSymptom: test_contract case 0 and 1 fail due to missing last line\nStatus: confirmed\nReason: Loop exits when len(text)<=cols and returns only collected lines, missing the last piece. Tests show expected list has one extra final line.",
+        "severity": "medium",
+        "title": "wrap returns lines without final remainder, dropping last chunk"
+      },
+      {
+        "category": "other",
+        "evidence": [
+          "program.py:4 end = text.rfind(' ', 0, cols + 1) can be 0",
+          "program.py:7 line, text = text[:end], text[end:] with end=0 gives zero progress"
+        ],
+        "fix": "Changed program.py: code fix for H2 - changed condition from\n  if end == -1:\nto\n  if end <= 0:\n      end = cols\n to prevent zero-progress slice when rfind returns 0.\nRecommended, not in this patch: No additional actions.",
+        "hypothesis_ids": [
+          "H2"
+        ],
+        "root_cause": "Claim [H2] - wrap can infinite loop when only breakable space is at index 0 (leading space + long word)\nSymptom: potential hang or empty string line violating spec\nStatus: confirmed\nReason: If rfind returns 0 (only space at start within window), slicing yields empty line and unchanged text, causing infinite loop. This violates progress guarantee.",
+        "severity": "medium",
+        "title": "wrap can infinite loop when only breakable space is at index 0"
+      }
+    ],
+    "summary": "Final Investigation Report\n\nIncident: The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.\n\nFindings - 2 confirmed root causes in code:\n\nH1 (confirmed): wrap returns lines without final remainder. Evidence shows loop while len(text) > cols exits and returns without final text, causing test_contract case_0 and case_1 to miss one item.\n\nH2 (confirmed): wrap can infinite loop when rfind finds space at index 0. Evidence shows end = text.rfind(' ', 0, cols+1) can be 0, and line, text = text[:end], text[end:] with end=0 gives zero progress.\n\nPatch Applied:\n--- a/program.py\n+++ b/program.py\n@@ -2,11 +2,12 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n-\n+    if text:\n+        lines.append(text)\n     return lines\n\nThe patch correctly adds the missing final chunk (fixes H1) and changes end==-1 to end<=0 to eliminate zero-progress infinite loop (fixes H2). Partitioning now guarantees ''.join(lines)==text.\n\nVerification: verified=true\nFixed: tests/test_public.py::test_contract[case_0], tests/test_public.py::test_contract[case_1]\nStill failing: []\nRegressions: []\n\nIndependent Review: verdict=approve, summary=\"Patch correctly adds the missing final chunk (fixes dropped remainder) and changes end==-1 to end<=0 to eliminate zero-progress infinite loop when only space is at index 0. Partitioning logic now guarantees ''.join(lines)==text and len(line)<=cols with proper space handling.\", risks=[]"
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -2,11 +2,12 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n-\n+    if text:\n+        lines.append(text)\n     return lines\n \n \"\"\"\n",
+  "excluded_tests": [],
+  "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+  "verification": {
+    "verified": true,
+    "fixed": [
+      "tests/test_public.py::test_contract[case_0]",
+      "tests/test_public.py::test_contract[case_1]"
+    ],
+    "still_failing": [],
+    "regressions": [],
+    "missing": [],
+    "before": {
+      "failed": 2
+    },
+    "after": {
+      "passed": 2
+    }
+  },
+  "outcome": "fixed",
+  "second_opinion": {
+    "verdict": "approve",
+    "confidence": "high",
+    "summary": "Patch correctly adds the missing final chunk (fixes dropped remainder) and changes end==-1 to end<=0 to eliminate zero-progress infinite loop when only space is at index 0. Partitioning logic now guarantees ''.join(lines)==text and len(line)<=cols with proper space handling.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "supported",
+        "note": "Loop exit without appending remainder is proven by code and by two failing contract tests showing one missing final element; adding if text: lines.append(text) directly fixes root cause."
+      },
+      {
+        "id": "H2",
+        "assessment": "supported",
+        "note": "rfind returning 0 with original if end==-1 yields text[:0]=='' and text[0:]==text, proven infinite loop; changing to end<=0 forces progress at cols, correctly handled."
+      }
+    ],
+    "risks": [],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 5078,
+    "duration_s": 14.6
+  },
+  "usage": {
+    "input_tokens": 33010,
+    "output_tokens": 15515,
+    "cached_tokens": 25579,
+    "model_calls": 9,
+    "tool_calls": 9,
+    "by_phase": {
+      "investigate": 28264,
+      "fix": 16247,
+      "report": 4014
+    }
+  },
+  "timing": {
+    "prepare_s": 0.0,
+    "sandbox_s": 1.52,
+    "model_s": 160.07,
+    "tools_s": 2.97,
+    "verify_s": 1.09,
+    "review_s": 14.57,
+    "by_phase": {
+      "investigate": 105.51,
+      "fix": 48.91,
+      "review": 14.58,
+      "report": 9.71
+    }
+  },
+  "duration_s": 180.2,
+  "events": [
+    {
+      "seq": 1,
+      "t": 0.54,
+      "type": "start",
+      "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+      "provider": "meta",
+      "model": "muse-spark-1.1",
+      "isolation": "docker"
+    },
+    {
+      "seq": 2,
+      "t": 1.52,
+      "type": "baseline",
+      "tests": {
+        "tests/test_public.py::test_contract[case_0]": "failed",
+        "tests/test_public.py::test_contract[case_1]": "failed"
+      },
+      "tally": {
+        "failed": 2
+      }
+    },
+    {
+      "seq": 3,
+      "t": 1.52,
+      "type": "brief",
+      "text": "Workspace files: program.py, tests/test_public.py\nTests: 0 passed, 2 failing\n  FAILING tests/test_public.py::test_contract[case_0]: AssertionError: assert ['The leaves ...ound as', ...] == ['The leaves ...ound as', ...]\n  FAILING tests/test_public.py::test_contract[case_1]: AssertionError: assert ['The leaves ...the sea', ...] == ['The leaves ...the sea', ...]",
+      "supplied_to_model": true
+    },
+    {
+      "seq": 4,
+      "t": 1.52,
+      "type": "phase",
+      "phase": "investigate"
+    },
+    {
+      "seq": 5,
+      "t": 3.07,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "program.py"
+      }
+    },
+    {
+      "seq": 6,
+      "t": 3.07,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"program.py\", \"lines\": \"1-28 of 28\", \"content\": \"   1  def wrap(text, cols):\\n   2      lines = []\\n   3      while len(text) > cols:\\n   4          end = text.rfind(' ', 0, cols + 1)\\n   5          if end == -1:\\n   6              end = cols\\n   7          line, text = text[:end], text[end:]\\n   8          lines.append(line)\\n   9  \\n  10      return lines\\n  11  \\n  12  \\\"\\\"\\\"\\n  13  Wrap Text\\n  14  \\n  15  Given a long string and a column width, break the string on spaces into a list of lines such that each line is no longer than the column width.\\n  16  \\n  17  Input:\\n  18      text: The starting text.\\n  19      cols: The target column width, i.e. the maximum length of any single line after wrapping.\\n  20  \\n  21  Precondition:\\n  22      cols > 0.\\n  23  \\n  24  Output:\\n  25      An ordered list of strings, each no longer than the column width, such that the concatenation of the strings returns the original text,\\n  26  and such that no word in the original text is broken into two parts unless necessary.  The original amount of spaces are preserved (e.g. spaces\\n  27  at the start or end of each line aren't trimmed.),Wrapping Text\\n  28  \\\"\\\"\\\"\"}"
+    },
+    {
+      "seq": 7,
+      "t": 3.07,
+      "type": "tool_call",
+      "tool": "read_file",
+      "args": {
+        "path": "tests/test_public.py"
+      }
+    },
+    {
+      "seq": 8,
+      "t": 3.08,
+      "type": "tool_result",
+      "tool": "read_file",
+      "preview": "{\"path\": \"tests/test_public.py\", \"lines\": \"1-7 of 7\", \"content\": \"   1  import json\\n   2  import pytest\\n   3  from program import wrap as function\\n   4  CASES = json.loads('[[[\\\"The leaves did not stir on the trees, grasshoppers chirruped, and the monotonous hollow sound of the sea rising up from below, spoke of the peace, of the eternal sleep awaiting us. So it must have sounded when there was no Yalta, no Oreanda here; so it sounds now, and it will sound as indifferently and monotonously when we are all no more. And in this constancy, in this complete indifference to the life and death of each of us, there lies hid, perhaps, a pledge of our eternal salvation, of the unceasing movement of life upon earth, of unceasing progress towards perfection. Sitting beside a young woman who in the dawn seemed so lovely, soothed and spellbound in these magical surroundings - the sea, mountains, clouds, the open sky - Gurov thought how in reality everything is beautiful in this world when one reflects: everything except what we think or do ourselves when we forget our human dignity and the higher aims of our existence.\\\", 50], [\\\"The leaves did not stir on the trees, grasshoppers\\\", \\\" chirruped, and the monotonous hollow sound of the\\\", \\\" sea rising up from below, spoke of the peace, of\\\", \\\" the eternal sleep awaiting us. So it must have\\\", \\\" sounded when there was no Yalta, no Oreanda here;\\\", \\\" so it sounds now, and it will sound as\\\", \\\" indifferently and monotonously when we are all no\\\", \\\" more. And in this constancy, in this complete\\\", \\\" indifference to the life and death of each of us,\\\", \\\" there lies hid, perhaps, a pledge of our eternal\\\", \\\" salvation, of the unceasing movement of life upon\\\", \\\" earth, of unceasing progress towards perfection.\\\", \\\" Sitting beside a young woman who in the dawn\\\", \\\" seemed so lovely, soothed and spellbound in these\\\", \\\" magical surroundings - the sea, mountains,\\\", \\\" clouds, the open sky - Gurov thought how in\\\", \\\" real"
+    },
+    {
+      "seq": 9,
+      "t": 43.03,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Identifying wrap function bugs with missing final line and leading space handling. Diagnosing the missing final line and inclusive rfind boundary for space preservation. Fixing the infinite-loop edge when rfind returns zero and ensuring the final segment is appended. Handling the leading-space edge to prevent an empty-line infinite loop on long words."
+    },
+    {
+      "seq": 10,
+      "t": 43.03,
+      "type": "hypothesis",
+      "id": "H1",
+      "claim": "wrap returns lines without final remainder, dropping last chunk",
+      "symptom": "test_contract case 0 and 1 fail due to missing last line",
+      "next_check": "inspect program.py lines 2-10 logic, run reproduction comparing output length",
+      "status": "open",
+      "evidence": [],
+      "reason": "",
+      "fix_in": "code"
+    },
+    {
+      "seq": 11,
+      "t": 43.04,
+      "type": "hypothesis",
+      "id": "H2",
+      "claim": "wrap can infinite loop when only breakable space is at index 0 (leading space + long word)",
+      "symptom": "potential hang or empty string line violating spec",
+      "next_check": "simulate text \" a...long\" with cols small and trace loop",
+      "status": "open",
+      "evidence": [],
+      "reason": "",
+      "fix_in": "code"
+    },
+    {
+      "seq": 12,
+      "t": 62.38,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Analyzing code for a missing remainder append and space preservation in text wrapping. Identifying the missing remainder append and short-text return path for concatenation correctness. Addressing the leading-space infinite-loop edge case and the empty-line break condition."
+    },
+    {
+      "seq": 13,
+      "t": 62.38,
+      "type": "tool_call",
+      "tool": "run_tests",
+      "args": {}
+    },
+    {
+      "seq": 14,
+      "t": 63.8,
+      "type": "tool_result",
+      "tool": "run_tests",
+      "preview": "{\"exit_code\": 1, \"summary\": \"2 failed in 0.15s\", \"output\": \"FF                                                                       [100%]\\n=================================== FAILURES ===================================\\n____________________________ test_contract[case_0] _____________________________\\ntests/test_public.py:7: in test_contract\\n    assert function(*arguments) == expected\\nE   AssertionError: assert ['The leaves ...ound as', ...] == ['The leaves ...ound as', ...]\\nE     \\nE     Right contains one more item: ' dignity and the higher aims of our existence.'\\nE     Use -v to get more diff\\n____________________________ test_contract[case_1] _____________________________\\ntests/test_public.py:7: in test_contract\\n    assert function(*arguments) == expected\\nE   AssertionError: assert ['The leaves ...the sea', ...] == ['The leaves ...the sea', ...]\\nE     \\nE     Right contains one more item: ' existence.'\\nE     Use -v to get more diff\\n=========================== short test summary info ============================\\nFAILED tests/test_public.py::test_contract[case_0] - AssertionError: assert [...\\nFAILED tests/test_public.py::test_contract[case_1] - AssertionError: assert [...\\n2 failed in 0.15s\\n\"}"
+    },
+    {
+      "seq": 15,
+      "t": 88.19,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Confirming the loop condition causes the missing final chunk and noting the malformed docstring. Analyzing the trailing string literal and edge case where the window start is zero. Extending the edge-case fix to handle leading spaces and empty-string return behavior. Addressing the zero-break infinite loop and final remainder append for empty-input handling. Confirming the zero-break infinite loop and choosing empty-input return semantics."
+    },
+    {
+      "seq": 16,
+      "t": 88.2,
+      "type": "hypothesis_update",
+      "id": "H1",
+      "claim": "wrap returns lines without final remainder, dropping last chunk",
+      "symptom": "test_contract case 0 and 1 fail due to missing last line",
+      "next_check": "inspect program.py lines 2-10 logic, run reproduction comparing output length",
+      "status": "confirmed",
+      "evidence": [
+        "program.py:3 while len(text) > cols:",
+        "program.py:10 return lines without final text",
+        "tests/test_public.py::test_contract[case_0] Right contains one more item: ' dignity and the higher aims of our existence.'",
+        "tests/test_public.py::test_contract[case_1] Right contains one more item: ' existence.'"
+      ],
+      "reason": "Loop exits when len(text)<=cols and returns only collected lines, missing the last piece. Tests show expected list has one extra final line.",
+      "fix_in": "code"
+    },
+    {
+      "seq": 17,
+      "t": 88.2,
+      "type": "hypothesis_update",
+      "id": "H2",
+      "claim": "wrap can infinite loop when only breakable space is at index 0 (leading space + long word)",
+      "symptom": "potential hang or empty string line violating spec",
+      "next_check": "simulate text \" a...long\" with cols small and trace loop",
+      "status": "confirmed",
+      "evidence": [
+        "program.py:4 end = text.rfind(' ', 0, cols + 1) can be 0",
+        "program.py:7 line, text = text[:end], text[end:] with end=0 gives zero progress"
+      ],
+      "reason": "If rfind returns 0 (only space at start within window), slicing yields empty line and unchanged text, causing infinite loop. This violates progress guarantee.",
+      "fix_in": "code"
+    },
+    {
+      "seq": 18,
+      "t": 107.03,
+      "type": "thinking",
+      "phase": "investigate",
+      "text": "Analyzing wrap function bugs for remainder handling and zero-space infinite loop against spec constraints. Extending the wrap fix to append remaining text and prevent zero-space infinite loops. Resolving empty-input behavior for the wrap function to return [] instead of [ Fixing the zero-progress edge case by adjusting the break point when no space is found."
+    },
+    {
+      "seq": 19,
+      "t": 107.03,
+      "type": "message",
+      "phase": "investigate",
+      "text": "Investigation complete.\n\n- **H1 confirmed** \u2013 `wrap` drops the final remainder: `while len(text) > cols` collects only full chunks and returns `lines` without appending the leftover `text`. Evidence: `program.py:3-10`, tests show `Right contains one more item: ' dignity and the higher aims of our existence.'` and `' existence.'`.\n\n- **H2 confirmed** \u2013 potential infinite loop when the only space in the window is at index 0: `rfind` returns `0`, then `text[:0]` is empty and `text[0:]` is unchanged, causing zero progress. Evidence: `program.py:4` can be 0, `program.py:7` slice with `end=0`.\n\nFix needed: append final `text` and treat `end <= 0` as `cols`."
+    },
+    {
+      "seq": 20,
+      "t": 107.03,
+      "type": "phase",
+      "phase": "fix"
+    },
+    {
+      "seq": 21,
+      "t": 126.52,
+      "type": "thinking",
+      "phase": "fix",
+      "text": "Analyzing text wrapping logic to fix missing remainder and empty input handling for column constraints. Adjusting the wrap boundary to prevent zero-width splits and preserve leading spaces. Ruling out zero-width splits by treating a leading-space break as invalid and appending the remainder."
+    },
+    {
+      "seq": 22,
+      "t": 126.52,
+      "type": "tool_call",
+      "tool": "edit_file",
+      "args": {
+        "path": "program.py",
+        "old": "def wrap(text, cols):\n    lines = []\n    while len(text) > cols:\n        end = text.rfind(' ', 0, cols + 1)\n        if end == -1:\n            end = cols\n        line, text = text[:end], text[end:]\n        lines.append(line)\n\n    return lines",
+        "new": "def wrap(text, cols):\n    lines = []\n    while len(text) > cols:\n        end = text.rfind(' ', 0, cols + 1)\n        if end <= 0:\n            end = cols\n        line, text = text[:end], text[end:]\n        lines.append(line)\n    if text:\n        lines.append(text)\n    return lines"
+      }
+    },
+    {
+      "seq": 23,
+      "t": 126.52,
+      "type": "tool_result",
+      "tool": "edit_file",
+      "preview": "{\"edited\": \"program.py\"}"
+    },
+    {
+      "seq": 24,
+      "t": 126.53,
+      "type": "patch",
+      "path": "program.py",
+      "diff": "--- a/program.py\n+++ b/program.py\n@@ -2,11 +2,12 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n-\n+    if text:\n+        lines.append(text)\n     return lines\n \n \"\"\"\n"
+    },
+    {
+      "seq": 25,
+      "t": 140.68,
+      "type": "tool_call",
+      "tool": "run_tests",
+      "args": {}
+    },
+    {
+      "seq": 26,
+      "t": 142.2,
+      "type": "tool_result",
+      "tool": "run_tests",
+      "preview": "{\"exit_code\": 0, \"summary\": \"2 passed in 0.30s\"}"
+    },
+    {
+      "seq": 27,
+      "t": 154.85,
+      "type": "message",
+      "phase": "fix",
+      "text": "Fixed `wrap` in `program.py`:\n\n- Changed `if end == -1` to `if end <= 0` to avoid infinite loop when the only space is at index 0, by falling back to hard break at `cols`.\n- Added `if text: lines.append(text)` before return so final remainder (when `len(text) <= cols`) is preserved.\n\nTests: 2 passed."
+    },
+    {
+      "seq": 28,
+      "t": 155.94,
+      "type": "verification",
+      "attempt": 1,
+      "tests": {
+        "tests/test_public.py::test_contract[case_0]": "passed",
+        "tests/test_public.py::test_contract[case_1]": "passed"
+      },
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    },
+    {
+      "seq": 29,
+      "t": 155.94,
+      "type": "phase",
+      "phase": "review"
+    },
+    {
+      "seq": 30,
+      "t": 170.52,
+      "type": "second_opinion",
+      "verdict": "approve",
+      "confidence": "high",
+      "summary": "Patch correctly adds the missing final chunk (fixes dropped remainder) and changes end==-1 to end<=0 to eliminate zero-progress infinite loop when only space is at index 0. Partitioning logic now guarantees ''.join(lines)==text and len(line)<=cols with proper space handling.",
+      "hypotheses": [
+        {
+          "id": "H1",
+          "assessment": "supported",
+          "note": "Loop exit without appending remainder is proven by code and by two failing contract tests showing one missing final element; adding if text: lines.append(text) directly fixes root cause."
+        },
+        {
+          "id": "H2",
+          "assessment": "supported",
+          "note": "rfind returning 0 with original if end==-1 yields text[:0]=='' and text[0:]==text, proven infinite loop; changing to end<=0 forces progress at cols, correctly handled."
+        }
+      ],
+      "risks": [],
+      "provider": "baseten",
+      "model": "meta-models/muse-spark-open-1026",
+      "tokens": 5078,
+      "duration_s": 14.6
+    },
+    {
+      "seq": 31,
+      "t": 170.52,
+      "type": "phase",
+      "phase": "report"
+    },
+    {
+      "seq": 32,
+      "t": 180.24,
+      "type": "report",
+      "report": {
+        "incident": "The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.",
+        "provider": "meta",
+        "model": "muse-spark-1.1",
+        "isolation": "docker",
+        "hypotheses": [
+          {
+            "id": "H1",
+            "claim": "wrap returns lines without final remainder, dropping last chunk",
+            "symptom": "test_contract case 0 and 1 fail due to missing last line",
+            "next_check": "inspect program.py lines 2-10 logic, run reproduction comparing output length",
+            "status": "confirmed",
+            "evidence": [
+              "program.py:3 while len(text) > cols:",
+              "program.py:10 return lines without final text",
+              "tests/test_public.py::test_contract[case_0] Right contains one more item: ' dignity and the higher aims of our existence.'",
+              "tests/test_public.py::test_contract[case_1] Right contains one more item: ' existence.'"
+            ],
+            "reason": "Loop exits when len(text)<=cols and returns only collected lines, missing the last piece. Tests show expected list has one extra final line.",
+            "fix_in": "code"
+          },
+          {
+            "id": "H2",
+            "claim": "wrap can infinite loop when only breakable space is at index 0 (leading space + long word)",
+            "symptom": "potential hang or empty string line violating spec",
+            "next_check": "simulate text \" a...long\" with cols small and trace loop",
+            "status": "confirmed",
+            "evidence": [
+              "program.py:4 end = text.rfind(' ', 0, cols + 1) can be 0",
+              "program.py:7 line, text = text[:end], text[end:] with end=0 gives zero progress"
+            ],
+            "reason": "If rfind returns 0 (only space at start within window), slicing yields empty line and unchanged text, causing infinite loop. This violates progress guarantee.",
+            "fix_in": "code"
+          }
+        ],
+        "findings": {
+          "issues": [
+            {
+              "category": "other",
+              "evidence": [
+                "program.py:3 while len(text) > cols:",
+                "program.py:10 return lines without final text",
+                "tests/test_public.py::test_contract[case_0] Right contains one more item: ' dignity and the higher aims of our existence.'",
+                "tests/test_public.py::test_contract[case_1] Right contains one more item: ' existence.'"
+              ],
+              "fix": "Changed program.py: code fix for H1 - added final remainder handling:\n  if text:\n      lines.append(text)\nbefore return lines.\nRecommended, not in this patch: No additional actions.",
+              "hypothesis_ids": [
+                "H1"
+              ],
+              "root_cause": "Incident: The function's behavior disagrees with its documented contract and supplied examples.\n\nClaim [H1] - wrap returns lines without final remainder, dropping last chunk\nSymptom: test_contract case 0 and 1 fail due to missing last line\nStatus: confirmed\nReason: Loop exits when len(text)<=cols and returns only collected lines, missing the last piece. Tests show expected list has one extra final line.",
+              "severity": "medium",
+              "title": "wrap returns lines without final remainder, dropping last chunk"
+            },
+            {
+              "category": "other",
+              "evidence": [
+                "program.py:4 end = text.rfind(' ', 0, cols + 1) can be 0",
+                "program.py:7 line, text = text[:end], text[end:] with end=0 gives zero progress"
+              ],
+              "fix": "Changed program.py: code fix for H2 - changed condition from\n  if end == -1:\nto\n  if end <= 0:\n      end = cols\n to prevent zero-progress slice when rfind returns 0.\nRecommended, not in this patch: No additional actions.",
+              "hypothesis_ids": [
+                "H2"
+              ],
+              "root_cause": "Claim [H2] - wrap can infinite loop when only breakable space is at index 0 (leading space + long word)\nSymptom: potential hang or empty string line violating spec\nStatus: confirmed\nReason: If rfind returns 0 (only space at start within window), slicing yields empty line and unchanged text, causing infinite loop. This violates progress guarantee.",
+              "severity": "medium",
+              "title": "wrap can infinite loop when only breakable space is at index 0"
+            }
+          ],
+          "summary": "Final Investigation Report\n\nIncident: The function's behavior disagrees with its documented contract and supplied examples. Investigate and correct the implementation.\n\nFindings - 2 confirmed root causes in code:\n\nH1 (confirmed): wrap returns lines without final remainder. Evidence shows loop while len(text) > cols exits and returns without final text, causing test_contract case_0 and case_1 to miss one item.\n\nH2 (confirmed): wrap can infinite loop when rfind finds space at index 0. Evidence shows end = text.rfind(' ', 0, cols+1) can be 0, and line, text = text[:end], text[end:] with end=0 gives zero progress.\n\nPatch Applied:\n--- a/program.py\n+++ b/program.py\n@@ -2,11 +2,12 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n-\n+    if text:\n+        lines.append(text)\n     return lines\n\nThe patch correctly adds the missing final chunk (fixes H1) and changes end==-1 to end<=0 to eliminate zero-progress infinite loop (fixes H2). Partitioning now guarantees ''.join(lines)==text.\n\nVerification: verified=true\nFixed: tests/test_public.py::test_contract[case_0], tests/test_public.py::test_contract[case_1]\nStill failing: []\nRegressions: []\n\nIndependent Review: verdict=approve, summary=\"Patch correctly adds the missing final chunk (fixes dropped remainder) and changes end==-1 to end<=0 to eliminate zero-progress infinite loop when only space is at index 0. Partitioning logic now guarantees ''.join(lines)==text and len(line)<=cols with proper space handling.\", risks=[]"
+        },
+        "diff": "--- a/program.py\n+++ b/program.py\n@@ -2,11 +2,12 @@\n     lines = []\n     while len(text) > cols:\n         end = text.rfind(' ', 0, cols + 1)\n-        if end == -1:\n+        if end <= 0:\n             end = cols\n         line, text = text[:end], text[end:]\n         lines.append(line)\n-\n+    if text:\n+        lines.append(text)\n     return lines\n \n \"\"\"\n",
+        "excluded_tests": [],
+        "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+        "verification": {
+          "verified": true,
+          "fixed": [
+            "tests/test_public.py::test_contract[case_0]",
+            "tests/test_public.py::test_contract[case_1]"
+          ],
+          "still_failing": [],
+          "regressions": [],
+          "missing": [],
+          "before": {
+            "failed": 2
+          },
+          "after": {
+            "passed": 2
+          }
+        },
+        "outcome": "fixed",
+        "second_opinion": {
+          "verdict": "approve",
+          "confidence": "high",
+          "summary": "Patch correctly adds the missing final chunk (fixes dropped remainder) and changes end==-1 to end<=0 to eliminate zero-progress infinite loop when only space is at index 0. Partitioning logic now guarantees ''.join(lines)==text and len(line)<=cols with proper space handling.",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "assessment": "supported",
+              "note": "Loop exit without appending remainder is proven by code and by two failing contract tests showing one missing final element; adding if text: lines.append(text) directly fixes root cause."
+            },
+            {
+              "id": "H2",
+              "assessment": "supported",
+              "note": "rfind returning 0 with original if end==-1 yields text[:0]=='' and text[0:]==text, proven infinite loop; changing to end<=0 forces progress at cols, correctly handled."
+            }
+          ],
+          "risks": [],
+          "provider": "baseten",
+          "model": "meta-models/muse-spark-open-1026",
+          "tokens": 5078,
+          "duration_s": 14.6
+        },
+        "usage": {
+          "input_tokens": 33010,
+          "output_tokens": 15515,
+          "cached_tokens": 25579,
+          "model_calls": 9,
+          "tool_calls": 9,
+          "by_phase": {
+            "investigate": 28264,
+            "fix": 16247,
+            "report": 4014
+          }
+        },
+        "timing": {
+          "prepare_s": 0.0,
+          "sandbox_s": 1.52,
+          "model_s": 160.07,
+          "tools_s": 2.97,
+          "verify_s": 1.09,
+          "review_s": 14.57,
+          "by_phase": {
+            "investigate": 105.51,
+            "fix": 48.91,
+            "review": 14.58,
+            "report": 9.71
+          }
+        },
+        "duration_s": 180.2
+      }
+    }
+  ]
+}

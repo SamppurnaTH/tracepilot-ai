@@ -1,0 +1,64 @@
+{
+  "case": "max_sublist_sum",
+  "kind": "reference",
+  "reviewer": "meta-models/muse-spark-open-1026",
+  "repeat": 1,
+  "label_correct_patch": true,
+  "error": null,
+  "review_facts": {
+    "incident": "The function disagrees with its documented contract and supplied examples.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "status": "confirmed",
+        "claim": "Implementation disagrees with the documented function contract",
+        "evidence": [
+          "assert 4 == 5",
+          "assert 3 == 4"
+        ],
+        "reason": "public test observations"
+      }
+    ],
+    "verification": {
+      "verified": true,
+      "fixed": [
+        "tests/test_public.py::test_contract[case_0]",
+        "tests/test_public.py::test_contract[case_1]"
+      ],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "failed": 2
+      },
+      "after": {
+        "passed": 2
+      }
+    }
+  },
+  "diff": "--- a/program.py\n+++ b/program.py\n@@ -4,28 +4,41 @@\n     max_so_far = 0\n \n     for x in arr:\n-        max_ending_here = max_ending_here + x\n+        max_ending_here = max(0, max_ending_here + x)\n+        max_so_far = max(max_so_far, max_ending_here)\n+\n+    return max_so_far\n+\n+\"\"\"\n+def max_sublist_sum(arr):\n+    max_ending_here = 0\n+    max_so_far = 0\n+\n+    for x in arr:\n+        max_ending_here = max(max_ending_here + x, 0)\n+        max_so_far = max(max_so_far, max_ending_here)\n+\n+    return max_so_far\n+\n+def max_sublist_sum(arr):\n+    max_ending_here = 0\n+    max_so_far = 0\n+\n+    for x in arr:\n+        max_ending_here = max(x, max_ending_here + x)\n         max_so_far = max(max_so_far, max_ending_here)\n \n     return max_so_far\n \n \n+def max_sublist_sum(arr):\n+    max_ending_here = 0\n+    max_so_far = 0\n+\n+    for x in arr:\n+        max_ending_here = max(max_ending_here + x, x)\n+        max_so_far = max(max_so_far, max_ending_here)\n+\n+    return max_so_far\n+\n \"\"\"\n-Max Sublist Sum\n-max-sublist-sum\n-\n-Efficient equivalent to max(sum(arr[i:j]) for 0 <= i <= j <= len(arr))\n-\n-Algorithm source: WordAligned.org by Thomas Guest\n-\n-\n-Input:\n-    arr: A list of ints\n-\n-Output:\n-    The maximum sublist sum\n-\n-Example:\n-    >>> max_sublist_sum([4, -5, 2, 1, -1, 3])\n-    5\n-\"\"\"\n",
+  "files": {
+    "program.py": "\ndef max_sublist_sum(arr):\n    max_ending_here = 0\n    max_so_far = 0\n\n    for x in arr:\n        max_ending_here = max(0, max_ending_here + x)\n        max_so_far = max(max_so_far, max_ending_here)\n\n    return max_so_far\n\n\"\"\"\ndef max_sublist_sum(arr):\n    max_ending_here = 0\n    max_so_far = 0\n\n    for x in arr:\n        max_ending_here = max(max_ending_here + x, 0)\n        max_so_far = max(max_so_far, max_ending_here)\n\n    return max_so_far\n\ndef max_sublist_sum(arr):\n    max_ending_here = 0\n    max_so_far = 0\n\n    for x in arr:\n        max_ending_here = max(x, max_ending_here + x)\n        max_so_far = max(max_so_far, max_ending_here)\n\n    return max_so_far\n\n\ndef max_sublist_sum(arr):\n    max_ending_here = 0\n    max_so_far = 0\n\n    for x in arr:\n        max_ending_here = max(max_ending_here + x, x)\n        max_so_far = max(max_so_far, max_ending_here)\n\n    return max_so_far\n\n\"\"\"\n"
+  },
+  "opinion": {
+    "verdict": "concerns",
+    "confidence": "high",
+    "summary": "Patch correctly changes Kadane update to max(0, max_ending_here + x) matching spec max(sum(arr[i:j])) with empty sublist allowed (example [4,-5,2,1,-1,3]->5) and 2 public tests now pass. Fix addresses root cause, but leaves a large dead-code triple-quoted block with three duplicate implementations that should be removed before merge.",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "assessment": "weak",
+        "note": "Asserts 4==5 and 3==4 are consistent with documented example failure (got 4 expected 5), but evidence is bare equality checks without input, call trace or docstring linkage; support relies on test harness inference rather than direct proof of contract violation."
+      }
+    ],
+    "risks": [
+      "Dead-code bloat: new module-level triple-quoted string containing three duplicate max_sublist_sum definitions is inert at runtime but pollutes file and indicates incomplete cleanup",
+      "No functional regression, but patch should not be merged as-is due to leftover artifact; original docstring remains as second string literal"
+    ],
+    "provider": "baseten",
+    "model": "meta-models/muse-spark-open-1026",
+    "tokens": 6386,
+    "duration_s": 21.9
+  },
+  "wrong": true
+}

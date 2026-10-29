@@ -92,6 +92,14 @@ def test_zip_upload_runs_an_investigation_with_attachments(client):
     assert not built["root"].exists()  # the upload is deleted once the run ends
 
 
+def test_unsupported_project_is_refused_before_run_or_model(client):
+    response = client.post("/api/investigations/custom", data={"incident": "Checkout is broken in production"},
+                           files=[("project", ("node.zip", project_zip({"package.json": "{}", "index.js": "throw Error('broken')", "scripts/helper.py": "print('build helper')"}), "application/zip"))])
+    assert response.status_code == 400
+    assert "Unsupported project" in response.json()["detail"]
+    assert not FakeCustom.built and not main.manager.runs
+
+
 def test_zip_with_path_traversal_is_refused(client):
     resp = client.post(
         "/api/investigations/custom",

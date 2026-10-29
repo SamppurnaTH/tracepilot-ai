@@ -18,6 +18,9 @@ When you are done, reply with a short summary and end with exactly one line: RES
 
 
 class PlainAgent(Investigation):
+    def __init__(self, *args, include_brief: bool = False, **kwargs):
+        super().__init__(*args, include_brief=include_brief, **kwargs)
+
     def run(self) -> dict:
         self._started = time.monotonic()
         self.protect_tests = False
@@ -28,11 +31,14 @@ class PlainAgent(Investigation):
             self._emit("start", incident=self.incident, model=self.model, isolation=sandbox.isolation, system="plain")
             if self.seed_requests:
                 workspace.send_batch(self.seed_requests)
-            before = workspace.test_outcomes()  # for scoring only; the agent never sees it
+            before, reasons = workspace.test_report()  # hidden from plain; supplied only in the brief control
+            brief = ""
+            if self.include_brief:
+                brief = "\n\nEvidence brief (computed by the harness):\n" + workspace.brief(workspace.log_digest(), before, reasons)
             text = self._run_phase(
                 workspace,
                 "agent",
-                [{"role": "system", "content": PLAIN_PROMPT}, {"role": "user", "content": self.incident}],
+                [{"role": "system", "content": PLAIN_PROMPT}, {"role": "user", "content": self._with_images(self.incident + brief)}],
                 tools_for(self.app, INVESTIGATION_TOOLS) + FIX_TOOLS,
                 MAX_INVESTIGATION_STEPS + MAX_FIX_STEPS,  # the same total step budget TracePilot gets
             )

@@ -77,6 +77,17 @@ def test_changed_files_reads_diff_headers():
     assert changed_files(diff) == ["app/x.py", "y.py"]
 
 
+def test_private_meta_reviewer_endpoint_requires_explicit_configuration(monkeypatch):
+    monkeypatch.setenv("REVIEWER_BASE_URL", "http://localhost:9000/v1")
+    monkeypatch.delenv("REVIEWER_API_KEY", raising=False)
+    with pytest.raises(RuntimeError, match="requires REVIEWER_API_KEY"):
+        Reviewer.from_env()
+    monkeypatch.setenv("REVIEWER_API_KEY", "synthetic-test-key")
+    monkeypatch.setenv("REVIEWER_MODEL", "internal-meta-open-weights")
+    reviewer = Reviewer.from_env()
+    assert reviewer.provider == "custom" and reviewer.model == "internal-meta-open-weights"
+
+
 def test_run_includes_second_opinion_with_patched_code():
     chat = FakeChat([json.dumps(APPROVE)])
     report, client = run_with(Reviewer(chat, "open-model"))
@@ -104,6 +115,16 @@ def test_no_reviewer_means_no_second_opinion():
     assert "second_opinion" not in [e["type"] for e in report["events"]]
 
 
+def test_green_tests_with_unresolved_concerns_require_review():
+    from app.handoff import markdown_report, pr_description
+    concerns = {**APPROVE, "verdict": "concerns", "summary": "A valid input can still hang.", "risks": ["zero-progress loop"]}
+    report, _ = run_with(Reviewer(FakeChat([json.dumps(concerns)]), "open-model"))
+    assert report["verification"]["verified"]  # bounded test facts remain true
+    assert report["outcome"] == "needs_review"
+    assert "Tests verified; review required" in markdown_report(report, "incident")
+    assert "resolve the reviewer's objections" in pr_description(report)
+
+
 def test_rejection_sends_the_patch_back_for_another_round():
     reject = {**APPROVE, "verdict": "reject", "summary": "Only order 7 is protected.", "risks": ["IDOR remains for order 8"]}
     chat = FakeChat([json.dumps(reject), json.dumps(APPROVE)])
@@ -116,3 +137,11 @@ def test_rejection_sends_the_patch_back_for_another_round():
     retry_prompt = next(r for r in client.requests if "independent reviewer rejected" in str(r.get("input")))
     assert "IDOR remains for order 8" in str(retry_prompt["input"])
     assert [e["attempt"] for e in report["events"] if e["type"] == "verification"] == [1, 2]
+
+
+def test_exhausted_rejection_does_not_become_a_ready_fix():
+    reject = {**APPROVE, "verdict": "reject", "summary": "A valid input still hangs.", "risks": ["zero-progress loop"]}
+    script = fix_script()
+    script[-1:-1] = ["No additional edit made."]
+    report, _ = run_with(Reviewer(FakeChat([json.dumps(reject), json.dumps(reject)]), "open-model"), script)
+    assert report["verification"]["verified"] and report["outcome"] == "needs_review"

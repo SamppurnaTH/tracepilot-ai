@@ -1,0 +1,327 @@
+{
+  "fixture": "No known planted bug; deliberately under-specified synthetic incident",
+  "report": {
+    "incident": "Support reports one incorrect invoice total in production yesterday. The customer request, expected/actual amounts, production data and logs are unavailable. Existing CI is green. Investigate whether the provided service has a reproducible cause.",
+    "provider": "meta",
+    "model": "muse-spark-1.3",
+    "isolation": "docker",
+    "hypotheses": [
+      {
+        "id": "H1",
+        "claim": "total() miscomputes unit_cents * quantity for valid inputs",
+        "symptom": "incorrect invoice total",
+        "next_check": "inspect invoice.py arithmetic and run existing tests",
+        "status": "rejected",
+        "evidence": [
+          "invoice.py:4 returns unit_cents * quantity - correct arithmetic",
+          "tests/test_invoice.py::test_normal and test_zero_price pass, 6 passed total"
+        ],
+        "reason": "Code is correct multiplication with strict validation; existing tests pass and no failing input found",
+        "fix_in": "code"
+      }
+    ],
+    "findings": {
+      "issues": [],
+      "summary": "Support-reported single incorrect invoice total from yesterday was not reproduced. H1 (total() miscomputes unit_cents*quantity) was rejected: invoice.py:4 returns correct multiplication and 6 tests passed including test_normal and test_zero_price. Customer request, expected/actual amounts, production data and logs were unavailable, CI is green, no patch was made and no fix was verified."
+    },
+    "diff": "",
+    "excluded_tests": [],
+    "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+    "verification": {
+      "verified": false,
+      "fixed": [],
+      "still_failing": [],
+      "regressions": [],
+      "missing": [],
+      "before": {
+        "passed": 6
+      },
+      "after": {
+        "passed": 6
+      }
+    },
+    "outcome": "no_root_cause",
+    "second_opinion": null,
+    "usage": {
+      "input_tokens": 14830,
+      "output_tokens": 5346,
+      "cached_tokens": 4405,
+      "model_calls": 7,
+      "tool_calls": 6,
+      "by_phase": {
+        "investigate": 18549,
+        "report": 1627
+      }
+    },
+    "timing": {
+      "prepare_s": 0.0,
+      "sandbox_s": 2.59,
+      "model_s": 68.42,
+      "tools_s": 1.38,
+      "verify_s": 0.0,
+      "review_s": 0.0,
+      "by_phase": {
+        "investigate": 63.44,
+        "report": 6.37
+      }
+    },
+    "duration_s": 72.4,
+    "events": [
+      {
+        "seq": 1,
+        "t": 0.97,
+        "type": "start",
+        "incident": "Support reports one incorrect invoice total in production yesterday. The customer request, expected/actual amounts, production data and logs are unavailable. Existing CI is green. Investigate whether the provided service has a reproducible cause.",
+        "provider": "meta",
+        "model": "muse-spark-1.3",
+        "isolation": "docker"
+      },
+      {
+        "seq": 2,
+        "t": 2.59,
+        "type": "baseline",
+        "tests": {
+          "tests/test_invoice.py::test_normal": "passed",
+          "tests/test_invoice.py::test_zero_price": "passed",
+          "tests/test_invoice.py::test_invalid[-1-1]": "passed",
+          "tests/test_invoice.py::test_invalid[1-0]": "passed",
+          "tests/test_invoice.py::test_invalid[1-1.2]": "passed",
+          "tests/test_invoice.py::test_invalid[True-1]": "passed"
+        },
+        "tally": {
+          "passed": 6
+        }
+      },
+      {
+        "seq": 3,
+        "t": 2.59,
+        "type": "brief",
+        "text": "Workspace files: invoice.py, tests/test_invoice.py\nTests: 6 passed, 0 failing"
+      },
+      {
+        "seq": 4,
+        "t": 2.59,
+        "type": "phase",
+        "phase": "investigate"
+      },
+      {
+        "seq": 5,
+        "t": 5.73,
+        "type": "thinking",
+        "phase": "investigate",
+        "text": "Hunting the mis-total \u2014 inspecting the invoice service for a reproducible cause."
+      },
+      {
+        "seq": 6,
+        "t": 5.73,
+        "type": "tool_call",
+        "tool": "read_file",
+        "args": {
+          "path": "invoice.py"
+        }
+      },
+      {
+        "seq": 7,
+        "t": 5.73,
+        "type": "tool_result",
+        "tool": "read_file",
+        "preview": "{\"path\": \"invoice.py\", \"lines\": \"1-4 of 4\", \"content\": \"   1  def total(unit_cents: int, quantity: int) -> int:\\n   2      if type(unit_cents) is not int or type(quantity) is not int or unit_cents < 0 or quantity < 1:\\n   3          raise ValueError(\\\"expected nonnegative integer cents and positive integer quantity\\\")\\n   4      return unit_cents * quantity\"}"
+      },
+      {
+        "seq": 8,
+        "t": 5.73,
+        "type": "tool_call",
+        "tool": "read_file",
+        "args": {
+          "path": "tests/test_invoice.py"
+        }
+      },
+      {
+        "seq": 9,
+        "t": 5.73,
+        "type": "tool_result",
+        "tool": "read_file",
+        "preview": "{\"path\": \"tests/test_invoice.py\", \"lines\": \"1-13 of 13\", \"content\": \"   1  import pytest\\n   2  from invoice import total\\n   3  \\n   4  def test_normal():\\n   5      assert total(1205, 3) == 3615\\n   6  \\n   7  def test_zero_price():\\n   8      assert total(0, 1) == 0\\n   9  \\n  10  @pytest.mark.parametrize(\\\"price,qty\\\", [(-1,1),(1,0),(1,1.2),(True,1)])\\n  11  def test_invalid(price,qty):\\n  12      with pytest.raises(ValueError):\\n  13          total(price,qty)\"}"
+      },
+      {
+        "seq": 10,
+        "t": 14.43,
+        "type": "tool_call",
+        "tool": "read_file",
+        "args": {
+          "path": "."
+        }
+      },
+      {
+        "seq": 11,
+        "t": 14.43,
+        "type": "tool_result",
+        "tool": "read_file",
+        "preview": "{\"directory\": \".\", \"files\": [\"invoice.py\", \"tests/test_invoice.py\"]}"
+      },
+      {
+        "seq": 12,
+        "t": 29.31,
+        "type": "thinking",
+        "phase": "investigate",
+        "text": "This total looks trivially correct \u2014 I'll register hypotheses to rule out hidden faults.",
+        "summary": "Analyzing code for reproducible invoice total error, ruling out overflow and type issues given integer-only logic and passing tests. Registering hypotheses for the invoice total discrepancy and checking log access for investigation. Proposing and rejecting hypotheses after confirming strict input validation and no reproducible defect in the code."
+      },
+      {
+        "seq": 13,
+        "t": 29.31,
+        "type": "hypothesis",
+        "id": "H1",
+        "claim": "total() miscomputes unit_cents * quantity for valid inputs",
+        "symptom": "incorrect invoice total",
+        "next_check": "inspect invoice.py arithmetic and run existing tests",
+        "status": "open",
+        "evidence": [],
+        "reason": "",
+        "fix_in": "code"
+      },
+      {
+        "seq": 14,
+        "t": 39.1,
+        "type": "thinking",
+        "phase": "investigate",
+        "text": "Code review shows simple multiplication \u2014 now I'll check execution to confirm."
+      },
+      {
+        "seq": 15,
+        "t": 39.1,
+        "type": "tool_call",
+        "tool": "run_tests",
+        "args": {}
+      },
+      {
+        "seq": 16,
+        "t": 40.47,
+        "type": "tool_result",
+        "tool": "run_tests",
+        "preview": "{\"exit_code\": 0, \"summary\": \"6 passed in 0.09s\"}"
+      },
+      {
+        "seq": 17,
+        "t": 53.2,
+        "type": "thinking",
+        "phase": "investigate",
+        "text": "Reviewing the invoice total calculation code and ruling out overflow, float, and bool type issues while noting no reproducible cause found. Resolving the primary hypothesis and concluding no reproducible cause was found."
+      },
+      {
+        "seq": 18,
+        "t": 53.2,
+        "type": "hypothesis_update",
+        "id": "H1",
+        "claim": "total() miscomputes unit_cents * quantity for valid inputs",
+        "symptom": "incorrect invoice total",
+        "next_check": "inspect invoice.py arithmetic and run existing tests",
+        "status": "rejected",
+        "evidence": [
+          "invoice.py:4 returns unit_cents * quantity - correct arithmetic",
+          "tests/test_invoice.py::test_normal and test_zero_price pass, 6 passed total"
+        ],
+        "reason": "Code is correct multiplication with strict validation; existing tests pass and no failing input found",
+        "fix_in": "code"
+      },
+      {
+        "seq": 19,
+        "t": 66.03,
+        "type": "thinking",
+        "phase": "investigate",
+        "text": "Evaluating hypotheses for the invoice total discrepancy with no logs or production data available and CI passing. Concluding no reproducible root cause and recommending a regression test for the validation edge."
+      },
+      {
+        "seq": 20,
+        "t": 66.03,
+        "type": "message",
+        "phase": "investigate",
+        "text": "No reproducible cause found: `invoice.py:4` correctly returns `unit_cents*quantity` with strict int validation; all 6 CI tests pass. With request/amounts/data/logs unavailable, the single reported incorrect total cannot be confirmed or reproduced in the provided service."
+      },
+      {
+        "seq": 21,
+        "t": 66.03,
+        "type": "skip_fix",
+        "reason": "no confirmed root cause"
+      },
+      {
+        "seq": 22,
+        "t": 66.03,
+        "type": "phase",
+        "phase": "report"
+      },
+      {
+        "seq": 23,
+        "t": 72.41,
+        "type": "report",
+        "report": {
+          "incident": "Support reports one incorrect invoice total in production yesterday. The customer request, expected/actual amounts, production data and logs are unavailable. Existing CI is green. Investigate whether the provided service has a reproducible cause.",
+          "provider": "meta",
+          "model": "muse-spark-1.3",
+          "isolation": "docker",
+          "hypotheses": [
+            {
+              "id": "H1",
+              "claim": "total() miscomputes unit_cents * quantity for valid inputs",
+              "symptom": "incorrect invoice total",
+              "next_check": "inspect invoice.py arithmetic and run existing tests",
+              "status": "rejected",
+              "evidence": [
+                "invoice.py:4 returns unit_cents * quantity - correct arithmetic",
+                "tests/test_invoice.py::test_normal and test_zero_price pass, 6 passed total"
+              ],
+              "reason": "Code is correct multiplication with strict validation; existing tests pass and no failing input found",
+              "fix_in": "code"
+            }
+          ],
+          "findings": {
+            "issues": [],
+            "summary": "Support-reported single incorrect invoice total from yesterday was not reproduced. H1 (total() miscomputes unit_cents*quantity) was rejected: invoice.py:4 returns correct multiplication and 6 tests passed including test_normal and test_zero_price. Customer request, expected/actual amounts, production data and logs were unavailable, CI is green, no patch was made and no fix was verified."
+          },
+          "diff": "",
+          "excluded_tests": [],
+          "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+          "verification": {
+            "verified": false,
+            "fixed": [],
+            "still_failing": [],
+            "regressions": [],
+            "missing": [],
+            "before": {
+              "passed": 6
+            },
+            "after": {
+              "passed": 6
+            }
+          },
+          "outcome": "no_root_cause",
+          "second_opinion": null,
+          "usage": {
+            "input_tokens": 14830,
+            "output_tokens": 5346,
+            "cached_tokens": 4405,
+            "model_calls": 7,
+            "tool_calls": 6,
+            "by_phase": {
+              "investigate": 18549,
+              "report": 1627
+            }
+          },
+          "timing": {
+            "prepare_s": 0.0,
+            "sandbox_s": 2.59,
+            "model_s": 68.42,
+            "tools_s": 1.38,
+            "verify_s": 0.0,
+            "review_s": 0.0,
+            "by_phase": {
+              "investigate": 63.44,
+              "report": 6.37
+            }
+          },
+          "duration_s": 72.4
+        }
+      }
+    ]
+  }
+}
