@@ -43,7 +43,7 @@ export function AdminShell({ children, live, sections, active, onSelect, user, s
         {sections.length ? sections.map((section) => <button key={section} className={cx(a.navButton,active === section && a.navActive)} aria-current={active === section ? "page" : undefined} onClick={() => choose(section)}><Icon name={ADMIN_ICONS[section]} size={21} /><span>{section}</span></button>) : <a href="#admin-sign-in" className={cx(a.navButton,a.navActive)}><Icon name="lock" size={20} />Administrator sign in</a>}
       </nav>
       <svg className={a.sidebarWave} viewBox="0 0 280 300" aria-hidden="true"><defs><linearGradient id="sidebar-wave" x2="1" y2="1"><stop stopColor="#722cff" stopOpacity=".55"/><stop offset="1" stopColor="#2469ff" stopOpacity=".05"/></linearGradient></defs><path d="M-80 160C60 400 150 30 340 35L360 90C150 50 70 390-80 215Z" fill="url(#sidebar-wave)"/><path d="M-70 140C50 380 150 0 330 10" stroke="#875aff" strokeOpacity=".22" fill="none"/></svg>
-      <div className={a.sidebarCard}><div><span className={a.meta}>∞</span><span>Meta Global AI<br/>Developer Hackathon</span></div><p><i className={cx(a.dot,live && a.online)} />{live === null ? "Checking backend…" : live ? "Live backend connected" : "Backend unavailable"}</p><small><Icon name="lock" size={13} /> Restricted administration</small></div>
+      <div className={a.sidebarCard}><div><span>Meta Global AI<br/>Developer Hackathon</span></div><p><i className={cx(a.dot,live && a.online)} />{live === null ? "Checking backend…" : live ? "Live backend connected" : "Backend unavailable"}</p><small><Icon name="lock" size={13} /> Restricted administration</small></div>
     </aside>
     <div className={a.workspace}>
       <header className={a.topbar}>

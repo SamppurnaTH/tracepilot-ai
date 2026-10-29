@@ -50,7 +50,7 @@ export function AppShell({ live, children }: { live?: boolean | null; children: 
           ))}
         </nav>
         <div className={s.sideCard}>
-          <span className={s.hackathonBrand}><span className={s.metaMark}>∞</span><span className={s.sideCardTitle}>Meta Global AI<br />Developer Hackathon</span></span>
+          <span className={s.hackathonBrand}><span className={s.sideCardTitle}>Meta Global AI<br />Developer Hackathon</span></span>
           <span className={s.sideMode}>
             <span className={cx(s.modeDot, live && s.modeDotLive)} aria-hidden="true" />
             {live === undefined ? "Verification-first debugging" : live === null ? "Checking for a backend" : live ? "Live backend connected" : "Replaying real recorded runs"}

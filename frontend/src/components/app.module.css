@@ -1133,7 +1133,6 @@
 .navLink svg { color: #d4def6; }
 .sideCard { background: #071021; border: 1px solid #1b2d46; border-radius: 8px; padding: 14px 12px; font-size: 10px; gap: 14px; }
 .hackathonBrand { display: flex; align-items: center; gap: 10px; }
-.metaMark { color: #008dff; font-size: 48px; line-height: .8; font-family: var(--font-sans); }
 .sideCardTitle { font-weight: 500; line-height: 1.6; }
 .content { padding: 36px; gap: 24px; max-width: 1440px; }
 .pageTitle { font-size: 28px; letter-spacing: -.035em; }
