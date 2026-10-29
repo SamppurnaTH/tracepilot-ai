@@ -110,7 +110,7 @@ export type Stage = (typeof STAGES)[number];
 export interface TimelineItem {
   seq: number;
   t: number;
-  kind: "phase" | "tool" | "hypothesis" | "resolve" | "patch" | "verify" | "note" | "alert";
+  kind: "phase" | "tool" | "hypothesis" | "resolve" | "patch" | "verify" | "note" | "alert" | "thought";
   title: string;
   detail?: string;
   tone?: "good" | "bad" | "neutral" | "signal";
@@ -136,6 +136,7 @@ export interface RunState {
   images: string[]; // screenshots given to the model as evidence
   incident?: string;
   reviewRetries: number;
+  thought?: string; // the investigator's most recent note on what it is doing
 }
 
 export const initialState: RunState = {
@@ -248,6 +249,14 @@ export function reduce(state: RunState, e: RunEvent): RunState {
       const h = e as unknown as Hypothesis;
       s.hypotheses = upsert(s.hypotheses, h);
       add({ kind: "resolve", title: `${h.id} ${h.status}`, detail: h.reason, tone: h.status === "confirmed" ? "good" : "bad" });
+      break;
+    }
+    case "thinking": {
+      // Muse Spark's own note alongside its tool calls, or its reasoning summary.
+      const text = String(e.text ?? "").trim();
+      if (!text) break;
+      s.thought = text;
+      add({ kind: "thought", title: "Muse Spark", detail: text });
       break;
     }
     case "tool_call": {

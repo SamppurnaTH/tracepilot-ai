@@ -177,6 +177,26 @@ def test_no_confirmed_hypothesis_skips_fix():
     assert report["diff"] == "" and not report["verification"]["verified"]
 
 
+def test_model_reasoning_is_streamed_as_thinking_events():
+    reasoning = SimpleNamespace(type="reasoning", summary=[SimpleNamespace(type="summary_text", text="Comparing the log and the code.")])
+    note = SimpleNamespace(type="message", content=[SimpleNamespace(type="output_text", text="The 500s point at a missing coupon; checking the code.")])
+    report, client = run(
+        [
+            [reasoning, note, call("propose_hypothesis", claim="db is down", symptom="500", next_check="logs")],
+            [reasoning, call("resolve_hypothesis", id="H1", status="rejected", evidence=["no db in app"], reason="no database")],
+            "Could not find the cause.",
+            json.dumps({"summary": "Inconclusive.", "issues": []}),
+        ]
+    )
+    thoughts = [e for e in report["events"] if e["type"] == "thinking"]
+    assert thoughts[0]["text"] == "The 500s point at a missing coupon; checking the code."
+    assert thoughts[0]["summary"] == "Comparing the log and the code." and thoughts[0]["phase"] == "investigate"
+    assert thoughts[1] == {**thoughts[1], "text": "Comparing the log and the code."} and "summary" not in thoughts[1]
+    # The phase's final reply is a message event, not a thought.
+    assert not any(e["type"] == "thinking" and "Could not find" in e["text"] for e in report["events"])
+    assert all(r.get("reasoning") == {"summary": "auto"} for r in client.requests)
+
+
 def test_confirm_without_evidence_is_refused():
     report, client = run(
         [

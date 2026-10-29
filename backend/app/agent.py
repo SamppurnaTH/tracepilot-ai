@@ -280,7 +280,8 @@ class Investigation:
         """One model call. With chain=False it runs in a fresh context: cheaper, and the transcript is untouched."""
         if self.should_stop and self.should_stop():
             raise Cancelled("stopped by the user")
-        params: dict[str, Any] = {"model": self.model, "input": input_items, **kwargs}
+        # Reasoning summaries cost no extra tokens: the model reasons either way, and the summary makes it visible.
+        params: dict[str, Any] = {"model": self.model, "input": input_items, "reasoning": {"summary": "auto"}, **kwargs}
         if tools:
             params["tools"] = tools
         if not chain:
@@ -303,11 +304,9 @@ class Investigation:
         self._previous_id = response.id
         self._history.extend(item for item in map(_as_input_item, response.output) if item)
         self._count(response)
-        for item in response.output:
-            if item.type == "reasoning":
-                summary = " ".join(getattr(part, "text", "") for part in (getattr(item, "summary", None) or []))
-                if summary.strip():
-                    self._emit("thinking", text=summary.strip())
+        thought = _thought(response)
+        if thought:
+            self._emit("thinking", phase=self._phase, **thought)
         return response
 
     def _with_images(self, text: str) -> str | list[dict]:
@@ -668,6 +667,24 @@ class Investigation:
 
 def _names(tools: list[dict]) -> set[str]:
     return {tool["name"] for tool in tools}
+
+
+def _thought(response: Any) -> dict | None:
+    """What the model said it was doing in this step: its note alongside the tool calls, and its reasoning summary.
+
+    A reply without tool calls is the phase's final message, emitted separately, so only its summary counts here.
+    """
+    summary = " ".join(
+        getattr(part, "text", "") for item in response.output if item.type == "reasoning" for part in (getattr(item, "summary", None) or [])
+    ).strip()
+    narration = ""
+    if any(item.type == "function_call" for item in response.output):
+        narration = " ".join(
+            getattr(part, "text", "") for item in response.output if item.type == "message" for part in (getattr(item, "content", None) or [])
+        ).strip()
+    if narration:
+        return {"text": narration, **({"summary": summary} if summary else {})}
+    return {"text": summary} if summary else None
 
 
 def _as_input_item(item: Any) -> dict | None:

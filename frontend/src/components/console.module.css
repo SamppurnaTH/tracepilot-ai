@@ -337,6 +337,38 @@
   color: var(--console-muted);
 }
 
+/* the investigator's own notes, between its tool calls */
+.tThought {
+  font-style: italic;
+  color: var(--console-muted);
+}
+
+.tThoughtWho {
+  font-style: normal;
+  color: var(--console-accent);
+}
+
+.thought {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--console-accent);
+  background: var(--console-code-bg);
+  border-radius: 0 8px 8px 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.thoughtLabel {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--console-accent);
+}
+
 /* outcome card */
 .outcome {
   background: var(--console-surface);

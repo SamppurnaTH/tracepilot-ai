@@ -143,6 +143,13 @@ export function Terminal({ items, startedAt }: { items: TimelineItem[]; startedA
           <p key={item.seq} className={s.tPhase}>
             ── {item.title} ──
           </p>
+        ) : item.kind === "thought" ? (
+          <p key={item.seq} className={cx(s.tLine, s.tThought)}>
+            <span className={s.tTime}>[{stamp(item.t)}]</span>
+            <span className={s.tText}>
+              <span className={s.tThoughtWho}>{item.title}:</span> “{item.detail}”
+            </span>
+          </p>
         ) : (
           <p key={item.seq} className={s.tLine}>
             <span className={s.tTime}>[{stamp(item.t)}]</span>
@@ -161,7 +168,7 @@ export function OutcomeCard({ state }: { state: RunState }) {
   const r = state.report;
   const stopped = state.error === "Stopped by the user";
   if (!r) {
-    const last = [...state.timeline].reverse().find((i) => i.kind !== "phase");
+    const last = [...state.timeline].reverse().find((i) => i.kind !== "phase" && i.kind !== "thought");
     return (
       <div className={s.outcome}>
         <div className={s.outcomeHead}>
@@ -174,6 +181,12 @@ export function OutcomeCard({ state }: { state: RunState }) {
           </div>
         </div>
         {last?.detail && <p className={s.outcomeText}>{last.detail}</p>}
+        {state.thought && state.phase !== "failed" && (
+          <p className={s.thought}>
+            <span className={s.thoughtLabel}>Muse Spark is thinking</span>
+            {state.thought}
+          </p>
+        )}
       </div>
     );
   }
