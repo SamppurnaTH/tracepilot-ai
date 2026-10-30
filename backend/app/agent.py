@@ -517,11 +517,17 @@ class Investigation:
                 break
             if not any(o != "passed" for o in baseline.values()):
                 break  # nothing failed before the fix, so another attempt can't prove anything either
-            prompt = (
-                "Verification failed. Still failing: "
-                f"{verification['still_failing'] or 'none'}; regressions: {verification['regressions'] or 'none'}. "
-                "Investigate why and correct the fix. Do not modify tests."
-            )
+            if baseline and not after:
+                # No results at all is a crashed or timed-out run, not thousands of regressions.
+                prompt = (
+                    "Verification failed: the test run after your change produced no results, so the suite crashed or "
+                    "timed out. Check that the code still imports and runs, then correct the fix. Do not modify tests."
+                )
+            else:
+                prompt = (
+                    f"Verification failed. Still failing: {_some(verification['still_failing'])}; "
+                    f"regressions: {_some(verification['regressions'])}. Investigate why and correct the fix. Do not modify tests."
+                )
         return verification
 
     def _run_phase(self, workspace: Workspace, phase: str, prompt_items: list, tools: list[dict], max_steps: int) -> str:
@@ -734,6 +740,14 @@ class Investigation:
 
 def _names(tools: list[dict]) -> set[str]:
     return {tool["name"] for tool in tools}
+
+
+def _some(tests: list[str], limit: int = 15) -> str:
+    """Test ids for a prompt: a large suite can fail by the thousand, and each name costs tokens."""
+    if not tests:
+        return "none"
+    more = f", and {len(tests) - limit} more" if len(tests) > limit else ""
+    return ", ".join(tests[:limit]) + more
 
 
 def _rounded(timing: dict) -> dict:

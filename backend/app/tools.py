@@ -311,8 +311,11 @@ class Workspace:
             args.append(selector)
         # A wide virtual terminal stops pytest from truncating the failure messages.
         code = f"import os, sys; os.environ['COLUMNS'] = '400'; import pytest; sys.exit(pytest.main({args!r}))"
-        result = self.sandbox.python(["-c", code], timeout=180)
+        # Large suites (tens of thousands of parametrized tests) need minutes; a timeout returns no outcomes at all.
+        result = self.sandbox.python(["-c", code], timeout=600)
         outcomes, reasons = {}, {}
+        if result.timed_out:
+            reasons["(test run)"] = "timed out after 600s"
         for line in (result.stdout + result.stderr).splitlines():
             match = re.match(r"^(PASSED|FAILED|ERROR) (\S+)(?: - (.+))?$", line)
             if match:

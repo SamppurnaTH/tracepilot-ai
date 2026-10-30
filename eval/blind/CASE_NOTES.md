@@ -12,6 +12,8 @@ Artifacts: [round-2 report](round-2/inflect-172/report.json), [candidate diff](r
 
 The investigator replaced truthiness checks with `is not None` and added three reproductions. Its selected local tests passed and Muse Spark Open approved. The upstream hidden tests accepted the falsy-exception behavior but rejected two `does_not_evaluate_repr` cases: the code still builds the default error message before raising the supplied exception. Formatting a deliberately problematic item's representation can therefore raise instead of the requested exception.
 
+**Disclosure:** the incident given to TracePilot did not state this requirement. It was written from the fix PR, which listed "only construct the default exception message when no custom exception is supplied, avoiding potential errors in item `__repr__`" as a separate change; the study author omitted it from the symptom description. The two failed hidden tests check exactly that unstated behaviour. The result is kept as **not fixed** because the hidden oracle is the study's scoring rule, but it is weaker evidence of a verification blind spot than a failure on a stated requirement would be.
+
 The outcome is **not fixed (2/4 hidden target tests)**. This is a concrete test-green, reviewer-approved candidate that the broader oracle rejects. Separate context does not guarantee independent coverage or eliminate shared blind spots. No second model attempt was used to repair this result.
 
 Artifacts: [report](round-2/more-itertools-1279/report.json), [candidate diff](round-2/more-itertools-1279/patch.diff), [held-out outcomes](round-2/more-itertools-1279/hidden-outcomes.json).

@@ -433,3 +433,26 @@ def test_unsupported_screenshot_is_refused(tmp_path):
     bad.write_bytes(b"%PDF")
     with pytest.raises(ValueError, match="unsupported screenshot type"):
         Investigation("x", SAMPLE_APP, client=object(), model="fake", images=[bad])
+
+
+def test_retry_prompt_stays_small_when_a_large_suite_fails():
+    from app.agent import _some
+
+    assert _some([]) == "none"
+    many = [f"tests/test_x.py::test_{i}" for i in range(56_619)]
+    text = _some(many)
+    assert text.endswith("and 56604 more") and len(text) < 600
+
+
+def test_a_test_run_with_no_results_is_reported_as_a_crash_not_regressions(monkeypatch):
+    from app.tools import Workspace
+
+    # The baseline runs normally (test_report); every verification run after the patch returns nothing.
+    monkeypatch.setattr(Workspace, "test_outcomes", lambda self: {})
+    report, client = run(
+        investigation_script()
+        + [[call("edit_file", path="orders_api/app.py", old=COUPON_BUG, new=COUPON_FIX)], "Fixed.",
+           [call("read_file", path="orders_api/app.py")], "Checked.", REPORT]
+    )
+    retry = next(r for r in client.requests if any("produced no results" in str(i) for i in r["input"]))
+    assert "regressions:" not in str(retry["input"]) and not report["verification"]["verified"]

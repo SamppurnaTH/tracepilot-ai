@@ -66,7 +66,7 @@ What this shows, honestly: the model is strong on its own, and the plain agent n
 
 ### Blind study on fresh real bugs
 
-**Round 2: 2/7 fixed by the projects' own hidden tests**: Inflect and Tomlkit. All seven cases were attempted once with the follow-up harness; three were not fixed and two ended in errors (API connection and model context-window overflow). More-itertools passed local verification and received reviewer approval but failed two hidden edge cases. Click was only partially fixed; Pyparsing received no application-code fix. No failed case was restarted to improve its score.
+**Round 2: 2/7 fixed by the projects' own hidden tests**: Inflect and Tomlkit. All seven cases were attempted once with the follow-up harness; three were not fixed and two ended in errors (API connection and model context-window overflow). More-itertools passed local verification and received reviewer approval but failed two hidden edge cases, which test a requirement its bug report (written by us from the fix PR) did not state. Click was only partially fixed; Pyparsing received no application-code fix. No failed case was restarted to improve its score.
 
 Round 1 is preserved separately: 1/4 recorded cases passed the hidden oracle before the run stopped. It exposed an unanswered chained-tool-call crash and collection errors that prevented unrelated tests from running. The follow-up repairs those harness paths, supports common pyproject test dependencies and src layouts, and reports unchanged unloadable files explicitly. The original unrecorded process exit remains unexplained; it is not retroactively relabelled as the later connection failure.
 
