@@ -180,7 +180,10 @@ class Hypothesis:
 def compare_outcomes(before: dict[str, str], after: dict[str, str]) -> dict:
     """Decide verification from per-test outcomes: every failing test fixed, nothing newly broken."""
     fixed = sorted(t for t, o in before.items() if o != "passed" and after.get(t) == "passed")
-    still_failing = sorted(t for t, o in after.items() if o != "passed" and before.get(t, "failed") != "passed")
+    # A Python test file that can't even be loaded in the sandbox, before and after alike (a missing optional
+    # dependency or data checkout), says nothing about the fix: it's reported, not counted as still failing.
+    unloadable = sorted(t for t, o in after.items() if t.endswith(".py") and o == "error" and before.get(t) == "error")
+    still_failing = sorted(t for t, o in after.items() if o != "passed" and before.get(t, "failed") != "passed" and t not in unloadable)
     regressions = sorted(t for t, o in before.items() if o == "passed" and after.get(t) != "passed")
     missing = sorted(t for t in before if t not in after)
     # Something that failed must now pass: a run that fixed nothing proved nothing.
@@ -191,6 +194,7 @@ def compare_outcomes(before: dict[str, str], after: dict[str, str]) -> dict:
         "still_failing": still_failing,
         "regressions": regressions,
         "missing": missing,
+        "unloadable": unloadable,
         "before": _tally(before),
         "after": _tally(after),
     }
@@ -261,6 +265,7 @@ class Investigation:
         self.usage = {"input_tokens": 0, "output_tokens": 0, "cached_tokens": 0, "model_calls": 0, "tool_calls": 0, "by_phase": {}}
         self._phase = "investigate"
         self._previous_id: str | None = None
+        self._pending_calls: list[str] = []
         self._history: list = []
         self._call_counts: dict[str, int] = {}
         self._started = 0.0
@@ -330,6 +335,13 @@ class Investigation:
             return response
         if self._previous_id:
             params["previous_response_id"] = self._previous_id
+        answered = {item.get("call_id") for item in input_items if isinstance(item, dict) and item.get("type") == "function_call_output"}
+        input_items = [
+            {"type": "function_call_output", "call_id": call_id,
+             "output": json.dumps({"error": "not executed: the step budget was reached"})}
+            for call_id in self._pending_calls if call_id not in answered
+        ] + list(input_items)
+        params["input"] = input_items
         # Keep our own transcript so a run survives the server losing the response chain.
         self._history.extend(input_items)
         try:
@@ -342,6 +354,7 @@ class Investigation:
             params["input"] = list(self._history)
             response = self.client.responses.create(**params)
         self._previous_id = response.id
+        self._pending_calls = [item.call_id for item in response.output if getattr(item, "type", None) == "function_call"]
         self._history.extend(item for item in map(_as_input_item, response.output) if item)
         self._count(response)
         thought = _thought(response)
@@ -652,7 +665,8 @@ class Investigation:
                 "findings": findings,
                 "diff": sandbox.diff(),
                 "excluded_tests": workspace.excluded,
-                "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified.",
+                "verification_scope": "Selected/default local tests only; excluded infrastructure tests and unobserved production behavior are not verified."
+                + (" Unchanged collection errors excluded from verification: " + ", ".join(verification["unloadable"]) + "." if verification.get("unloadable") else ""),
                 "verification": verification,
                 "outcome": outcome,
                 "second_opinion": second_opinion,

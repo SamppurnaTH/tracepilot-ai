@@ -1,0 +1,65 @@
+[
+  {
+    "number": 282,
+    "html_url": "https://github.com/jaraco/inflect/pull/282",
+    "merged_at": "2026-10-21T17:11:32Z",
+    "merge_commit_sha": "a58a8a3571f2f3595e59faa1644002fda328713d",
+    "title": "Fix IndexError in plural() for phrases whose word count changes (#172)",
+    "id": "inflect-172",
+    "pinned_fix_matches": true
+  },
+  {
+    "number": 1279,
+    "html_url": "https://github.com/more-itertools/more-itertools/pull/1279",
+    "merged_at": "2026-09-14T14:39:09Z",
+    "merge_commit_sha": "b2f3aff7633057d234ec9186c18a53f4df306d08",
+    "title": "Fix one() and only() dropping a falsy user-supplied exception",
+    "id": "more-itertools-1279",
+    "pinned_fix_matches": true
+  },
+  {
+    "number": 599,
+    "html_url": "https://github.com/python-poetry/tomlkit/pull/599",
+    "merged_at": "2026-10-12T10:45:30Z",
+    "merge_commit_sha": "8c30fc17d91aee7469c0287e509300e78aa15227",
+    "title": "Fix Array.__delitem__ corrupting rendered output on slice deletion",
+    "id": "tomlkit-599",
+    "pinned_fix_matches": true
+  },
+  {
+    "number": 653,
+    "html_url": "https://github.com/pyparsing/pyparsing/pull/653",
+    "merged_at": "2026-08-18T04:25:14Z",
+    "merge_commit_sha": "efd56db4e59f36b1673ce0eb0823e3afaa9d1201",
+    "title": "Fix match_previous_expr to match nested and repeated expressions (issue #560)",
+    "id": "pyparsing-560",
+    "pinned_fix_matches": true
+  },
+  {
+    "number": 3082,
+    "html_url": "https://github.com/marshmallow-code/marshmallow/pull/3082",
+    "merged_at": "2026-10-19T16:55:44Z",
+    "merge_commit_sha": "5761beab3985d654d712f9326e08bfb2e2ec9c4c",
+    "title": "Fix Pluck handling of empty data_key",
+    "id": "marshmallow-3082",
+    "pinned_fix_matches": true
+  },
+  {
+    "number": 3884,
+    "html_url": "https://github.com/pallets/click/pull/3884",
+    "merged_at": "2026-10-06T20:59:00Z",
+    "merge_commit_sha": "8c73ff134480f436faa0d041bd19aaf949aac22c",
+    "title": "Fix `show_envvar` output for a sequence or an empty `envvar`",
+    "id": "click-3884",
+    "pinned_fix_matches": true
+  },
+  {
+    "number": 1430,
+    "html_url": "https://github.com/pypa/packaging/pull/1430",
+    "merged_at": "2026-10-06T14:23:26Z",
+    "merge_commit_sha": "2aada00b158feb36109d77dc91d62baa91f7d400",
+    "title": "fix: reject empty arbitrary versions in requirements",
+    "id": "packaging-1430",
+    "pinned_fix_matches": true
+  }
+]

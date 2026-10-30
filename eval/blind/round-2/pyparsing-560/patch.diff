@@ -1,0 +1,51 @@
+--- /dev/null
++++ b/tests/test_regression_nested_match_previous.py
+@@ -0,0 +1,48 @@
++import pyparsing as pp
++
++
++def test_match_previous_expr_nested_different_tags():
++    # SO https://stackoverflow.com/questions/78574784/ - nested open/close tags
++    # opener name and closer must match, LIFO for nesting:
++    # <a><b>...</b></a> should parse, <a><b>...</a></b> should not
++    tag_open_name = pp.Word(pp.alphas)
++    tag_close_name = pp.match_previous_expr(tag_open_name)
++
++    open_tag = "<" + tag_open_name + ">"
++    close_tag = "</" + tag_close_name + ">"
++
++    element = pp.Forward()
++    element <<= pp.Group(
++        open_tag + pp.ZeroOrMore(element | pp.Word(pp.alphas)) + close_tag
++    )
++
++    # single level sanity is covered by nested case; nested with distinct
++    # tags must succeed
++    result = element.parse_string("<a><b>hello</b></a>", parse_all=True)
++    # verify structure contains both tags
++    flat = " ".join(result.as_list()[0][:5])
++    assert "a" in flat and "b" in flat
++
++
++def test_match_previous_expr_nested_mismatch_detected():
++    tag_open_name = pp.Word(pp.alphas)
++    tag_close_name = pp.match_previous_expr(tag_open_name)
++
++    open_tag = "<" + tag_open_name + ">"
++    close_tag = "</" + tag_close_name + ">"
++
++    element = pp.Forward()
++    element <<= pp.Group(
++        open_tag + pp.ZeroOrMore(element | pp.Word(pp.alphas)) + close_tag
++    )
++
++    # mismatched nesting must raise, not silently succeed
++    try:
++        element.parse_string("<a><b>hello</a></b>", parse_all=True)
++    except pp.ParseBaseException:
++        pass
++    else:
++        raise AssertionError("mismatched nested tags should not parse")
++
++    # correctly nested must succeed
++    element.parse_string("<a><b>hello</b></a>", parse_all=True)

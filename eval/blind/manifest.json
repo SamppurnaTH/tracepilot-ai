@@ -1,0 +1,152 @@
+[
+  {
+    "id": "inflect-172",
+    "repo": "jaraco/inflect",
+    "pr": 282,
+    "merged": "2026-10-21",
+    "source": "issue #172 (verbatim; traceback shortened to the library's own frames)",
+    "tests": [
+      "tests/test_pwd.py"
+    ],
+    "before": "99596854bd296af1557db2015cfa98c8104ec155",
+    "fix": "a58a8a3571f2f3595e59faa1644002fda328713d",
+    "image": "tracepilot-sandbox-project:b639a29a61f9",
+    "target_tests": [
+      "tests/test_pwd.py::Test::test_plural_phrase_changing_word_count"
+    ],
+    "passing_after_fix": 176,
+    "collected": 176
+  },
+  {
+    "id": "more-itertools-1279",
+    "repo": "more-itertools/more-itertools",
+    "pr": 1279,
+    "merged": "2026-09-14",
+    "source": "written from PR #1279's bug description",
+    "tests": [
+      "tests/test_more.py"
+    ],
+    "before": "4ebeea3e569388911a0bec740092f3cf996d79f3",
+    "fix": "b2f3aff7633057d234ec9186c18a53f4df306d08",
+    "image": "tracepilot-sandbox:1",
+    "target_tests": [
+      "tests/test_more.py::OneTests::test_falsy_custom_exception",
+      "tests/test_more.py::OneTests::test_too_long_does_not_evaluate_repr",
+      "tests/test_more.py::OnlyTests::test_falsy_custom_exception",
+      "tests/test_more.py::OnlyTests::test_too_long_does_not_evaluate_repr"
+    ],
+    "passing_after_fix": 609,
+    "collected": 609
+  },
+  {
+    "id": "tomlkit-599",
+    "repo": "sdispater/tomlkit",
+    "pr": 599,
+    "merged": "2026-10-12",
+    "source": "written from PR #599's bug description",
+    "tests": [
+      "tests/test_items.py"
+    ],
+    "before": "88aa4b1c1128587b8c8ee92d0db11db7bfbdc0ed",
+    "fix": "8c30fc17d91aee7469c0287e509300e78aa15227",
+    "image": "tracepilot-sandbox-project:78f5672abf14",
+    "target_tests": [
+      "tests/test_items.py::test_array_slice_deletion_keeps_render_in_sync"
+    ],
+    "passing_after_fix": 104,
+    "collected": 104
+  },
+  {
+    "id": "pyparsing-560",
+    "repo": "pyparsing/pyparsing",
+    "pr": 653,
+    "merged": "2026-08-18",
+    "source": "issue #560 (verbatim; its Stack Overflow link is not reachable from the sandbox)",
+    "tests": [
+      "tests/test_unit.py"
+    ],
+    "before": "038ff39cbc29b77a74ac21674206d5bf170ca769",
+    "fix": "efd56db4e59f36b1673ce0eb0823e3afaa9d1201",
+    "image": "tracepilot-sandbox:1",
+    "target_tests": [
+      "tests/test_unit.py::Test02_WithoutPackrat::testRepeaterNested",
+      "tests/test_unit.py::Test02_WithoutPackrat::testRepeaterReusedParser"
+    ],
+    "passing_after_fix": 1934,
+    "collected": 1934
+  },
+  {
+    "id": "marshmallow-3082",
+    "repo": "marshmallow-code/marshmallow",
+    "pr": 3082,
+    "merged": "2026-10-19",
+    "source": "written from PR #3074's bug description",
+    "tests": [
+      "tests/test_fields.py"
+    ],
+    "before": "d08471b17880c62b789971ada638707a11d3f8d4",
+    "fix": "5761beab3985d654d712f9326e08bfb2e2ec9c4c",
+    "image": "tracepilot-sandbox-project:5276acadb62c",
+    "target_tests": [
+      "tests/test_fields.py::TestPluckFiekd::test_pluck_empty_data_key[False]",
+      "tests/test_fields.py::TestPluckFiekd::test_pluck_empty_data_key[True]"
+    ],
+    "passing_after_fix": 110,
+    "collected": 110
+  },
+  {
+    "id": "click-3884",
+    "repo": "pallets/click",
+    "pr": 3884,
+    "merged": "2026-10-06",
+    "source": "written from PR #3884's bug description",
+    "tests": [
+      "tests/test_options.py"
+    ],
+    "before": "bb695aaecdef95832d167fc1d508921745aa824e",
+    "fix": "8c73ff134480f436faa0d041bd19aaf949aac22c",
+    "image": "tracepilot-sandbox-project:b8c520d719fb",
+    "target_tests": [
+      "tests/test_options.py::test_missing_envvar_sequence[-'--units']",
+      "tests/test_options.py::test_missing_envvar_sequence[envvar1-'--units'",
+      "tests/test_options.py::test_missing_envvar_sequence[envvar2-'--units'",
+      "tests/test_options.py::test_missing_envvar_sequence[envvar3-'--units'",
+      "tests/test_options.py::test_missing_envvar_sequence[envvar4-'--units']",
+      "tests/test_options.py::test_show_envvar_empty[None-",
+      "tests/test_options.py::test_show_envvar_empty[WEATHER-"
+    ],
+    "passing_after_fix": 644,
+    "collected": 644
+  },
+  {
+    "id": "packaging-1430",
+    "repo": "pypa/packaging",
+    "pr": 1430,
+    "merged": "2026-10-06",
+    "source": "written from PR #1430's bug description",
+    "tests": [
+      "tests/test_requirements.py",
+      "tests/test_specifiers.py"
+    ],
+    "before": "2c87a33f665828b7aa0f650b1b50243b3ab95695",
+    "fix": "2aada00b158feb36109d77dc91d62baa91f7d400",
+    "image": "tracepilot-sandbox-project:69b7d6fb7d1a",
+    "target_tests": [
+      "tests/test_requirements.py::TestRequirementParsing::test_error_on_missing_arbitrary_version[foo",
+      "tests/test_requirements.py::TestRequirementParsing::test_error_on_missing_arbitrary_version[foo===",
+      "tests/test_requirements.py::TestRequirementParsing::test_error_on_missing_arbitrary_version[foo===,>=1]",
+      "tests/test_requirements.py::TestRequirementParsing::test_error_on_missing_arbitrary_version[foo===]",
+      "tests/test_requirements.py::TestRequirementParsing::test_error_on_missing_arbitrary_version[foo===x,===,>=1]",
+      "tests/test_requirements.py::TestRequirementParsing::test_error_on_missing_arbitrary_version[foo===x,===]",
+      "tests/test_requirements.py::TestRequirementParsing::test_error_on_missing_arbitrary_version[foo>=1,===,<=2]",
+      "tests/test_requirements.py::TestRequirementParsing::test_error_on_missing_arbitrary_version[foo>=1,===]",
+      "tests/test_specifiers.py::TestSpecifier::test_specifiers_invalid[===",
+      "tests/test_specifiers.py::TestSpecifier::test_specifiers_invalid[===]",
+      "tests/test_specifiers.py::TestSpecifierSet::test_empty_arbitrary_version_invalid[===,===x]",
+      "tests/test_specifiers.py::TestSpecifierSet::test_empty_arbitrary_version_invalid[===]",
+      "tests/test_specifiers.py::TestSpecifierSet::test_empty_arbitrary_version_invalid[>=1,===]"
+    ],
+    "passing_after_fix": 3897,
+    "collected": 3897
+  }
+]

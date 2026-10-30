@@ -1,0 +1,54 @@
+--- a/more_itertools/more.py
++++ b/more_itertools/more.py
+@@ -662,9 +662,11 @@
+                 f'Expected exactly one item in iterable, but got {first!r}, '
+                 f'{second!r}, and perhaps more.'
+             )
+-            raise too_long or ValueError(msg)
++            raise too_long if too_long is not None else ValueError(msg)
+         return first
+-    raise too_short or ValueError('too few items in iterable (expected 1)')
++    raise too_short if too_short is not None else ValueError(
++        'too few items in iterable (expected 1)'
++    )
+ 
+ 
+ def raise_(exception, *args):
+@@ -3685,7 +3687,7 @@
+                 f'Expected exactly one item in iterable, but got {first!r}, '
+                 f'{second!r}, and perhaps more.'
+             )
+-            raise too_long or ValueError(msg)
++            raise too_long if too_long is not None else ValueError(msg)
+         return first
+     return default
+ 
+--- /dev/null
++++ b/tests/test_regression_falsy_exception.py
+@@ -0,0 +1,26 @@
++import pytest
++
++import more_itertools as mi
++
++
++class FalsyException(Exception):
++    def __bool__(self):
++        return False
++
++
++def test_one_too_long_falsy_exception():
++    exc = FalsyException('too long')
++    with pytest.raises(FalsyException):
++        mi.one([1, 2], too_long=exc)
++
++
++def test_one_too_short_falsy_exception():
++    exc = FalsyException('too short')
++    with pytest.raises(FalsyException):
++        mi.one([], too_short=exc)
++
++
++def test_only_too_long_falsy_exception():
++    exc = FalsyException('too long')
++    with pytest.raises(FalsyException):
++        mi.only([1, 2], too_long=exc)

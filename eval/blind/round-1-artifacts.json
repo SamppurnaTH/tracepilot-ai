@@ -1,0 +1,22 @@
+[
+  {
+    "id": "inflect-172",
+    "report": "eval/blind/round-1/inflect-172/report.json",
+    "note": "Recovered cached original report before round-2 replacement; no report available for API crash."
+  },
+  {
+    "id": "more-itertools-1279",
+    "report": null,
+    "note": "Recovered cached original report before round-2 replacement; no report available for API crash."
+  },
+  {
+    "id": "tomlkit-599",
+    "report": "eval/blind/round-1/tomlkit-599/report.json",
+    "note": "Recovered cached original report before round-2 replacement; no report available for API crash."
+  },
+  {
+    "id": "pyparsing-560",
+    "report": "eval/blind/round-1/pyparsing-560/report.json",
+    "note": "Recovered cached original report before round-2 replacement; no report available for API crash."
+  }
+]

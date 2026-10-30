@@ -83,6 +83,39 @@ def investigation_script() -> list:
 # --- verification logic -----------------------------------------------------
 
 
+def test_new_phase_answers_unexecuted_chained_calls():
+    pending = call("read_file", path="README.md")
+    client = FakeClient([[pending], "next phase"])
+    inv = Investigation("incident", SAMPLE_APP, client=client, model="fake")
+    inv._call_model([{"role": "user", "content": "summarize"}], None, True)
+    inv._call_model([{"role": "user", "content": "next phase"}], None, True)
+    request = client.requests[1]
+    assert request["previous_response_id"] == "resp-1"
+    output = request["input"][0]
+    assert output["call_id"] == pending.call_id
+    assert output["type"] == "function_call_output"
+    assert "not executed" in output["output"]
+    assert output in inv._history
+
+
+def test_chained_tool_output_is_not_duplicated():
+    pending = call("read_file", path="README.md")
+    client = FakeClient([[pending], "done"])
+    inv = Investigation("incident", SAMPLE_APP, client=client, model="fake")
+    inv._call_model([], None, True)
+    answered = {"type": "function_call_output", "call_id": pending.call_id, "output": "file contents"}
+    inv._call_model([answered], None, True)
+    assert client.requests[1]["input"] == [answered]
+
+
+def test_unchanged_collection_error_is_reported_as_unloadable():
+    result = compare_outcomes({"tests/test_x.py": "error", "bug": "failed"}, {"tests/test_x.py": "error", "bug": "passed"})
+    assert result["verified"]
+    assert result["unloadable"] == ["tests/test_x.py"]
+    assert not result["still_failing"]
+    assert not compare_outcomes({"bug": "failed"}, {"bug": "passed", "tests/test_x.py": "error"})["verified"]
+
+
 def test_compare_outcomes_verified():
     before = {"a": "passed", "b": "failed"}
     result = compare_outcomes(before, {"a": "passed", "b": "passed"})

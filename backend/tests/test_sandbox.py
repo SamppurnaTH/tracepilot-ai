@@ -102,3 +102,29 @@ def test_docker_send_request(docker_sandbox):
     ws = Workspace(docker_sandbox)
     result = ws.send_request("GET", "/orders/7", headers={"Authorization": "Bearer token-bob"})
     assert result["status"] == 200
+
+
+def test_python_requirements_reads_pyproject_extras_groups_and_files(tmp_path):
+    from app.sandbox import python_requirements
+
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "My_Lib"\ndependencies = ["attrs>=23"]\n'
+        '[project.optional-dependencies]\ntest = ["pytest-mock", "my-lib[extra]"]\ndocs = ["sphinx"]\n'
+        '[dependency-groups]\ndev = ["hypothesis", {include-group = "test"}]\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "requirements-test.txt").write_text("pretend  # comment\n-r other.txt\n-e .\nattrs>=23\n", encoding="utf-8")
+    reqs = python_requirements(tmp_path)
+    # Test and dev needs are installed; docs extras, includes, editable installs and the project itself are not.
+    assert reqs == ["pretend", "attrs>=23", "pytest-mock", "hypothesis"]
+
+
+def test_src_layout_is_importable_without_installing(tmp_path):
+    from app.sandbox import Sandbox
+
+    (tmp_path / "src" / "mylib").mkdir(parents=True)
+    (tmp_path / "src" / "mylib" / "__init__.py").write_text("VALUE = 42\n", encoding="utf-8")
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "mylib"\n', encoding="utf-8")
+    with Sandbox(tmp_path, isolation="process", app=None) as sb:
+        result = sb.python(["-c", "import mylib; print(mylib.VALUE)"])
+    assert result.stdout.strip() == "42"

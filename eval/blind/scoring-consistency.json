@@ -1,0 +1,53 @@
+{
+  "checks": [
+    {
+      "id": "marshmallow-3082",
+      "result": "error"
+    },
+    {
+      "id": "inflect-172",
+      "result": "fixed",
+      "scored_outcomes": 176,
+      "reference_outcomes": 176,
+      "target_passed": 1,
+      "model": "muse-spark-1.3"
+    },
+    {
+      "id": "more-itertools-1279",
+      "result": "not fixed",
+      "scored_outcomes": 609,
+      "reference_outcomes": 609,
+      "target_passed": 2,
+      "model": "muse-spark-1.3"
+    },
+    {
+      "id": "tomlkit-599",
+      "result": "fixed",
+      "scored_outcomes": 104,
+      "reference_outcomes": 104,
+      "target_passed": 1,
+      "model": "muse-spark-1.3"
+    },
+    {
+      "id": "pyparsing-560",
+      "result": "not fixed",
+      "scored_outcomes": 1934,
+      "reference_outcomes": 1934,
+      "target_passed": 0,
+      "model": "muse-spark-1.3"
+    },
+    {
+      "id": "click-3884",
+      "result": "not fixed",
+      "scored_outcomes": 644,
+      "reference_outcomes": 644,
+      "target_passed": 5,
+      "model": "muse-spark-1.3"
+    },
+    {
+      "id": "packaging-1430",
+      "result": "error"
+    }
+  ],
+  "no_new_model_attempts": true
+}

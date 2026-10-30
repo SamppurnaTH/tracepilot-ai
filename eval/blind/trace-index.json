@@ -1,0 +1,264 @@
+[
+  {
+    "id": "click-3884",
+    "trace_sha256": "f4c6e953d67d9fc79bb0ad7233b532ce8b78d7c320749e5e2fd8be96fc168e8f",
+    "events": 86,
+    "last_event_s": 375.32,
+    "phases": [
+      {
+        "phase": "investigate",
+        "t": 22.95
+      },
+      {
+        "phase": "fix",
+        "t": 218.07
+      },
+      {
+        "phase": "fix",
+        "t": 259.77
+      },
+      {
+        "phase": "review",
+        "t": 300.77
+      },
+      {
+        "phase": "fix",
+        "t": 309.43
+      },
+      {
+        "phase": "review",
+        "t": 348.08
+      },
+      {
+        "phase": "report",
+        "t": 355.84
+      }
+    ],
+    "verification": [
+      {
+        "attempt": 1,
+        "verified": false,
+        "t": 259.77
+      },
+      {
+        "attempt": 2,
+        "verified": false,
+        "t": 300.77
+      },
+      {
+        "attempt": 3,
+        "verified": false,
+        "t": 348.08
+      }
+    ],
+    "budget_events": 4,
+    "baseline_outcomes": 1656
+  },
+  {
+    "id": "inflect-172",
+    "trace_sha256": "3785f56b243b34ed07948c7e8ee843225c7fe5d5b4703c0b3eb5d22af398ce4e",
+    "events": 71,
+    "last_event_s": 449.23,
+    "phases": [
+      {
+        "phase": "investigate",
+        "t": 9.73
+      },
+      {
+        "phase": "fix",
+        "t": 334.61
+      },
+      {
+        "phase": "fix",
+        "t": 363.96
+      },
+      {
+        "phase": "review",
+        "t": 399.21
+      },
+      {
+        "phase": "report",
+        "t": 420.61
+      }
+    ],
+    "verification": [
+      {
+        "attempt": 1,
+        "verified": false,
+        "t": 363.95
+      },
+      {
+        "attempt": 2,
+        "verified": true,
+        "t": 399.21
+      }
+    ],
+    "budget_events": 3,
+    "baseline_outcomes": 197
+  },
+  {
+    "id": "marshmallow-3082",
+    "trace_sha256": "376c4170943513b4580295c4abf53a294a778cc6d60e99b29d9d89ef1dd7b109",
+    "events": 33,
+    "last_event_s": 127.6,
+    "phases": [
+      {
+        "phase": "investigate",
+        "t": 10.3
+      }
+    ],
+    "verification": [],
+    "budget_events": 0,
+    "baseline_outcomes": 1156
+  },
+  {
+    "id": "more-itertools-1279",
+    "trace_sha256": "29304608f9ccae3c23554a7fb491c68aa69ab7dee485334c2ec938bff0481165",
+    "events": 61,
+    "last_event_s": 298.67,
+    "phases": [
+      {
+        "phase": "investigate",
+        "t": 47.23
+      },
+      {
+        "phase": "fix",
+        "t": 157.49
+      },
+      {
+        "phase": "review",
+        "t": 278.09
+      },
+      {
+        "phase": "report",
+        "t": 288.56
+      }
+    ],
+    "verification": [
+      {
+        "attempt": 1,
+        "verified": true,
+        "t": 278.07
+      }
+    ],
+    "budget_events": 1,
+    "baseline_outcomes": 750
+  },
+  {
+    "id": "packaging-1430",
+    "trace_sha256": "9410c8fa6170d5eba912caf3d62f343caf11afd1cd0b5c2c3d5da0b8b8aa8fb3",
+    "events": 64,
+    "last_event_s": 486.46,
+    "phases": [
+      {
+        "phase": "investigate",
+        "t": 104.34
+      },
+      {
+        "phase": "fix",
+        "t": 204.71
+      },
+      {
+        "phase": "fix",
+        "t": 486.46
+      }
+    ],
+    "verification": [
+      {
+        "attempt": 1,
+        "verified": false,
+        "t": 486.39
+      }
+    ],
+    "budget_events": 1,
+    "baseline_outcomes": 56619
+  },
+  {
+    "id": "pyparsing-560",
+    "trace_sha256": "22aaeca9099236fa950d2934b996dbc6eff0276170ad4d071fad7075a741be26",
+    "events": 95,
+    "last_event_s": 1107.89,
+    "phases": [
+      {
+        "phase": "investigate",
+        "t": 126.53
+      },
+      {
+        "phase": "fix",
+        "t": 429.05
+      },
+      {
+        "phase": "fix",
+        "t": 693.43
+      },
+      {
+        "phase": "review",
+        "t": 894.55
+      },
+      {
+        "phase": "fix",
+        "t": 899.88
+      },
+      {
+        "phase": "review",
+        "t": 1086.71
+      },
+      {
+        "phase": "report",
+        "t": 1093.17
+      }
+    ],
+    "verification": [
+      {
+        "attempt": 1,
+        "verified": false,
+        "t": 693.43
+      },
+      {
+        "attempt": 2,
+        "verified": false,
+        "t": 894.55
+      },
+      {
+        "attempt": 3,
+        "verified": false,
+        "t": 1086.71
+      }
+    ],
+    "budget_events": 4,
+    "baseline_outcomes": 2042
+  },
+  {
+    "id": "tomlkit-599",
+    "trace_sha256": "4c28112f9e270eef07f27aca7095add13dd8cbf977b4fc307a560347b3c59048",
+    "events": 50,
+    "last_event_s": 229.85,
+    "phases": [
+      {
+        "phase": "investigate",
+        "t": 9.91
+      },
+      {
+        "phase": "fix",
+        "t": 100.89
+      },
+      {
+        "phase": "review",
+        "t": 204.75
+      },
+      {
+        "phase": "report",
+        "t": 217.96
+      }
+    ],
+    "verification": [
+      {
+        "attempt": 1,
+        "verified": true,
+        "t": 204.75
+      }
+    ],
+    "budget_events": 0,
+    "baseline_outcomes": 388
+  }
+]

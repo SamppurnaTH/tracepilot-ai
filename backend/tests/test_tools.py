@@ -79,6 +79,15 @@ def test_send_request_rejects_external_or_bad_paths(ws, path):
 # --- run_tests ------------------------------------------------------------
 
 
+def test_collection_error_does_not_hide_other_test_outcomes(ws):
+    (ws.root / "tests" / "test_unloadable.py").write_text("import nonexistent_tracepilot_optional_dependency\n")
+    outcomes, _ = ws.test_report()
+    assert outcomes["tests/test_unloadable.py"] == "error"
+    assert "passed" in outcomes.values() and "failed" in outcomes.values()
+    result = call(ws, "run_tests")
+    assert "passed" in result["summary"] and "failed" in result["summary"]
+
+
 def test_run_tests_reports_planted_failures(ws):
     result = call(ws, "run_tests")
     assert result["exit_code"] == 1

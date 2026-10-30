@@ -217,7 +217,7 @@ class Workspace:
         if self.kind == "maven":
             return self._maven_run_tests(selector)
         # --color=no: FORCE_COLOR or PY_COLORS in the environment would otherwise send escape codes to the model.
-        args = ["-m", "pytest", "-q", "--tb=short", "--color=no", "-p", "no:cacheprovider"]
+        args = ["-m", "pytest", "-q", "--tb=short", "--color=no", "--continue-on-collection-errors", "-p", "no:cacheprovider"]
         if selector:
             if ".." in selector or not re.fullmatch(r"[\w/.:\-\[\]]+", selector):
                 raise ValueError("selector must be a test path or node id, e.g. tests/test_orders.py::test_x")
@@ -304,7 +304,7 @@ class Workspace:
                 reasons["(build)"] = self._build_errors(result)
             return outcomes, reasons
         # --color=no: with FORCE_COLOR or PY_COLORS set, colour codes would hide every result line from the parser.
-        args = ["-q", "-rA", "--tb=no", "--color=no", "-p", "no:cacheprovider"]
+        args = ["-q", "-rA", "--tb=no", "--color=no", "--continue-on-collection-errors", "-p", "no:cacheprovider"]
         if selector:
             if ".." in selector or not re.fullmatch(r"[\w/.:\-\[\]]+", selector):
                 raise ValueError("selector must be a test path or node id")

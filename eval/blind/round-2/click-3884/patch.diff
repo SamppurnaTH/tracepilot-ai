@@ -1,0 +1,44 @@
+--- a/src/click/core.py
++++ b/src/click/core.py
+@@ -3270,8 +3270,13 @@
+ 
+     def get_error_hint(self, ctx: Context | None) -> str:
+         result = super().get_error_hint(ctx)
+-        if self.show_envvar and self.envvar is not None:
+-            result += f" (env var: '{self.envvar}')"
++        if self.show_envvar and self.envvar:
++            if isinstance(self.envvar, str):
++                result += f" (env var: '{self.envvar}')"
++            else:
++                envvars = ", ".join(f"'{var}'" for var in self.envvar)
++                if envvars:
++                    result += f" (env var: {envvars})"
+         return result
+ 
+     def _parse_decls(
+--- /dev/null
++++ b/tests/test_regression_show_envvar_hint.py
+@@ -0,0 +1,23 @@
++import click
++
++
++def test_show_envvar_hint_formatting():
++    ctx = click.Context(click.Command("cli"))
++
++    # Empty string envvar: no hint at all.
++    opt_empty_str = click.Option(["--foo"], show_envvar=True, envvar="")
++    assert "env var" not in opt_empty_str.get_error_hint(ctx)
++    help_text = opt_empty_str.get_help_record(ctx)[1]
++    assert "env var" not in help_text
++
++    # Empty list envvar: no hint at all.
++    opt_empty_list = click.Option(["--foo"], show_envvar=True, envvar=[])
++    assert "env var" not in opt_empty_list.get_error_hint(ctx)
++    help_text = opt_empty_list.get_help_record(ctx)[1]
++    assert "env var" not in help_text
++
++    # Sequence envvar: each name quoted individually.
++    opt_seq = click.Option(
++        ["--foo"], show_envvar=True, envvar=["WEATHER_UNITS", "UNITS"]
++    )
++    assert opt_seq.get_error_hint(ctx) == "'--foo' (env var: 'WEATHER_UNITS', 'UNITS')"

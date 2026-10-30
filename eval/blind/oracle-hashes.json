@@ -1,0 +1,104 @@
+[
+  {
+    "id": "inflect-172",
+    "before": "99596854bd296af1557db2015cfa98c8104ec155",
+    "fix": "a58a8a3571f2f3595e59faa1644002fda328713d",
+    "tests": {
+      "tests/test_pwd.py": {
+        "before_sha256": "ddd390da0056b6c581e6e339ff96cef47eecf1338887092f12271cf8243bc2bd",
+        "hidden_sha256": "9b19c34de9f5706a186a41170f4144277ba5e58f1f669d1902a92ccd5cb593d2"
+      }
+    },
+    "license_files": []
+  },
+  {
+    "id": "more-itertools-1279",
+    "before": "4ebeea3e569388911a0bec740092f3cf996d79f3",
+    "fix": "b2f3aff7633057d234ec9186c18a53f4df306d08",
+    "tests": {
+      "tests/test_more.py": {
+        "before_sha256": "9001cc40555f2d70e1bad67d460c928fd200bf41130e2727212553d91cc414ae",
+        "hidden_sha256": "cee36a0f396b9fe7e2992b7acbfb3f32adf9283d738685436dd6dadc68494924"
+      }
+    },
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "tomlkit-599",
+    "before": "88aa4b1c1128587b8c8ee92d0db11db7bfbdc0ed",
+    "fix": "8c30fc17d91aee7469c0287e509300e78aa15227",
+    "tests": {
+      "tests/test_items.py": {
+        "before_sha256": "da4f1b14feef3b270fcfbd27f034e99496e7ce84f84be0dbde87ab3e7f4913f3",
+        "hidden_sha256": "e94664b356fea05f860e4282f5513f5bcd8ca8c5c5f77056552eb3784df8de0b"
+      }
+    },
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "pyparsing-560",
+    "before": "038ff39cbc29b77a74ac21674206d5bf170ca769",
+    "fix": "efd56db4e59f36b1673ce0eb0823e3afaa9d1201",
+    "tests": {
+      "tests/test_unit.py": {
+        "before_sha256": "71addce155be57bcd022a504876a989276dce6b0b04d92bd0c5085565dec8859",
+        "hidden_sha256": "b606a385c0aa5418333fc1b595a7ff54225f511bd71ae2e45cf96277523d59d9"
+      }
+    },
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "marshmallow-3082",
+    "before": "d08471b17880c62b789971ada638707a11d3f8d4",
+    "fix": "5761beab3985d654d712f9326e08bfb2e2ec9c4c",
+    "tests": {
+      "tests/test_fields.py": {
+        "before_sha256": "740232bd88c977728945b858e7f991d92539fc64ca5ddf5db5c1fd753d6a8833",
+        "hidden_sha256": "bad2a6d82cf56410b7b6ce3002155aa6d4c2f3eb5112b75a92b80b96e22fc423"
+      }
+    },
+    "license_files": [
+      "LICENSE"
+    ]
+  },
+  {
+    "id": "click-3884",
+    "before": "bb695aaecdef95832d167fc1d508921745aa824e",
+    "fix": "8c73ff134480f436faa0d041bd19aaf949aac22c",
+    "tests": {
+      "tests/test_options.py": {
+        "before_sha256": "78928adcfacac1436f8a0333b56d74a8d469773d63010ab86ecd1ba6f68bf6a7",
+        "hidden_sha256": "0a6afc3e82ac3c2ccb98d96e6f9a3d50e4143476b5dfdcf4ad70b7deeea9acab"
+      }
+    },
+    "license_files": [
+      "LICENSE.txt"
+    ]
+  },
+  {
+    "id": "packaging-1430",
+    "before": "2c87a33f665828b7aa0f650b1b50243b3ab95695",
+    "fix": "2aada00b158feb36109d77dc91d62baa91f7d400",
+    "tests": {
+      "tests/test_requirements.py": {
+        "before_sha256": "53f5ccb35b05752873ef3e164c9164ab9fe0ff574e4a2f48aef231a8489f66d1",
+        "hidden_sha256": "bc8dfb0ce673bc6c2ee469901cb0dc313f65ceef40eb2b709927b1f043eefc70"
+      },
+      "tests/test_specifiers.py": {
+        "before_sha256": "2a6be9595312cf9ef7147fe5919d28db976710a6dda1cd669b89a53ce36dcf09",
+        "hidden_sha256": "4c82a79a755c014f08990d397c272887091599bd933e1a36bb17e82508916387"
+      }
+    },
+    "license_files": [
+      "LICENSE",
+      "LICENSE.APACHE",
+      "LICENSE.BSD"
+    ]
+  }
+]

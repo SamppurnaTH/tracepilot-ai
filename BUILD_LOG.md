@@ -2,6 +2,13 @@
 
 TracePilot's work below was built during the hackathon building period (Oct 27 – Nov 4, 2026). Times are IST. ShipSpace itself is the author's pre-existing public project; only the planted bug, TracePilot investigation and evaluation are new. Existing libraries/frameworks are reused dependencies, not newly authored hackathon work.
 
+## Oct 30 — model-blinded real-bug study
+
+- Completed the seven-case follow-up on pinned public Python fixes merged Aug–Oct 2026: **2/7 fixed by the upstream hidden tests**, three not fixed and two errors. Inflect and Tomlkit passed; More-itertools was locally verified and reviewer-approved but failed hidden edge cases; Pyparsing and Click were not fixed; Marshmallow had a connection error and Packaging exceeded the model context window. All observations are retained, with no score-seeking restarts.
+- Preserved round 1 (1/4 recorded cases fixed) separately. Repaired unanswered chained tool calls at phase boundaries, continued pytest after collection errors, exposed unchanged unloadable files in the report scope, and added common pyproject test dependencies and src-layout imports. The runner persists per-case traces, records exceptions including exit codes, and refuses silent retries or oracle replacement. The original unrecorded process exit is not retrospectively diagnosed.
+- Published `eval/blind/`: both rounds, candidate diffs, hidden per-test outcomes, partial error traces, pinned source verification, oracle hashes, source licenses, and the measured inference-module snapshot. Disclosed PR-derived incidents, the existing Inflect hint, author knowledge, possible training familiarity, internal fix loops and the absence of a paired control. Previous evaluation numbers rebuild unchanged.
+- Local validation: 176 backend tests passed, one skipped; frontend lint and production build passed. Bookkeeping tests cover retained exits, continued execution, retry refusal, frozen oracles and separate round reporting.
+
 ## Oct 27
 
 **10:44: building started.**

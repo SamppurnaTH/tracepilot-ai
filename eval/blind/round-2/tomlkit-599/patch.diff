@@ -1,0 +1,38 @@
+--- /dev/null
++++ b/tests/test_regression_array_slice_delete.py
+@@ -0,0 +1,22 @@
++import tomlkit
++
++
++def test_del_empty_slice_keeps_rendering():
++    doc = tomlkit.parse("a = [1, 2, 3]\n")
++    del doc["a"][:0]
++    assert doc["a"] == [1, 2, 3]
++    assert tomlkit.dumps(doc) == "a = [1, 2, 3]\n"
++
++
++def test_del_last_slice_matches_list():
++    doc = tomlkit.parse("a = [1, 2, 3]\n")
++    del doc["a"][-1:]
++    assert doc["a"] == [1, 2]
++    assert tomlkit.dumps(doc) == "a = [1, 2]\n"
++
++
++def test_del_all_but_last_slice_matches_list():
++    doc = tomlkit.parse("a = [1, 2, 3]\n")
++    del doc["a"][:-1]
++    assert doc["a"] == [3]
++    assert tomlkit.dumps(doc) == "a = [3]\n"
+--- a/tomlkit/items.py
++++ b/tomlkit/items.py
+@@ -1687,9 +1687,7 @@
+         list.__delitem__(self, key)
+ 
+         if isinstance(key, slice):
+-            indices_to_remove = list(
+-                range(key.start or 0, key.stop or length, key.step or 1)
+-            )
++            indices_to_remove = list(range(*key.indices(length)))
+         else:
+             indices_to_remove = [length + key if key < 0 else key]
+         for i in sorted(indices_to_remove, reverse=True):

@@ -19,6 +19,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import tomllib
 import uuid
 from dataclasses import dataclass
 from functools import lru_cache
@@ -137,6 +138,38 @@ def maven_image(source: Path) -> str:
     return _build(tag, files, dockerfile, "download the project's Maven dependencies into the sandbox image")
 
 
+TEST_EXTRAS = ("test", "tests", "testing", "dev")
+REQUIREMENT_FILES = ("requirements.txt", "requirements-test.txt", "requirements-dev.txt", "test-requirements.txt", "requirements/test.txt")
+
+
+def python_requirements(source: Path) -> list[str]:
+    """What a Python project needs to run its tests: requirements files, plus pyproject.toml's dependencies
+    and its test or dev extras and dependency groups. The project itself is not installed; tests import it
+    from the workspace (and from src/ in a src layout)."""
+    reqs: list[str] = []
+    for name in REQUIREMENT_FILES:
+        path = source / name
+        if path.is_file():
+            # Plain requirements only: includes, constraints, editable installs and options need files we don't copy.
+            reqs += [line.split(" #")[0].strip() for line in path.read_text(encoding="utf-8").splitlines()
+                     if line.strip() and not line.lstrip().startswith(("#", "-", "."))]  # fmt: skip
+    pyproject = source / "pyproject.toml"
+    if pyproject.is_file():
+        try:
+            data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+        except tomllib.TOMLDecodeError:
+            data = {}
+        project = data.get("project", {})
+        reqs += project.get("dependencies", [])
+        for extra in TEST_EXTRAS:
+            reqs += project.get("optional-dependencies", {}).get(extra, [])
+            # PEP 735 groups may include other groups as tables; only plain requirement strings are installable.
+            reqs += [r for r in data.get("dependency-groups", {}).get(extra, []) if isinstance(r, str)]
+    name = str(data.get("project", {}).get("name", "")).lower() if pyproject.is_file() else ""
+    # A project's extras can name the project itself (e.g. "click[dev]"); that's the workspace copy, not a download.
+    return list(dict.fromkeys(r for r in reqs if not name or not r.lower().replace("_", "-").startswith(name.replace("_", "-"))))
+
+
 def project_image(source: Path, kind: str = "python") -> str:
     """The sandbox image for a project: the base image plus the project's own dependencies.
 
@@ -146,16 +179,16 @@ def project_image(source: Path, kind: str = "python") -> str:
     if kind == "maven":
         return maven_image(source)
     ensure_image()
-    requirements = source / "requirements.txt"
-    if not requirements.is_file():
+    reqs = python_requirements(source)
+    if not reqs:
         return IMAGE
-    text = requirements.read_text(encoding="utf-8")
+    text = "\n".join(reqs) + "\n"
     tag = f"tracepilot-sandbox-project:{hashlib.sha256(text.encode()).hexdigest()[:12]}"
     dockerfile = (
         f"FROM {IMAGE}\nUSER root\nCOPY requirements.txt /tmp/requirements.txt\n"
         "RUN pip install -r /tmp/requirements.txt pytest httpx && rm /tmp/requirements.txt\nUSER sandbox\n"
     )
-    return _build(tag, {"requirements.txt": text}, dockerfile, "install the project's requirements.txt in the sandbox image")
+    return _build(tag, {"requirements.txt": text}, dockerfile, "install the project's dependencies in the sandbox image")
 
 
 class LocalRunner:
@@ -165,6 +198,8 @@ class LocalRunner:
         self.root = root
         self.env = {k: v for k, v in os.environ.items() if not any(m in k.upper() for m in SECRET_MARKERS)}
         self.env["PYTHONDONTWRITEBYTECODE"] = "1"
+        if (root / "src").is_dir():  # src layout: tests import the package from the workspace, not an install
+            self.env["PYTHONPATH"] = os.pathsep.join(filter(None, [str(root / "src"), self.env.get("PYTHONPATH")]))
 
     def start(self) -> None:
         pass
@@ -219,6 +254,7 @@ class DockerRunner:
             "--memory", memory,
             "--cpus", cpus,
             "-e", "HOME=/tmp",
+            *(["-e", "PYTHONPATH=/workspace/src"] if (self.root / "src").is_dir() else []),
             "-v", f"{self.root}:/workspace:rw",
             self.image, "sleep", "infinity",
         )  # fmt: skip

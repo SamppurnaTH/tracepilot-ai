@@ -1,0 +1,106 @@
+{
+  "round": 2,
+  "frozen_at": "2026-10-30T07:29:03",
+  "base_commit": "3be67fb21103ed546fef9fd2dd7f39ec97e1fb64",
+  "cases": [
+    {
+      "id": "inflect-172",
+      "fix": "a58a8a3571f2f3595e59faa1644002fda328713d",
+      "repo": "jaraco/inflect",
+      "pr": 282,
+      "merged": "2026-10-21",
+      "source": "issue #172 (verbatim; traceback shortened to the library's own frames)",
+      "tests": [
+        "tests/test_pwd.py"
+      ],
+      "incident": "`engine.plural` raises unexpected `IndexError`\n\nThis might be considered invalid input, but `engine.plural` accepts multiple words. When doing so, it can raise an unexpected `IndexError`:\n\n>>> import inflect\n>>> engine = inflect.engine()\n>>> engine.plural(\"I'm only here for a minute, John.\")\nTraceback (most recent call last):\n  File \"inflect/__init__.py\", line 2403, in plural\n    plural = self.postprocess(\n  File \"inflect/__init__.py\", line 2375, in postprocess\n    result[index] = result[index].capitalize()\nIndexError: list index out of range\n\nThis seems to be because `engine.postprocess` expects the `inflected` it's passed to be the same number of words as the `orig` it's passed, but that's not necessarily the case."
+    },
+    {
+      "id": "more-itertools-1279",
+      "fix": "b2f3aff7633057d234ec9186c18a53f4df306d08",
+      "repo": "more-itertools/more-itertools",
+      "pr": 1279,
+      "merged": "2026-09-14",
+      "source": "written from PR #1279's bug description",
+      "tests": [
+        "tests/test_more.py"
+      ],
+      "incident": "one() and only() ignore a custom exception when the exception object is falsy\n\nPassing a custom exception instance as `too_long` (or `too_short`) to `one()` or `only()` normally raises that exception. But if the exception's class defines `__bool__` returning False, the custom exception is discarded and the default ValueError is raised instead. Expected: the custom exception is raised whatever its truthiness."
+    },
+    {
+      "id": "tomlkit-599",
+      "fix": "8c30fc17d91aee7469c0287e509300e78aa15227",
+      "repo": "sdispater/tomlkit",
+      "pr": 599,
+      "merged": "2026-10-12",
+      "source": "written from PR #599's bug description",
+      "tests": [
+        "tests/test_items.py"
+      ],
+      "incident": "Deleting a slice from an array corrupts the rendered TOML\n\nAfter deleting a slice from an Array, the list contents are right but as_string()/dumps() disagree with them:\n\n    import tomlkit\n    doc = tomlkit.parse(\"a = [1, 2, 3]\\n\")\n    del doc[\"a\"][:0]   # deletes nothing\n    tomlkit.dumps(doc)  # 'a = []\\n'  -- expected 'a = [1, 2, 3]\\n'\n\nOther cases: `del arr[-1:]` leaves list(arr) == [1, 2] but renders `[]`; `del arr[:-1]` leaves [3] but the rendering doesn't match either. Expected: the rendered array always matches the list contents."
+    },
+    {
+      "id": "pyparsing-560",
+      "fix": "efd56db4e59f36b1673ce0eb0823e3afaa9d1201",
+      "repo": "pyparsing/pyparsing",
+      "pr": 653,
+      "merged": "2026-08-18",
+      "source": "issue #560 (verbatim; its Stack Overflow link is not reachable from the sandbox)",
+      "tests": [
+        "tests/test_unit.py"
+      ],
+      "incident": "match_previous_expr does not handle nested expressions\n\nSee this SO post (https://stackoverflow.com/questions/78574784/how-to-make-sure-element-has-parsing-precedence-before-other-elements-in-pyparsi), should be able to use match_previous_expr to enforce matching of opening and closing tags. Does not work for nested tags."
+    },
+    {
+      "id": "marshmallow-3082",
+      "fix": "5761beab3985d654d712f9326e08bfb2e2ec9c4c",
+      "repo": "marshmallow-code/marshmallow",
+      "pr": 3082,
+      "merged": "2026-10-19",
+      "source": "written from PR #3074's bug description",
+      "tests": [
+        "tests/test_fields.py"
+      ],
+      "incident": "fields.Pluck with data_key=\"\" fails to load and dump\n\nA Pluck field whose nested field has `data_key=\"\"` treats the empty key as unset. Loading a valid plucked value raises ValidationError, and dumping it raises KeyError. Ordinary schema fields accept an empty data_key; Pluck should behave the same, for single and many=True nested values."
+    },
+    {
+      "id": "click-3884",
+      "fix": "8c73ff134480f436faa0d041bd19aaf949aac22c",
+      "repo": "pallets/click",
+      "pr": 3884,
+      "merged": "2026-10-06",
+      "source": "written from PR #3884's bug description",
+      "tests": [
+        "tests/test_options.py"
+      ],
+      "incident": "show_envvar renders sequences and empty envvars badly\n\nWith show_envvar=True, the env var hint in error messages and help is wrong for some envvar values:\n\n- envvar=\"\": the error hint shows `(env var: '')` and help shows `[env var: ]`; expected: no hint at all.\n- envvar=[]: the error hint shows `(env var: '[]')` and help shows `[env var: ]`; expected: no hint at all.\n- envvar=[\"WEATHER_UNITS\", \"UNITS\"]: the error hint shows `(env var: '['WEATHER_UNITS', 'UNITS']')`; expected: `(env var: 'WEATHER_UNITS', 'UNITS')`."
+    },
+    {
+      "id": "packaging-1430",
+      "fix": "2aada00b158feb36109d77dc91d62baa91f7d400",
+      "repo": "pypa/packaging",
+      "pr": 1430,
+      "merged": "2026-10-06",
+      "source": "written from PR #1430's bug description",
+      "tests": [
+        "tests/test_requirements.py",
+        "tests/test_specifiers.py"
+      ],
+      "incident": "Empty arbitrary-equality versions are accepted\n\n`Requirement(\"foo===\")` parses without error, and so do `Specifier(\"===\")` and `SpecifierSet(\"===\")`. An arbitrary-equality (===) clause with no version is invalid. Expected: Requirement raises InvalidRequirement, and Specifier/SpecifierSet raise InvalidSpecifier."
+    }
+  ],
+  "module_sha256": {
+    "backend/app/agent.py": "29557c356c90535089ae561b1b5158bd94b5c022f7ab3afe79ec325dbf60b86f",
+    "backend/app/tools.py": "4cc2a8836edf2ce72895f27ce9c058f76db2d465df02b133b3e358f3d91e8c4f",
+    "backend/app/sandbox.py": "fbc2dcd809ebbee08f6a4e70fa5af736f6ba1e479c866ac3ebfadaf96d4160b8",
+    "backend/app/reviewer.py": "dd5d157f1d47b5a5433d605ee45a98703b4ed6956c0579aadcc0ebcbcea7e629",
+    "backend/app/config.py": "c837da154e2147b1080f666813697dd7b6729cc931d6816fa33e66383dcca2f7"
+  },
+  "changes": [
+    "pyproject test dependencies and src layout",
+    "continue past collection errors; report unchanged unloadable files",
+    "answer unexecuted chained calls before next request",
+    "persist artifacts and catch per-case runner failures"
+  ],
+  "limits": "Follow-up after inspecting round 1; not a fresh preregistered holdout. No population or training-contamination claim."
+}

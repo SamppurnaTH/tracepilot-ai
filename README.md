@@ -64,6 +64,16 @@ The dollar figure is a model-cost estimate/order of magnitude from the saved usa
 
 What this shows, honestly: the model is strong on its own, and the plain agent never claimed a false fix here. TracePilot's measurable gains are cost and speed, plus proof that ships with every fix. The largest gap was ShipSpace, a real Spring Boot app: 505K tokens and 18 minutes for the plain agent, against 335K and 12 minutes for the same one-line fix. Where verification matters most is a patch that looks right but isn't, and the reviewer benchmark measures exactly that.
 
+### Blind study on fresh real bugs
+
+**Round 2: 2/7 fixed by the projects' own hidden tests**: Inflect and Tomlkit. All seven cases were attempted once with the follow-up harness; three were not fixed and two ended in errors (API connection and model context-window overflow). More-itertools passed local verification and received reviewer approval but failed two hidden edge cases. Click was only partially fixed; Pyparsing received no application-code fix. No failed case was restarted to improve its score.
+
+Round 1 is preserved separately: 1/4 recorded cases passed the hidden oracle before the run stopped. It exposed an unanswered chained-tool-call crash and collection errors that prevented unrelated tests from running. The follow-up repairs those harness paths, supports common pyproject test dependencies and src layouts, and reports unchanged unloadable files explicitly. The original unrecorded process exit remains unexplained; it is not retroactively relabelled as the later connection failure.
+
+[Every result](eval/blind/RESULTS.md) · [Case analysis and failure evidence](eval/blind/CASE_NOTES.md) · [Method, artifacts and reproduction](eval/blind/README.md).
+
+Limits: seven selected public Python bugs, one investigation per case per round including normal internal fix loops. Five incidents were written from PR descriptions; two use original issues, and Inflect's issue includes a root-cause hint. Fix diffs and future tests were withheld from the model, but study authors knew them; recent merge dates cannot prove model unfamiliarity. Round 2 follows inspected round-1 failures, has no paired plain-agent control, and is not an independent or representative evaluation. Passing these tests is bounded evidence, not proof for every input. The results do not support a reliable general-purpose repair claim.
+
 ## Controlled research extension
 
 **Completed findings and claim corrections:** [research closure](docs/RESEARCH_CLOSURE.md). The measured harness is archived; current product code separately blocks application of a patch with unresolved review concerns or rejection.

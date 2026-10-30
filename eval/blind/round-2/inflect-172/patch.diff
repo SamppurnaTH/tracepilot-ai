@@ -1,0 +1,29 @@
+--- a/inflect/__init__.py
++++ b/inflect/__init__.py
+@@ -2416,6 +2416,8 @@
+ 
+         # Try to fix word wise capitalization
+         for index, word in enumerate(orig.split(" ")):
++            if index >= len(result):
++                break
+             if word in self.pl_sb_preserve_case:
+                 # This word's capitalization is intrinsic (e.g. "I", or an
+                 # acronym registered via ``defnoun(..., case='preserve')``),
+--- /dev/null
++++ b/tests/test_regression_plural_index_error.py
+@@ -0,0 +1,15 @@
++import inflect
++
++
++def test_plural_long_sentence_no_index_error():
++    p = inflect.engine()
++    # Reported input collapsed by dual-compound handling (" for a " loses the "a"),
++    # leaving fewer inflected words than original words, which crashed postprocess.
++    p.plural("I'm only here for a minute, John.")
++
++
++def test_postprocess_mismatched_word_counts_no_index_error():
++    p = inflect.engine()
++    # Directly exercise postprocess with fewer inflected words than orig words
++    # and a capitalized trailing word (triggers the indexing path).
++    p.postprocess("a b John", "x y")
