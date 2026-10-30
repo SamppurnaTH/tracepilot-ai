@@ -316,5 +316,42 @@
     "tokens": 46117,
     "review": "concerns",
     "started_at": 1793281025.0
+  },
+  {
+    "scenario": {
+      "id": "tomlkit-599",
+      "title": "tomlkit (real bug, blind): deleting an array slice corrupts the TOML",
+      "service": "tomlkit",
+      "language": "python",
+      "incident": "Deleting a slice from an array corrupts the rendered TOML\n\nAfter deleting a slice from an Array, the list contents are right but as_string()/dumps() disagree with them:\n\n    import tomlkit\n    doc = tomlkit.parse(\"a = [1, 2, 3]\\n\")\n    del doc[\"a\"][:0]   # deletes nothing\n    tomlkit.dumps(doc)  # 'a = []\\n'  -- expected 'a = [1, 2, 3]\\n'\n\nOther cases: `del arr[-1:]` leaves list(arr) == [1, 2] but renders `[]`; `del arr[:-1]` leaves [3] but the rendering doesn't match either. Expected: the rendered array always matches the list contents.",
+      "screenshots": [],
+      "live": false
+    },
+    "file": "tomlkit-599.json",
+    "verified": true,
+    "outcome": "fixed",
+    "duration_s": 229.8,
+    "started_at": 1793327861.0,
+    "tests": {
+      "before": {
+        "passed": 387,
+        "error": 1,
+        "failed": 3
+      },
+      "after": {
+        "passed": 390,
+        "error": 1
+      }
+    },
+    "issues": [
+      {
+        "title": "Array.__delitem__ with slice incorrectly handles trivia/whitespace/comma tokens causing rendering mismatch",
+        "severity": "high",
+        "category": "correctness"
+      }
+    ],
+    "tokens": 279475,
+    "model_calls": 17,
+    "review": "approve"
   }
 ]
