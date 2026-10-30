@@ -1,14 +1,27 @@
 # TracePilot AI
 
-**The AI debugger that proves its fix.** TracePilot turns a software incident into a test that reproduces it, a patch your test suite confirms, and a review by an independent open-weight model, with the evidence to check before you merge. When the cause isn't in the code, it says so instead of patching.
+**The AI debugger that proves its fix, or tells you it can't.**
 
-Built with **Meta Muse Spark** (investigator) and **Muse Spark Open on Baseten** (independent reviewer) for the **Meta Global AI Developer Hackathon**: Indie Developer track, problem statement *Push the Frontier*.
+Give it an incident: logs, a screenshot, a bug report. Meta Muse Spark investigates your code in a locked-down sandbox and writes a test that reproduces the bug. It then patches the code and lets your test suite decide whether the fix works. Finally, an independent open-weight Meta model reviews the patch cold. If the cause isn't in the code, it says so instead of patching.
 
-| | |
+**[▶ Try it live, no account needed](https://tracepilot-ai.vercel.app/examples)** · [90-second demo](docs/DEMO_SCRIPT.md) · [Every result, including failures](docs/JUDGE_QA.md)
+
+### Why it's different: proof, not just green tests
+
+| | What happened |
 |---|---|
-| **Live product** | [tracepilot-ai.vercel.app](https://tracepilot-ai.vercel.app), connected to a live backend |
-| **Results** | [Same model, with and without TracePilot](eval/COMPARISON.md) · [Evaluation and reviewer benchmark](eval/RESULTS.md) |
-| **Build history** | [`BUILD_LOG.md`](BUILD_LOG.md): TracePilot work during Oct 27 – Nov 4, 2026; pre-existing ShipSpace and reused dependencies disclosed |
+| 🛡️ **Catches patches that cheat** | Muse Spark Open rejected all 6 model-generated patches that pass the visible tests but fail held-out ones (12 of 12 reviews) |
+| 🧭 **Knows when not to patch** | When refunds failed because of an expired API key, it diagnosed the key and changed **no code** |
+| 🖼️ **Reads the evidence you have** | It fixed a checkout bug whose only trace was a customer's screenshot |
+| 🐛 **Works on real code** | **2 of 7** real bugs fixed, judged by hidden tests, on bugs fixed in public projects (click, packaging, tomlkit…) between Aug and Oct 2026 ([blind study](eval/blind/RESULTS.md)). On a real Spring Boot app with a planted bug: 232 → 251 tests passing |
+| 🔍 **Doesn't oversell itself** | On the other real bugs it said "not verified" or the reviewer rejected the patch. The one exception is [disclosed and explained](eval/blind/CASE_NOTES.md) |
+
+### Built on Meta, end to end
+
+- **Muse Spark 1.3** (Meta Model API) investigates: tool calls, structured hypotheses, screenshots, and live reasoning you can watch.
+- **Muse Spark Open** (open weights, on Baseten) is the independent reviewer. When it objects, the patch goes back for another round.
+
+*Built for the Meta Global AI Developer Hackathon: Indie track, Push the Frontier.* Detailed numbers, statistics and limits: [Results](#results) · [`/evidence`](https://tracepilot-ai.vercel.app/evidence) · [build log](BUILD_LOG.md) (TracePilot work during Oct 27 – Nov 4, 2026; pre-existing ShipSpace and reused dependencies disclosed).
 
 ## Try it in 60 seconds
 
@@ -58,9 +71,14 @@ Every number comes from real runs. The raw data is in `eval/`.
 - **7/8** correct patches approved; one got "concerns".
 - About **$0.10 per investigation**.
 
+<details>
+<summary><b>Statistical detail and limits</b> (intervals, what the numbers do and don't establish)</summary>
+
 These are small, project-authored evaluations, not independent or statistically significant population claims. The eight gaming observations repeat four distinct attacks; they are not eight independently authored patches. Unsafe approvals: 0/8 (descriptive 95% Wilson interval 0–32.4%); correct-patch nonapprovals: 1/8 (2.2–47.1%, one concerns verdict, no hard reject). TracePilot 13/13 has a 77.2–100% interval. Incident-cluster cost/speed intervals include zero. [Rebuildable statistics](eval/STATISTICS.md) disclose the method and source hashes. The controlled research extension is reported separately; the original pilot alone does not establish component effects or a smaller-model advantage.
 
 The dollar figure is a model-cost estimate/order of magnitude from the saved usage, not a proposed retail price or all-in cost. Hosting, separate reviewer billing, retries and support are not fully represented. Provider rates and cache effects can change.
+
+</details>
 
 What this shows, honestly: the model is strong on its own, and the plain agent never claimed a false fix here. TracePilot's measurable gains are cost and speed, plus proof that ships with every fix. The largest gap was ShipSpace, a real Spring Boot app: 505K tokens and 18 minutes for the plain agent, against 335K and 12 minutes for the same one-line fix. Where verification matters most is a patch that looks right but isn't, and the reviewer benchmark measures exactly that.
 
