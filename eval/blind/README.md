@@ -19,7 +19,7 @@ One study attempt means one invocation of `Investigation.run()`, including the n
 - `round-1/`: original reports recovered from the cache before replacement. The original API-crash attempt has no cached report.
 - `round-2-protocol.json`, `round-2-harness/`: local follow-up protocol and software snapshot; not a public preregistration. Runner persistence/reporting was hardened during setup; the inference modules are snapshotted. Protocol and `sha256.json` hashes preserve the original Windows working-tree bytes; use `sha256-lf.json` after normalizing CRLF to LF when checking a Git checkout on another platform.
 - `round-2/<case>/`: progressively saved events, report, patch and held-out per-test outcomes when available. An API failure can have events without a final report or patch.
-- `trace-index.json`: compact phase/verification index and trace hashes. The unabridged Packaging trace is large because it retains the oversized test feedback; download it if the repository viewer truncates it.
+- `trace-index.json`: compact phase/verification index and trace hashes. `trace_sha256_original_worktree` preserves the original Windows bytes; `trace_sha256_lf` is portable across Git's newline normalization (normalize CRLF to LF before hashing). The unabridged Packaging trace is large because it retains the oversized test feedback; download it if the repository viewer truncates it.
 - `licenses/`: upstream license notices for code excerpts in saved traces.
 
 ## Commands
