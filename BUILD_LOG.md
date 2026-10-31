@@ -332,3 +332,12 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - Every run records where its time goes. In live runs, waiting for Muse Spark is about 85–90% of the total; tools, the sandbox and the harness's own test runs take the rest.
 - The live clock now ticks, durations are exact to the second, and timings use the high-resolution clock. Windows' 15.6 ms monotonic tick had been rounding short tool calls to zero.
 - Tried two speed-ups over 24 interleaved runs (`eval/speed/RESULTS.md`): not asking the model to run tests itself, and low reasoning effort. Both cut the median time by about 15% (175 s → 148–149 s), and every run still passed the tests. But the reviewer approved fewer patches: 6/8 and 7/8, against 8/8. The concerns were all on Billing, whose empty-invoice trap no test covers. Kept the current behaviour: speed doesn't buy back a weaker fix.
+
+## Oct 31
+
+**Demo video and submission:**
+
+- Demo video (1:45, full HD): real recorded runs from the live site, narrated by the builder, with captions of the script. Each shot is cut to its spoken line. It covers: a fix proven from a customer's screenshot, the "no code change needed" diagnosis, the reviewer rejecting test-gaming patches, and the real tomlkit bug fixed blind.
+- The real tomlkit fix from the blind study is now a public replay (`/run?id=tomlkit-599`).
+- Removed a claim the blind study contradicts ("never claimed a fix it couldn't prove") from the narration and the script, and removed stale demo references.
+- **Submitted on Cerebral Valley, Oct 31, 15:10 IST:** Indie Developer track, Push the Frontier.
