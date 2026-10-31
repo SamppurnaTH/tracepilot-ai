@@ -4,7 +4,7 @@
 
 Give it an incident: logs, a screenshot, a bug report. Meta Muse Spark investigates your code in a locked-down sandbox and writes a test that reproduces the bug. It then patches the code and lets your test suite decide whether the fix works. Finally, an independent open-weight Meta model reviews the patch cold. If the cause isn't in the code, it says so instead of patching.
 
-**[▶ Try it live, no account needed](https://tracepilot-ai.vercel.app/examples)** · [Every result, including failures](docs/JUDGE_QA.md)
+**[▶ Watch the demo video (1:45)](https://drive.google.com/file/d/1pBZ88zTUOTwa_qjTtTT-xoDYx3EFLh-m/view?usp=sharing)** · **[Try it live, no account needed](https://tracepilot-ai.vercel.app/examples)** · [Every result, including failures](docs/JUDGE_QA.md)
 
 ### Why it's different: proof, not just green tests
 
