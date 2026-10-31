@@ -33,3 +33,4 @@ frontend/preview.*.log
 # Local demo-video work: voice samples and narration audio stay private
 artifacts/
 DEMO_CUE_SHEET.html
+SUBMISSION_DRAFT.md
