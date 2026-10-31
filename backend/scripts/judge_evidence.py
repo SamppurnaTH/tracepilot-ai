@@ -99,7 +99,7 @@ def main() -> None:
     # Keep the evidence room useful on an unpushed local preview as well as a deployed site.
     downloads = ROOT / "frontend/public/judge"
     downloads.mkdir(exist_ok=True)
-    for name in ("JUDGE_QA.md", "CASE_STUDIES.md", "DEMO_SCRIPT.md", "HACKATHON_ALIGNMENT.md", "RESEARCH_CLOSURE.md", "RESEARCH_PROTOCOL.md"):
+    for name in ("JUDGE_QA.md", "CASE_STUDIES.md", "HACKATHON_ALIGNMENT.md", "RESEARCH_CLOSURE.md", "RESEARCH_PROTOCOL.md"):
         (downloads / name).write_bytes((ROOT / "docs" / name).read_bytes())
     (downloads / "SECURITY.md").write_bytes((ROOT / "SECURITY.md").read_bytes())
     (downloads / "tracepilot-ci.yml").write_bytes((ROOT / "examples/github-actions/tracepilot.yml").read_bytes())

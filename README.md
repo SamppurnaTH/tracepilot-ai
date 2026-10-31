@@ -4,7 +4,7 @@
 
 Give it an incident: logs, a screenshot, a bug report. Meta Muse Spark investigates your code in a locked-down sandbox and writes a test that reproduces the bug. It then patches the code and lets your test suite decide whether the fix works. Finally, an independent open-weight Meta model reviews the patch cold. If the cause isn't in the code, it says so instead of patching.
 
-**[▶ Try it live, no account needed](https://tracepilot-ai.vercel.app/examples)** · [3-minute demo script](docs/DEMO_SCRIPT.md) · [Every result, including failures](docs/JUDGE_QA.md)
+**[▶ Try it live, no account needed](https://tracepilot-ai.vercel.app/examples)** · [Every result, including failures](docs/JUDGE_QA.md)
 
 ### Why it's different: proof, not just green tests
 
@@ -52,7 +52,7 @@ TracePilot investigates first and proves its work:
 
 Every number comes from real runs. The raw data is in `eval/`.
 
-**Judge evidence:** [answers to every question](docs/JUDGE_QA.md) · [uncertainty and error rates](eval/STATISTICS.md) · [threat model / data flow](SECURITY.md) · [honest case studies](docs/CASE_STUDIES.md) · [3-minute demo script](docs/DEMO_SCRIPT.md) · [official rubric alignment](docs/HACKATHON_ALIGNMENT.md). The UI exposes the same limits at `/evidence` and alongside benchmarks.
+**Judge evidence:** [answers to every question](docs/JUDGE_QA.md) · [uncertainty and error rates](eval/STATISTICS.md) · [threat model / data flow](SECURITY.md) · [honest case studies](docs/CASE_STUDIES.md) · [official rubric alignment](docs/HACKATHON_ALIGNMENT.md). The UI exposes the same limits at `/evidence` and alongside benchmarks.
 
 **Same model, with and without TracePilot** ([details](eval/COMPARISON.md)). Both use `muse-spark-1.3`, the same sandbox, logs and basic tools. Code patches are judged by hidden acceptance tests. Refunds is scored as a correct external-cause diagnosis with no application patch, not verified operational recovery.
 

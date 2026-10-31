@@ -13,4 +13,4 @@ The rules' project rubric is **Impact 30%, Use of Meta AI Tooling 25%, Technical
 
 Current submission deadline on Meta's page: November 4, 2026, 9 PM Eastern Time, which is **November 5, 2026, 7:30 AM IST**. Verify the portal before submission; dates can change.
 
-Use the recorded evidence and limitations in `JUDGE_QA.md`, `DEMO_SCRIPT.md` and `eval/STATISTICS.md`. Do not claim top-five selection, model-family independence, unrun ablation results or privacy guarantees.
+Use the recorded evidence and limitations in `JUDGE_QA.md` and `eval/STATISTICS.md`. Do not claim top-five selection, model-family independence, unrun ablation results or privacy guarantees.
