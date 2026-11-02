@@ -341,3 +341,9 @@ Verified as a visitor: replay mode works and the console is clean. Live runs nee
 - The real tomlkit fix from the blind study is now a public replay (`/run?id=tomlkit-599`).
 - Removed a claim the blind study contradicts ("never claimed a fix it couldn't prove") from the narration and the script, and removed stale demo references.
 - **Submitted on Cerebral Valley, Oct 31, 15:10 IST:** Indie Developer track, Push the Frontier.
+
+## Nov 2
+
+**Demo video update:**
+
+- New demo video (2:24, full HD): the same recorded runs, narrated in the builder's own voice cloned with ElevenLabs (paid plan with a commercial licence), with captions timed to the speech. It replaces the 1:45 version in the submission.
